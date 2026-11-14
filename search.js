@@ -180,6 +180,7 @@ $("f").addEventListener("submit", async (e) => {
   clearMore();
   $("go").disabled = true;
   setStatus("جاري البحث…");
+  showSkeleton();
   try {
     const d = await call("drug-search", { query, search_type });
     const shown = renderAll(d, "مفيش منتجات محفوظة لهذا البحث لسه.");
@@ -199,6 +200,7 @@ $("f").addEventListener("submit", async (e) => {
         setStatus(underReview ? "ده اللي لقيناه. المنتجات «قيد المراجعة» لسه مش مؤكدة." : "");
       } else {
         setStatus(shown ? "ده اللي محفوظ عندنا. جاري تحديثه من المصادر…" : "جاري البحث في المصادر…", { progress: 5 });
+        if (!shown && !$("out").querySelector(".suggest")) showSkeleton();
         poll(d.job_id, token, query, search_type);
       }
     } else setStatus(d.cache_status === "fresh" ? "بيانات محدّثة." : "");

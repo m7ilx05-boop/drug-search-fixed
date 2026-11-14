@@ -88,7 +88,7 @@ async function handle(f) {
   if (!/^image\//.test(f.type)) { setStatus("الملف ده مش صورة.", { error: true }); return; }
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
-  busy(true); setStatus("جاري قراءة الصورة…");
+  busy(true); setStatus("جاري قراءة الصورة…"); showSkeleton();
   try {
     const b64 = await toJpegBase64(f);
     const r = await call("drug-image-search", { image: b64, mime: "image/jpeg" });

@@ -227,3 +227,13 @@ body[data-view=home] form{margin-top:-52px}
 .pd-h{font-size:17px;font-weight:600;margin:22px 0 4px}
 .detail .card{display:block;margin:0;padding:0;background:none;box-shadow:none;outline:0}
 .detail .card>.pic,.detail .card>h2,.detail .card>.price{display:none}
+
+/* ===== هيكل التحميل (Uiverse / sahilxkhadka) مكان النتايج وقت الانتظار ===== */
+.skel{display:flex;flex-direction:column;align-items:center;gap:16px;width:240px;max-width:100%;margin:28px auto;animation:skelPulse 2s cubic-bezier(.4,0,.6,1) infinite}
+.sk{background:var(--line);background:color-mix(in srgb,var(--muted) 38%,transparent);border-radius:6px}
+.sk-title{width:192px;height:24px;max-width:100%}
+.sk-sub{width:112px;height:16px;margin:12px auto 0}
+.sk-row{width:100%;height:28px}
+.sk-row.half{width:50%}
+@keyframes skelPulse{50%{opacity:.5}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}

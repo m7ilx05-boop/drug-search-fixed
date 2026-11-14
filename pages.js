@@ -86,7 +86,7 @@
     searched = true;
     lastQ = $("q").value.trim();
     if (document.body.dataset.view !== "results") {
-      $("out").replaceChildren();
+      if (!document.getElementById("skel")) $("out").replaceChildren();
       navd = true;
       location.hash = "#/r";
     } else $("ab-s").textContent = "«" + lastQ + "»";

@@ -29,7 +29,20 @@ async function call(name, body) {
   return data;
 }
 
+// هيكل تحميل مكان النتايج وقت الانتظار (الـ render/showSuggestions/... بتمسح #out فبيختفي لوحده)
+function showSkeleton() {
+  const out = $("out");
+  out.replaceChildren();
+  const s = el("div", "skel"); s.id = "skel"; s.setAttribute("aria-hidden", "true");
+  const head = el("div");
+  head.append(el("div", "sk sk-title"), el("div", "sk sk-sub"));
+  s.append(head, el("div", "sk sk-row"), el("div", "sk sk-row"), el("div", "sk sk-row"), el("div", "sk sk-row half"));
+  out.append(s);
+}
+function hideSkeleton() { const s = document.getElementById("skel"); if (s) s.remove(); }
+
 function setStatus(text, { error = false, progress = null } = {}) {
+  if (error || (progress != null && progress >= 100)) hideSkeleton();
   const s = $("status");
   s.className = "show" + (error ? " error" : "");
   $("msg").textContent = text;
