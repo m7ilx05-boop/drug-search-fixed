@@ -89,8 +89,15 @@ form .qs .scan-btn::after{content:"";flex:none;margin-inline-start:auto;width:20
 #status{margin:16px 0 4px;padding:12px 16px;border-radius:14px;background:var(--surface);box-shadow:0 1px 4px rgba(20,90,160,.1);display:none;font-size:14.5px}
 #status.show{display:block}
 #status.error{background:var(--bad-bg);color:var(--bad);box-shadow:none}
-.bar{height:5px;background:var(--line);border-radius:3px;margin-top:10px;overflow:hidden}
-.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .4s}
+/* شريط التحميل: 3 أشرطة بتتحرك (Uiverse / mrhyddenn) بألوان الثيم */
+.bar{position:relative;height:50px;margin-top:10px;overflow:hidden}
+.bar i{display:none}
+.mover{position:absolute;top:20px;left:calc(50% - 40px);width:80px;height:10px;border-radius:10px;background:var(--accent);animation:mover5 2s ease-in-out infinite}
+.mover::before,.mover::after{content:'';position:absolute;left:20px;height:10px;border-radius:10px;animation:mover5 2s ease-in-out infinite}
+.mover::before{top:20px;width:50px;background:var(--soft-ink)}
+.mover::after{top:-20px;width:60px;background:var(--accent);opacity:.45}
+@keyframes mover5{0%,100%{transform:translateX(30px) scale(1)}50%{transform:translateX(-30px) scale(1.1)}}
+@media (prefers-reduced-motion:reduce){.mover,.mover::before,.mover::after{animation:none}}
 
 /* ===== كارت المنتج: صورة صغيرة جنب الاسم ===== */
 .card{display:grid;grid-template-columns:92px 1fr;column-gap:14px;align-content:start;background:var(--surface);border-radius:var(--r);padding:16px;margin-top:14px;box-shadow:0 1px 6px rgba(20,90,160,.1)}

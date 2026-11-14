@@ -33,7 +33,7 @@ function setStatus(text, { error = false, progress = null } = {}) {
   const s = $("status");
   s.className = "show" + (error ? " error" : "");
   $("msg").textContent = text;
-  $("pg").parentElement.style.display = progress == null ? "none" : "block";
+  $("pg").parentElement.style.display = (progress == null || progress >= 100) ? "none" : "block";
   if (progress != null) $("pg").style.width = progress + "%";
 }
 
