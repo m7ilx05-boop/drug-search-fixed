@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#B7EBF7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#17485A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#BFE6FB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#143B5E" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,15 +13,43 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <title>بحث الأدوية في السوق المصري</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-view="home">
 <header class="appbar"><div class="appbar-in">
 <button id="back" class="back" type="button" aria-label="رجوع">→</button>
-<svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><g transform="rotate(-40 16 16)"><rect class="l" x="2" y="10" width="28" height="12" rx="6" fill="#0B7F9C"/><path class="r" d="M16 10h8a6 6 0 0 1 0 12h-8z" fill="#fff"/></g></svg>
+<svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+  <defs>
+    <linearGradient id="lg-b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4FB0FF"/><stop offset="1" stop-color="#0D5CBF"/></linearGradient>
+    <linearGradient id="lg-y" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE27A"/><stop offset="1" stop-color="#F5B301"/></linearGradient>
+  </defs>
+  <g transform="rotate(-42 32 32)">
+    <rect x="4" y="19" width="56" height="26" rx="13" fill="url(#lg-y)"/>
+    <path d="M32 19H17a13 13 0 0 0 0 26h15z" fill="url(#lg-b)"/>
+    <rect x="10" y="23" width="38" height="5" rx="2.5" fill="#fff" opacity=".35"/>
+  </g>
+  <path d="M54 8l1.6 4.4L60 14l-4.4 1.6L54 20l-1.6-4.4L48 14l4.4-1.6z" fill="#fff" opacity=".9"/>
+</svg>
 <div><h1 id="ab-t">دليل الدواء</h1><p class="sub" id="ab-s">السوق المصري — ابحث بالاسم التجاري أو المادة الفعّالة</p></div>
-</div></header>
+</div>
+<svg class="deco" viewBox="0 0 150 130" aria-hidden="true">
+  <path d="M18 112c-8-22-2-42 16-50 2 20-2 38-16 50z" fill="#3FAE6A"/>
+  <path d="M30 118c-4-18 4-34 20-40 0 16-6 32-20 40z" fill="#2E9A5A"/>
+  <rect x="44" y="40" width="58" height="76" rx="14" fill="#fff"/>
+  <rect x="44" y="40" width="58" height="76" rx="14" fill="none" stroke="#CFE6F7" stroke-width="2"/>
+  <rect x="48" y="22" width="50" height="22" rx="7" fill="#1E7BE0"/>
+  <rect x="48" y="32" width="50" height="4" fill="#0D5CBF" opacity=".5"/>
+  <rect x="58" y="58" width="30" height="34" rx="8" fill="#E4F1FC"/>
+  <path d="M73 63v24M61 75h24" stroke="#1E7BE0" stroke-width="7" stroke-linecap="round"/>
+  <g transform="rotate(14 118 98)">
+    <rect x="98" y="66" width="40" height="52" rx="8" fill="#CFE9FA"/>
+    <circle cx="108" cy="78" r="5" fill="#fff"/><circle cx="126" cy="78" r="5" fill="#fff"/>
+    <circle cx="108" cy="94" r="5" fill="#fff"/><circle cx="126" cy="94" r="5" fill="#fff"/>
+    <circle cx="108" cy="110" r="5" fill="#fff"/><circle cx="126" cy="110" r="5" fill="#fff"/>
+  </g>
+</svg>
+</header>
 <main>
 
 <!-- الصفحة 1: الرئيسية -->
@@ -29,16 +57,37 @@
 <form id="f">
   <div class="row">
     <input id="q" type="search" required minlength="2" maxlength="100" placeholder="مثال: Panadol أو باراسيتامول" aria-label="اسم الدواء أو المادة الفعّالة" autocomplete="off">
-    <button id="go" type="submit">بحث</button>
+    <button id="go" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h17l-6.5 7.6V19l-4-2v-4.4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg><span>بحث</span></button>
   </div>
   <div class="types" role="radiogroup" aria-label="نوع البحث">
-    <label><input type="radio" name="t" value="auto" checked>تلقائي</label>
-    <label><input type="radio" name="t" value="brand_family">عائلة تجارية</label>
-    <label><input type="radio" name="t" value="brand">منتج محدد</label>
-    <label><input type="radio" name="t" value="ingredient">مادة فعّالة</label>
+    <label><input type="radio" name="t" value="auto" checked><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" fill="currentColor"/></svg><span>تلقائي</span></label>
+    <label><input type="radio" name="t" value="brand_family"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.9 3.6 5.2 5.4 5.2 10.2a5.2 5.2 0 0 1-10.4 0c0-2 .9-3.3 2-4.2.2 1.6 1 2.3 1.9 2.6C10.2 8.2 10.4 4.6 12 2z" fill="currentColor"/></svg><span>عائلة تجارية</span></label>
+    <label><input type="radio" name="t" value="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12.5V4h8.5L21 13.5 13.5 21z" fill="currentColor"/><circle cx="7.6" cy="8.6" r="1.5" fill="var(--tag-hole,#fff)"/></svg><span>منتج محدد</span></label>
+    <label><input type="radio" name="t" value="ingredient"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="5.5" cy="5.5" r="2"/><circle cx="12" cy="5.5" r="2"/><circle cx="18.5" cy="5.5" r="2"/><circle cx="5.5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18.5" cy="12" r="2"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="12" cy="18.5" r="2"/><circle cx="18.5" cy="18.5" r="2"/></g></svg><span>مادة فعّالة</span></label>
   </div>
   <div id="recent" class="recent" role="group" aria-label="آخر عمليات البحث"></div>
 </form>
+
+<div class="mascot" aria-hidden="true">
+  <div class="bubble"><span>لصحتك.. نحن دائمًا بجانبك</span><svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z" fill="none" stroke="#F5B301" stroke-width="2.2" stroke-linejoin="round"/></svg></div>
+  <svg class="bot" viewBox="-34 0 208 178">
+    <defs><linearGradient id="bot-h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#DCEEFB"/></linearGradient></defs>
+    <rect x="6" y="104" width="22" height="48" rx="11" transform="rotate(-24 17 128)" fill="#fff" stroke="#BFDDF3" stroke-width="3"/>
+    <rect x="132" y="110" width="22" height="50" rx="11" transform="rotate(6 143 135)" fill="#fff" stroke="#BFDDF3" stroke-width="3"/>
+    <circle cx="150" cy="162" r="10" fill="#2E86E8"/>
+    <path d="M34 112q0-8 10-8h72q10 0 10 8l5 66H29z" fill="#fff" stroke="#BFDDF3" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M67 104l13 32 13-32z" fill="#1E7BE0"/>
+    <circle cx="106" cy="140" r="6" fill="#DCEEFB"/><path d="M103 140h6M106 137v6" stroke="#1E7BE0" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="27" cy="58" r="11" fill="#2E86E8"/><circle cx="133" cy="58" r="11" fill="#2E86E8"/>
+    <rect x="30" y="12" width="100" height="84" rx="38" fill="url(#bot-h)" stroke="#BFDDF3" stroke-width="3"/>
+    <rect x="41" y="26" width="78" height="54" rx="26" fill="#0F2F63"/>
+    <path d="M56 56q7-13 15 0M89 56q7-13 15 0" stroke="#8FE0FF" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    <path d="M70 66q10 9 20 0" stroke="#8FE0FF" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <circle cx="52" cy="66" r="5" fill="#FF8FA3" opacity=".6"/><circle cx="108" cy="66" r="5" fill="#FF8FA3" opacity=".6"/>
+    <g transform="rotate(-30 1 100)"><rect x="-9" y="62" width="20" height="38" rx="10" fill="#1E7BE0"/><path d="M-9 82h20v8a10 10 0 0 1-20 0z" fill="#F9C846"/></g>
+    <circle cx="4" cy="104" r="10" fill="#2E86E8"/>
+  </svg>
+</div>
 </section>
 
 <div id="imgbox" aria-live="polite"></div>
@@ -63,6 +112,18 @@
 <script src="image-search.js"></script>
 <script src="pages.js"></script>
 <script src="barcode-live.js"></script>
+<script>
+// بيلمّ أزرار (المسح الضوئي / الكاميرا / المعرض) اللي الملفات التانية بتضيفها في الفورم جوه صندوق "اقتراحات سريعة". شكل بس، مفيش منطق اتغيّر.
+(function () {
+  var f = document.getElementById("f"), bs = f && f.querySelectorAll(".scan-btn");
+  if (!bs || !bs.length) return;
+  var box = document.createElement("div"); box.className = "qs";
+  var h = document.createElement("div"); h.className = "qs-h"; h.textContent = "اقتراحات سريعة";
+  box.appendChild(h);
+  Array.prototype.forEach.call(bs, function (b) { box.appendChild(b); });
+  f.appendChild(box);
+})();
+</script>
 <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>
 </html>

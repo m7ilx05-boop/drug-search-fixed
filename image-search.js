@@ -15,8 +15,8 @@ $("out").after(fam);
 
 const mkInput = (capture) => { const i = el("input"); i.type = "file"; i.accept = "image/*"; if (capture) i.setAttribute("capture", "environment"); i.hidden = true; return i; };
 const camIn = mkInput(true), galIn = mkInput(false);
-const camBtn = el("button", "scan-btn", "📷 افتح الكاميرا وصوّر العلبة"); camBtn.type = "button";
-const galBtn = el("button", "scan-btn", "🖼️ ابحث بصورة من المعرض"); galBtn.type = "button";
+const camBtn = el("button", "scan-btn", "افتح الكاميرا وصوّر العلبة"); camBtn.type = "button";
+const galBtn = el("button", "scan-btn", "ابحث بصورة من المعرض"); galBtn.type = "button";
 $("f").append(camBtn, galBtn, camIn, galIn);
 camBtn.addEventListener("click", () => camIn.click());
 galBtn.addEventListener("click", () => galIn.click());
