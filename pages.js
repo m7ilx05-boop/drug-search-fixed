@@ -68,7 +68,7 @@
     if (v !== implied) history.replaceState(null, "", v === "results" ? "#/r" : "#/");
     const prev = document.body.dataset.view;
     document.body.dataset.view = v;
-    $("ab-t").textContent = v === "results" ? "نتائج البحث" : "دليل الدواء المصري";
+    $("ab-t").textContent = v === "results" ? "نتائج البحث" : "The Pharmacist";
     $("ab-s").textContent = v === "results" ? "«" + lastQ + "»" : HOME_SUB;
     if (v === "product") detail(+m[1]);
     window.scrollTo(0, v === "results" && prev === "product" ? listY : 0);
