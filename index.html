@@ -58,8 +58,10 @@
 <form id="f">
   <div class="row">
     <input id="q" type="search" required minlength="2" maxlength="100" placeholder="مثال: Panadol أو باراسيتامول" aria-label="اسم الدواء أو المادة الفعّالة" autocomplete="off">
+    <button id="ffBtn" class="ff-btn" type="button" aria-label="فلتر الشكل الدوائي" aria-expanded="false" aria-controls="forms"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.4" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="8" cy="17" r="2.4" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
     <button id="go" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h17l-6.5 7.6V19l-4-2v-4.4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg><span>بحث</span></button>
   </div>
+  <div id="forms" class="forms" role="radiogroup" aria-label="الشكل الدوائي" hidden></div>
   <div class="types" role="radiogroup" aria-label="نوع البحث">
     <label><input type="radio" name="t" value="auto" checked><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" fill="currentColor"/></svg><span>تلقائي</span></label>
     <label><input type="radio" name="t" value="brand_family"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.9 3.6 5.2 5.4 5.2 10.2a5.2 5.2 0 0 1-10.4 0c0-2 .9-3.3 2-4.2.2 1.6 1 2.3 1.9 2.6C10.2 8.2 10.4 4.6 12 2z" fill="currentColor"/></svg><span>عائلة تجارية</span></label>
@@ -96,6 +98,7 @@
 <!-- الصفحة 2: نتائج البحث -->
 <section id="v-results" class="view">
 <div id="status" role="status" aria-live="polite"><span id="msg"></span><div class="bar"><div class="typewriter" aria-hidden="true"><div class="slide"><i></i></div><div class="paper"></div><div class="keyboard"></div></div><i id="pg"></i></div></div>
+<div id="ffnote" class="sec-note ff-note" hidden></div>
 <div id="out"></div>
 <div id="more" aria-live="polite"></div>
 </section>
@@ -112,6 +115,7 @@
 <script src="scanner.js"></script>
 <script src="image-search.js"></script>
 <script src="pages.js"></script>
+<script src="dosage-filter.js"></script>
 <script src="barcode-live.js"></script>
 <script>
 // بيلمّ أزرار (المسح الضوئي / الكاميرا / المعرض) اللي الملفات التانية بتضيفها في الفورم جوه صندوق "اقتراحات سريعة". شكل بس، مفيش منطق اتغيّر.

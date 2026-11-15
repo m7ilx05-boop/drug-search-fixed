@@ -91,6 +91,7 @@ async function handle(f) {
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
   busy(true); setStatus("جاري قراءة الصورة…"); showSkeleton();
+  const ffPrev = window.__ff; window.__ff = ""; // فلتر الشكل الدوائي مش بيأثر على البحث بالصورة
   try {
     const b64 = await toJpegBase64(f);
     const r = await call("drug-image-search", { image: b64, mime: "image/jpeg" });
@@ -156,7 +157,7 @@ async function handle(f) {
     const gw = err && err.data && err.data.gateway_error;
     const known = ERR[err && err.code];
     setStatus(known || "حصلت مشكلة في قراءة الصورة (" + ((err && (err.code || err.message)) || "unknown") + (gw ? " / " + gw : "") + ").", { error: true });
-  } finally { busy(false); }
+  } finally { window.__ff = ffPrev; busy(false); }
 }
 
 [camIn, galIn].forEach((inp) => inp.addEventListener("change", () => { const f = inp.files && inp.files[0]; inp.value = ""; handle(f); }));
