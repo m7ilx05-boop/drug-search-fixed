@@ -223,9 +223,9 @@ body[data-view=home] form{margin-top:-52px}
 /* ===== نتايج البحث: كارت كامل، واحد تحت التاني (شكل مقتبس من Uiverse / JohnnyCSilva) ===== */
 #out .card{--g1:#8FD3FA;--g2:#2388EA;--cbg:#e0e0e0;--cs1:#bebebe;--cs2:#fff;position:relative;display:flex;flex-direction:column;overflow:hidden;padding:0;margin:0 auto 40px;max-width:480px;border-radius:50px;background:var(--cbg);cursor:pointer;box-shadow:8px 8px 20px var(--cs1),-8px -8px 20px var(--cs2);transition:box-shadow .2s ease,transform .15s ease}
 @media (prefers-color-scheme:dark){#out .card{--g1:#2D77B5;--g2:#123E68;--cbg:#16293a;--cs1:#0a141d;--cs2:#20384e}}
-#out .card>.pic{width:100%;height:196px;border-radius:50px;padding:36px;background:linear-gradient(135deg,var(--g1),var(--g2));box-shadow:inset 0 0 18px 6px var(--cbg);color:#fff;font-size:56px}
-#out .card>.pic:has(img){height:min(calc(86vw + 36px),376px)}
-#out .card>.pic img{background:#fff;mix-blend-mode:normal;border-radius:32px;padding:12px;object-fit:contain;box-shadow:0 0 10px 3px #fff,0 0 24px 8px rgba(255,255,255,.45)}
+#out .card>.pic{width:100%;height:200px;border-radius:50px;padding:38px;background:linear-gradient(135deg,var(--g1),var(--g2));box-shadow:inset 0 0 12px 3px var(--cbg);color:#fff;font-size:56px}
+#out .card>.pic:has(img){height:min(calc(86vw + 40px),380px)}
+#out .card>.pic img{background:#fff;mix-blend-mode:normal;border-radius:32px;padding:12px;object-fit:contain;box-shadow:0 0 8px 2px #fff,0 0 18px 5px rgba(255,255,255,.4)}
 #out .card>:not(.pic){margin-inline:20px}
 #out .card>h2{margin-top:18px;font-size:17px}
 #out .card>.alt-btn{width:auto}
