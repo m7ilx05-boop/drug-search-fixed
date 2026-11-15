@@ -280,7 +280,7 @@ body[data-view=home] form{margin-top:-52px}
 #out .card>.pic{order:1}
 #out .card>h2{order:2;margin:14px 20px 0;text-align:center;font-size:18px}
 #out .card:not(.open)>h2{margin-bottom:20px}
-#out .card:not(.open)>:not(.pic):not(h2){display:none}
+#out .card:not(.open):not(.closing)>:not(.pic):not(h2){display:none}
 #out .card.open::after{display:none}
 #out .card.open>h2{order:0;text-align:start;margin:0;padding:22px 20px 14px;padding-inline-end:150px}
 #out .card.open>.pic{margin-inline:20px;width:auto;border-radius:30px}
@@ -293,4 +293,5 @@ body[data-view=home] form{margin-top:-52px}
 /* مساحة على جوانب الكروت، وضل أخف وقت الحركة */
 body[data-view=results] #out{padding-inline:8px}
 #out .card.anim{will-change:height}
-#out .card.swap>h2{position:relative;z-index:2;background:var(--cbg);box-shadow:0 0 0 24px var(--cbg)}
+#out .card.swap>h2{position:relative;z-index:4;background:var(--cbg);box-shadow:0 0 0 24px var(--cbg)}
+#out .card.swap>.pic{position:relative;z-index:3}
