@@ -93,19 +93,19 @@
       if (dx || dy) {
         // الاسم بيتحرك ومعاه خلفية الكارت (لوحة) فوق الصورة، والصورة بتتحرك عكسه، بدل ما الاسم يعدّي على الصورة لوحده
         c.classList.add("swap");
-        const ha = h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.4,0,.2,1)" });
+        const ha = h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 480, easing: "cubic-bezier(.4,0,.2,1)" });
         const un = () => c.classList.remove("swap");
         ha.addEventListener("finish", un); ha.addEventListener("cancel", un);
       }
     }
     if (firstP && pic.animate) {
       const lp = pic.getBoundingClientRect(), pdy = firstP.top - lp.top;
-      if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.4,0,.2,1)" });
+      if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], { duration: 480, easing: "cubic-bezier(.4,0,.2,1)" });
     }
     // 2) ارتفاع الكارت بيتغيّر تدريجي بدل ما يقفز
     if (hFrom === hTo) return Promise.resolve();
     c.classList.add("anim");
-    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: 300, easing: "cubic-bezier(.4,0,.2,1)" });
+    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: 480, easing: "cubic-bezier(.4,0,.2,1)" });
     const done = () => c.classList.remove("anim");
     a.addEventListener("finish", done); a.addEventListener("cancel", done);
     return a.finished.catch(() => {});
