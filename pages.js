@@ -79,19 +79,34 @@
   const REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)");
   function setOpen(c, on, animate) {
     const h = c.querySelector("h2");
-    const first = animate && h ? h.getBoundingClientRect() : null;
+    const firstH = animate && h ? h.getBoundingClientRect() : null;
+    const hFrom = c.offsetHeight;
     c.classList.toggle("open", on);
     c.setAttribute("aria-expanded", on ? "true" : "false");
-    if (first && !REDUCE.matches && h.animate) {
-      const last = h.getBoundingClientRect(), dx = first.left - last.left, dy = first.top - last.top;
-      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 380, easing: "cubic-bezier(.2,.8,.2,1)" });
+    if (!animate || REDUCE.matches || !c.animate) return Promise.resolve();
+    const hTo = c.offsetHeight;
+    // 1) الاسم بيتحرك من مكانه القديم للجديد
+    if (firstH && h.animate) {
+      const last = h.getBoundingClientRect(), dx = firstH.left - last.left, dy = firstH.top - last.top;
+      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" });
     }
+    // 2) ارتفاع الكارت بيتغيّر تدريجي بدل ما يقفز
+    if (hFrom === hTo) return Promise.resolve();
+    c.classList.add("anim");
+    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" });
+    const done = () => c.classList.remove("anim");
+    a.addEventListener("finish", done); a.addEventListener("cancel", done);
+    return a.finished.catch(() => {});
   }
   function toggle(c) {
     const on = !c.classList.contains("open");
-    if (on) $("out").querySelectorAll(".card.open").forEach((o) => { if (o !== c) setOpen(o, false, false); }); // كارت واحد مفتوح
-    setOpen(c, on, true);
-    if (on) c.scrollIntoView({ block: "start", behavior: REDUCE.matches ? "auto" : "smooth" });
+    if (on) $("out").querySelectorAll(".card.open").forEach((o) => { if (o !== c) setOpen(o, false, true); }); // كارت واحد مفتوح
+    const p = setOpen(c, on, true);
+    // السكرول بيستنى الحركة تخلص عشان ما يتعارضش معاها
+    if (on) p.then(() => {
+      const r = c.getBoundingClientRect(), top = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+      if (r.top < top || r.bottom > window.innerHeight) c.scrollIntoView({ block: "start", behavior: REDUCE.matches ? "auto" : "smooth" });
+    });
   }
   $("out").addEventListener("click", (e) => {
     const c = e.target.closest(".card[data-i]");

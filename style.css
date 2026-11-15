@@ -286,6 +286,10 @@ body[data-view=home] form{margin-top:-52px}
 #out .card.open>.pic{margin-inline:20px;width:auto;border-radius:30px}
 #out .card>.goto{display:none;position:absolute;z-index:3;top:18px;inset-inline-end:18px;margin:0;min-height:34px;padding:0 14px;font-size:13px;font-weight:600;color:#fff;background:var(--grad);box-shadow:var(--grad-shadow);white-space:nowrap}
 #out .card.open>.goto{display:inline-flex;align-items:center}
-#out .card.open>:not(.pic):not(h2):not(.goto){animation:cardIn .35s ease-out}
+#out .card.open>:not(.pic):not(h2):not(.goto){animation:cardIn .4s .08s ease-out both}
 @keyframes cardIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){#out .card.open>:not(.pic):not(h2):not(.goto){animation:none}}
+
+/* مساحة على جوانب الكروت، وضل أخف وقت الحركة */
+body[data-view=results] #out{padding-inline:8px}
+#out .card.anim{box-shadow:6px 6px 16px var(--cs1),-6px -6px 16px var(--cs2);will-change:height}
