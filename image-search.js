@@ -11,7 +11,7 @@ ERR.invalid_gtin = "الباركود المقروء من الصورة مش صا�
 
 const box = $("imgbox");
 const fam = el("div"); fam.id = "fam"; fam.setAttribute("aria-live", "polite");
-$("more").after(fam); // آخر حاجة في صفحة النتايج
+$("out").after(fam); // بعد النتايج مباشرة، وفوق زر البحث في الصيدليات
 
 const mkInput = (capture) => { const i = el("input"); i.type = "file"; i.accept = "image/*"; if (capture) i.setAttribute("capture", "environment"); i.hidden = true; return i; };
 const camIn = mkInput(true), galIn = mkInput(false);
