@@ -152,9 +152,11 @@
   const REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)");
   function setOpen(c, on, animate) {
     const OPT = { duration: 1250, easing: "cubic-bezier(.4,0,.2,1)" };
-    // الصورة والاسم ثابتين مكانهم؛ اللي بيتحرك هو الكلام اللي تحتهم والخلفية بس
+    const h = c.querySelector("h2"), pic = c.querySelector(".pic");
     const kids = () => Array.from(c.children).filter((n) => !n.matches(".pic,h2,.goto"));
     const can = animate && !REDUCE.matches && !!c.animate;
+    const firstH = can && h ? h.getBoundingClientRect() : null;
+    const firstP = can && pic ? pic.getBoundingClientRect() : null;
     const firstK = can ? kids().map((n) => n.getBoundingClientRect().top) : [];
     const hFrom = c.offsetHeight;
     c.classList.toggle("open", on);
@@ -162,10 +164,20 @@
     if (!can) return Promise.resolve();
     const hTo = c.offsetHeight;
     if (hFrom === hTo) return Promise.resolve();
-    // وقت القفل: التفاصيل بتفضل ظاهرة لحد ما الحركة تخلص عشان تطلع مع الخلفية وهي بتصغر
+    // وقت القفل: التفاصيل بتفضل ظاهرة لحد ما الحركة تخلص عشان تطلع مع الخلفية الرمادي وهي بتصغر
     if (!on) c.classList.add("closing");
-    c.classList.add("anim");
-    // 1) الكلام اللي تحت بيتحرك مع حافة الخلفية وهي بتنزل (فتح) أو بتطلع (قفل) وبيدخل جوّا الكارت
+    c.classList.add("anim", "swap");
+    const lastH = h ? h.getBoundingClientRect() : null, lastP = pic ? pic.getBoundingClientRect() : null;
+    // 1) الاسم بيطلع لفوق من ورا الصورة، والصورة (بإطارها الأزرق) فوق كل الطبقات وبتنزل بالراحة مع الكارت
+    if (firstH && lastH) {
+      const dx = firstH.left - lastH.left, dy = firstH.top - lastH.top;
+      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], OPT);
+    }
+    if (firstP && lastP) {
+      const pdy = firstP.top - lastP.top;
+      if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], OPT);
+    }
+    // 2) الكلام اللي تحت بيتحرك مع حافة الخلفية الرمادي وهي بتنزل (فتح) أو بتطلع (قفل)
     const dH = hTo - hFrom;
     kids().forEach((n, i) => {
       if (on) n.animate([{ transform: "translateY(" + (-dH) + "px)" }, { transform: "none" }], OPT);
@@ -178,9 +190,9 @@
         ], OPT);
       }
     });
-    // 2) ارتفاع الكارت (الخلفية) بيتغيّر تدريجي
+    // 3) ارتفاع الكارت (الخلفية الرمادي) بيتغيّر تدريجي
     const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: OPT.duration, easing: OPT.easing, fill: "forwards" });
-    const done = () => c.classList.remove("anim", "closing");
+    const done = () => c.classList.remove("anim", "swap", "closing");
     a.addEventListener("finish", () => { done(); a.cancel(); });
     a.addEventListener("cancel", done);
     return a.finished.catch(() => {});
