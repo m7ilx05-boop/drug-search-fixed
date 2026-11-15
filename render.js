@@ -218,7 +218,6 @@ function card(p, tier) {
   } else c.append(el("div", "meta", "المواد الفعّالة غير مسجّلة بعد."));
 
   const chips = el("div", "chips");
-  if (tier === 1) chips.append(el("span", "chip ok", p.source_label || "معتمد من المصنع"));
   if (tier === 2) chips.append(el("span", "chip warn", "من الصيدليات"));
   if (tier === 3) chips.append(el("span", "chip warn", "غير مؤكد"));
   if (p.dosage_form) chips.append(el("span", "chip", p.dosage_form));
