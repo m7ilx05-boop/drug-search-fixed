@@ -152,11 +152,9 @@
   const REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)");
   function setOpen(c, on, animate) {
     const OPT = { duration: 1250, easing: "cubic-bezier(.4,0,.2,1)" };
-    const h = c.querySelector("h2"), pic = c.querySelector(".pic");
+    // الصورة والاسم ثابتين مكانهم؛ اللي بيتحرك هو الكلام اللي تحتهم والخلفية بس
     const kids = () => Array.from(c.children).filter((n) => !n.matches(".pic,h2,.goto"));
     const can = animate && !REDUCE.matches && !!c.animate;
-    const firstH = can && h ? h.getBoundingClientRect() : null;
-    const firstP = can && pic ? pic.getBoundingClientRect() : null;
     const firstK = can ? kids().map((n) => n.getBoundingClientRect().top) : [];
     const hFrom = c.offsetHeight;
     c.classList.toggle("open", on);
@@ -164,26 +162,10 @@
     if (!can) return Promise.resolve();
     const hTo = c.offsetHeight;
     if (hFrom === hTo) return Promise.resolve();
-    // وقت القفل: التفاصيل بتفضل ظاهرة لحد ما الحركة تخلص عشان تطلع مع الخلفية الرمادي وهي بتصغر
+    // وقت القفل: التفاصيل بتفضل ظاهرة لحد ما الحركة تخلص عشان تطلع مع الخلفية وهي بتصغر
     if (!on) c.classList.add("closing");
-    c.classList.add("anim", "swap");
-    const lastH = h ? h.getBoundingClientRect() : null, lastP = pic ? pic.getBoundingClientRect() : null;
-    // 1) الاسم (ومعاه لوحة بلون الكارت) والصورة بيتبادلوا أماكنهم
-    if (firstH && lastH) {
-      const dx = firstH.left - lastH.left, dy = firstH.top - lastH.top;
-      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], OPT);
-    }
-    if (firstP && lastP) {
-      const pdy = firstP.top - lastP.top;
-      if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], OPT);
-    }
-    // عرض الصورة وحوافها بيتغيّروا بالتدريج (مش بيتبدّلوا فجأة): مفتوح = هامش 20px من الجنبين
-    if (pic) {
-      const A = { marginInlineStart: "0px", marginInlineEnd: "0px", width: "100%", borderRadius: "50px" };
-      const Z = { marginInlineStart: "20px", marginInlineEnd: "20px", width: "calc(100% - 40px)", borderRadius: "30px" };
-      pic.animate(on ? [A, Z] : [Z, A], OPT);
-    }
-    // 2) الكلام اللي تحت بيتحرك مع حافة الخلفية الرمادي وهي بتنزل (فتح) أو بتطلع (قفل)
+    c.classList.add("anim");
+    // 1) الكلام اللي تحت بيتحرك مع حافة الخلفية وهي بتنزل (فتح) أو بتطلع (قفل) وبيدخل جوّا الكارت
     const dH = hTo - hFrom;
     kids().forEach((n, i) => {
       if (on) n.animate([{ transform: "translateY(" + (-dH) + "px)" }, { transform: "none" }], OPT);
@@ -196,9 +178,9 @@
         ], OPT);
       }
     });
-    // 3) ارتفاع الكارت (الخلفية الرمادي) بيتغيّر تدريجي
+    // 2) ارتفاع الكارت (الخلفية) بيتغيّر تدريجي
     const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: OPT.duration, easing: OPT.easing, fill: "forwards" });
-    const done = () => c.classList.remove("anim", "swap", "closing");
+    const done = () => c.classList.remove("anim", "closing");
     a.addEventListener("finish", () => { done(); a.cancel(); });
     a.addEventListener("cancel", done);
     return a.finished.catch(() => {});

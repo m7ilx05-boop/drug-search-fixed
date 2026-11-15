@@ -288,8 +288,7 @@ body[data-view=home] form{margin-top:-52px}
 #out .card:not(.open)>h2{margin-bottom:20px}
 #out .card:not(.open):not(.closing)>:not(.pic):not(h2){display:none}
 #out .card.open::after{display:none}
-#out .card.open>h2{order:0;text-align:start;margin:0;padding:22px 20px 14px;padding-inline-end:150px}
-#out .card.open>.pic{margin-inline:20px;width:auto;border-radius:30px}
+#out .card.open>h2{margin-bottom:8px}
 #out .card>.goto{display:none;position:absolute;z-index:3;top:18px;inset-inline-end:18px;margin:0;min-height:34px;padding:0 14px;font-size:13px;font-weight:600;color:#fff;background:var(--grad);box-shadow:var(--grad-shadow);white-space:nowrap}
 #out .card.open>.goto{display:inline-flex;align-items:center}
 #out .card.open>:not(.pic):not(h2):not(.goto){animation:cardIn .34s .16s ease-out both}
@@ -299,8 +298,6 @@ body[data-view=home] form{margin-top:-52px}
 /* مساحة على جوانب الكروت، وضل أخف وقت الحركة */
 body[data-view=results] #out{padding-inline:8px}
 #out .card.anim{will-change:height}
-#out .card.swap>h2{position:relative;z-index:4;background:var(--cbg);box-shadow:0 0 0 24px var(--cbg)}
-#out .card.swap>.pic{position:relative;z-index:3}
 
 /* ===== البدائل: الصف كله بيتدوس ويفتح صفحة البديل، ورابط "المصدر" مخفي ===== */
 .alt-item{position:relative;cursor:pointer;padding-inline-end:22px}
@@ -311,7 +308,6 @@ body[data-view=results] #out{padding-inline:8px}
 /* ===== سلاسة حركة الكارت: كل كارت معزول عن اللي حواليه، والعناصر المتحركة بتتجهّز قبل الحركة ===== */
 #out .card{contain:layout style}
 #out .card.anim>*{will-change:transform,opacity}
-#out .card.anim>.pic{will-change:transform,width,margin}
 
 /* ===== فلتر الشكل الدوائي ===== */
 .ff-btn{position:relative;flex:none;width:56px;height:56px;min-height:56px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--soft);color:var(--accent);border:2px solid var(--line)}
