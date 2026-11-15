@@ -215,7 +215,7 @@ body[data-view=home] form{margin-top:-52px}
 }
 
 /* ===== نتايج البحث: كارت كامل، واحد تحت التاني (شكل مقتبس من Uiverse / JohnnyCSilva) ===== */
-#out .card{--g1:#8FD3FA;--g2:#2388EA;--cbg:#e0e0e0;--cs1:#bebebe;--cs2:#fff;position:relative;display:flex;flex-direction:column;overflow:hidden;padding:0;margin:0 auto 40px;max-width:480px;border-radius:50px;background:var(--cbg);cursor:pointer;box-shadow:20px 20px 60px var(--cs1),-20px -20px 60px var(--cs2);transition:.2s ease-in-out}
+#out .card{--g1:#8FD3FA;--g2:#2388EA;--cbg:#e0e0e0;--cs1:#bebebe;--cs2:#fff;position:relative;display:flex;flex-direction:column;overflow:hidden;padding:0;margin:0 auto 40px;max-width:480px;border-radius:50px;background:var(--cbg);cursor:pointer;box-shadow:8px 8px 20px var(--cs1),-8px -8px 20px var(--cs2);transition:box-shadow .2s ease,transform .15s ease}
 @media (prefers-color-scheme:dark){#out .card{--g1:#2D77B5;--g2:#123E68;--cbg:#16293a;--cs1:#0a141d;--cs2:#20384e}}
 #out .card>.pic{width:100%;height:160px;border-radius:50px 50px 0 0;padding:18px;background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;font-size:56px}
 #out .card>.pic:has(img){height:min(86vw,340px)}
@@ -228,7 +228,7 @@ body[data-view=home] form{margin-top:-52px}
 #out .card.official{border-inline-start:0}
 #out .card::after{content:"‹";position:absolute;top:18px;inset-inline-end:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#fff;color:var(--accent);font-size:22px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.14);transition:.2s ease-in-out;pointer-events:none;transform:rotate(90deg)}
 #out .card:active{transform:scale(.99)}
-@media (hover:hover){#out .card:hover{box-shadow:10px 10px 30px var(--cs1),-10px -10px 30px var(--cs2)}#out .card:hover::after{transform:rotate(90deg) scale(1.1) rotate(10deg)}}
+@media (hover:hover){#out .card:hover{box-shadow:5px 5px 14px var(--cs1),-5px -5px 14px var(--cs2)}#out .card:hover::after{transform:rotate(90deg) scale(1.1) rotate(10deg)}}
 
 /* ===== صفحة المنتج ===== */
 .hero{position:relative;margin:0 -14px;padding:calc(var(--top) + 64px) 18px 56px;background:var(--fill);border-radius:0 0 36px 36px;display:flex;justify-content:center}
@@ -286,10 +286,10 @@ body[data-view=home] form{margin-top:-52px}
 #out .card.open>.pic{margin-inline:20px;width:auto;border-radius:30px}
 #out .card>.goto{display:none;position:absolute;z-index:3;top:18px;inset-inline-end:18px;margin:0;min-height:34px;padding:0 14px;font-size:13px;font-weight:600;color:#fff;background:var(--grad);box-shadow:var(--grad-shadow);white-space:nowrap}
 #out .card.open>.goto{display:inline-flex;align-items:center}
-#out .card.open>:not(.pic):not(h2):not(.goto){animation:cardIn .4s .08s ease-out both}
-@keyframes cardIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+#out .card.open>:not(.pic):not(h2):not(.goto){animation:cardIn .22s .1s ease-out both}
+@keyframes cardIn{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){#out .card.open>:not(.pic):not(h2):not(.goto){animation:none}}
 
 /* مساحة على جوانب الكروت، وضل أخف وقت الحركة */
 body[data-view=results] #out{padding-inline:8px}
-#out .card.anim{box-shadow:6px 6px 16px var(--cs1),-6px -6px 16px var(--cs2);will-change:height}
+#out .card.anim{will-change:height}
