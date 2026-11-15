@@ -307,3 +307,8 @@ body[data-view=results] #out{padding-inline:8px}
 .alt-item::after{content:"‹";position:absolute;inset-inline-end:0;top:50%;transform:translateY(-50%);color:var(--accent);font-size:24px;line-height:1}
 .alt-item:active{background:var(--soft)}
 .alt-item .alt-info>a{display:none}
+
+/* ===== سلاسة حركة الكارت: كل كارت معزول عن اللي حواليه، والعناصر المتحركة بتتجهّز قبل الحركة ===== */
+#out .card{contain:layout style}
+#out .card.anim>*{will-change:transform,opacity}
+#out .card.anim>.pic{will-change:transform,width,margin}

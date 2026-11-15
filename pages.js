@@ -177,6 +177,12 @@
       const pdy = firstP.top - lastP.top;
       if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], OPT);
     }
+    // عرض الصورة وحوافها بيتغيّروا بالتدريج (مش بيتبدّلوا فجأة): مفتوح = هامش 20px من الجنبين
+    if (pic) {
+      const A = { marginInlineStart: "0px", marginInlineEnd: "0px", width: "100%", borderRadius: "50px" };
+      const Z = { marginInlineStart: "20px", marginInlineEnd: "20px", width: "calc(100% - 40px)", borderRadius: "30px" };
+      pic.animate(on ? [A, Z] : [Z, A], OPT);
+    }
     // 2) الكلام اللي تحت بيتحرك مع حافة الخلفية الرمادي وهي بتنزل (فتح) أو بتطلع (قفل)
     const dH = hTo - hFrom;
     kids().forEach((n, i) => {
