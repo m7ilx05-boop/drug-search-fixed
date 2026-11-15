@@ -88,12 +88,12 @@
     // 1) الاسم بيتحرك من مكانه القديم للجديد
     if (firstH && h.animate) {
       const last = h.getBoundingClientRect(), dx = firstH.left - last.left, dy = firstH.top - last.top;
-      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" });
+      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.4,0,.2,1)" });
     }
     // 2) ارتفاع الكارت بيتغيّر تدريجي بدل ما يقفز
     if (hFrom === hTo) return Promise.resolve();
     c.classList.add("anim");
-    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: 420, easing: "cubic-bezier(.2,.8,.2,1)" });
+    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: 300, easing: "cubic-bezier(.4,0,.2,1)" });
     const done = () => c.classList.remove("anim");
     a.addEventListener("finish", done); a.addEventListener("cancel", done);
     return a.finished.catch(() => {});
