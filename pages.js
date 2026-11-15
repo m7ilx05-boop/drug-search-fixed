@@ -155,34 +155,46 @@
     const h = c.querySelector("h2"), pic = c.querySelector(".pic");
     const kids = () => Array.from(c.children).filter((n) => !n.matches(".pic,h2,.goto"));
     const can = animate && !REDUCE.matches && !!c.animate;
+    const top = (el) => el.getBoundingClientRect().top;
+    // الصورة والإطار الأزرق ثابتين على الشاشة: الكارت بيكبر لفوق (فوق الصورة) عشان الاسم يطلع من ورا الصورة،
+    // وبيكبر لتحت عشان تظهر التفاصيل. الصورة نفسها مبتتحركش.
+    const cardFrom = can ? top(c) : 0;
     const firstH = can && h ? h.getBoundingClientRect() : null;
-    const firstP = can && pic ? pic.getBoundingClientRect() : null;
-    const firstK = can ? kids().map((n) => n.getBoundingClientRect().top) : [];
+    const firstHrel = firstH ? firstH.top - cardFrom : 0;
+    const firstPrel = can && pic ? top(pic) - cardFrom : 0;
+    const firstK = can ? kids().map((n) => top(n) - cardFrom) : [];
     const hFrom = c.offsetHeight;
     c.classList.toggle("open", on);
     c.setAttribute("aria-expanded", on ? "true" : "false");
+    if (on && h) c.style.setProperty("--hh", h.offsetHeight + "px");
     if (!can) return Promise.resolve();
     const hTo = c.offsetHeight;
     if (hFrom === hTo) return Promise.resolve();
-    // وقت القفل: التفاصيل بتفضل ظاهرة لحد ما الحركة تخلص عشان تطلع مع الخلفية الرمادي وهي بتصغر
+    const H = parseFloat(c.style.getPropertyValue("--hh")) || 0;
+    // وقت القفل: التفاصيل بتفضل ظاهرة لحد ما الحركة تخلص عشان تطلع مع الخلفية وهي بتصغر
     if (!on) c.classList.add("closing");
     c.classList.add("anim", "swap");
-    const lastH = h ? h.getBoundingClientRect() : null, lastP = pic ? pic.getBoundingClientRect() : null;
-    // 1) الاسم بيطلع لفوق من ورا الصورة، والصورة (بإطارها الأزرق) فوق كل الطبقات وبتنزل بالراحة مع الكارت
+    const cardTo = top(c);
+    const lastH = h ? h.getBoundingClientRect() : null;
+    const lastHrel = lastH ? lastH.top - cardTo : 0;
+    const lastPrel = pic ? top(pic) - cardTo : 0;
+    const lastK = kids().map((n) => top(n) - cardTo);
+    // 1) الاسم بيطلع من ورا الصورة (أو بينزل وراها وقت القفل). الصورة فوق كل الطبقات.
     if (firstH && lastH) {
-      const dx = firstH.left - lastH.left, dy = firstH.top - lastH.top;
+      const dx = firstH.left - lastH.left, dy = firstHrel - lastHrel;
       if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], OPT);
     }
-    if (firstP && lastP) {
-      const pdy = firstP.top - lastP.top;
+    // 2) الصورة: ثابتة على الشاشة (حركة الكارت لفوق بتتعادل بالظبط)
+    if (pic) {
+      const pdy = firstPrel - lastPrel;
       if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], OPT);
     }
-    // 2) الكلام اللي تحت بيتحرك مع حافة الخلفية الرمادي وهي بتنزل (فتح) أو بتطلع (قفل)
+    // 3) الكلام اللي تحت بيتحرك مع حافة الخلفية وهي بتنزل (فتح) أو بتطلع (قفل) وبيدخل جوّا الكارت
     const dH = hTo - hFrom;
     kids().forEach((n, i) => {
       if (on) n.animate([{ transform: "translateY(" + (-dH) + "px)" }, { transform: "none" }], OPT);
       else if (firstK[i] != null) {
-        const o = firstK[i] - n.getBoundingClientRect().top;
+        const o = firstK[i] - lastK[i];
         n.animate([
           { transform: "translateY(" + o + "px)", opacity: 1 },
           { transform: "translateY(" + (o + dH) + "px)", opacity: 1, offset: 0.8 },
@@ -190,11 +202,14 @@
         ], OPT);
       }
     });
-    // 3) ارتفاع الكارت (الخلفية الرمادي) بيتغيّر تدريجي
-    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: OPT.duration, easing: OPT.easing, fill: "forwards" });
+    // 4) الخلفية: الحافة العلوية بتطلع لفوق (فتح) أو بتنزل (قفل)، وارتفاعها بيتغيّر تدريجي
+    const mFrom = on ? 0 : -H, mTo = on ? -H : 0;
+    const FILL = { duration: OPT.duration, easing: OPT.easing, fill: "forwards" };
+    const m = c.animate([{ marginTop: mFrom + "px" }, { marginTop: mTo + "px" }], FILL);
+    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], FILL);
     const done = () => c.classList.remove("anim", "swap", "closing");
-    a.addEventListener("finish", () => { done(); a.cancel(); });
-    a.addEventListener("cancel", done);
+    a.addEventListener("finish", () => { done(); a.cancel(); m.cancel(); });
+    a.addEventListener("cancel", () => { done(); m.cancel(); });
     return a.finished.catch(() => {});
   }
   function toggle(c) {

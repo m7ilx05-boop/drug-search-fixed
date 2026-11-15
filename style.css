@@ -288,6 +288,8 @@ body[data-view=home] form{margin-top:-52px}
 #out .card:not(.open)>h2{margin-bottom:20px}
 #out .card:not(.open):not(.closing)>:not(.pic):not(h2){display:none}
 #out .card.open::after{display:none}
+#out .card.open{margin-top:calc(var(--hh,0px)*-1)}
+#out .card>*{flex-shrink:0}
 #out .card.open>h2{order:0;text-align:start;margin:0;padding:22px 20px 14px;padding-inline-end:150px}
 #out .card>.goto{display:none;position:absolute;z-index:3;top:18px;inset-inline-end:18px;margin:0;min-height:34px;padding:0 14px;font-size:13px;font-weight:600;color:#fff;background:var(--grad);box-shadow:var(--grad-shadow);white-space:nowrap}
 #out .card.open>.goto{display:inline-flex;align-items:center}
