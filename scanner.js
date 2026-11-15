@@ -276,6 +276,17 @@ function renderLog() {
   });
 }
 
+// في وضع المسح الحقل بتاع السكانر بيسحب التركيز، فمينفعش نحط حقل كتابة هنا: الزر بيقفل المسح ويفتح البحث بالعائلة
+const famBtn = () => {
+  const b = el("button", "alt-btn", "عايز باقي أفراد عائلة الدواء؟ اكتب اسم الدواء"); b.type = "button";
+  b.addEventListener("click", () => {
+    end();
+    const r = document.querySelector('input[name=t][value="brand_family"]'); if (r) r.checked = true;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  return b;
+};
+
 function show(e) {
   outBox.replaceChildren();
   const p = e.p, parts = [p.label || "", e.gtin ? "GTIN: " + e.gtin : ""].filter(Boolean);
@@ -295,10 +306,11 @@ function show(e) {
       outBox.append(sb);
     }
   }
-  else if (e.outcome === "not_found") outBox.append(el("div", "scan-msg warn", "المنتج غير موجود في قاعدة البيانات"));
+  else if (e.outcome === "not_found") { outBox.append(el("div", "scan-msg warn", "المنتج غير موجود في قاعدة البيانات")); outBox.append(famBtn()); }
   else {
     if (e.outcome === "ambiguous") outBox.append(el("div", "scan-msg warn", "الباركود ده مسجّل لأكتر من منتج في المصدر. راجع الاسم والحجم على العبوة."));
     ((e.data && e.data.results) || []).forEach((r) => outBox.append(card(r, 1)));
+    outBox.append(famBtn());
   }
   refocus();
 }

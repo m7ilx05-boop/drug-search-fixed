@@ -11,7 +11,7 @@ ERR.invalid_gtin = "الباركود المقروء من الصورة مش صا�
 
 const box = $("imgbox");
 const fam = el("div"); fam.id = "fam"; fam.setAttribute("aria-live", "polite");
-$("out").after(fam);
+$("more").after(fam); // آخر حاجة في صفحة النتايج
 
 const mkInput = (capture) => { const i = el("input"); i.type = "file"; i.accept = "image/*"; if (capture) i.setAttribute("capture", "environment"); i.hidden = true; return i; };
 const camIn = mkInput(true), galIn = mkInput(false);
@@ -83,6 +83,8 @@ function famBox(family) {
   row.append(inp, go); b.append(row); fam.append(b);
 }
 
+window.famBox = famBox; // search.js بيستخدمه بعد أي بحث عادي
+
 async function handle(f) {
   if (!f) return;
   if (!/^image\//.test(f.type)) { setStatus("الملف ده مش صورة.", { error: true }); return; }
@@ -98,6 +100,7 @@ async function handle(f) {
     if (!x.is_medicine_pack) { setStatus("مش باين في الصورة علبة دواء. صوّر العلبة من قدّام وبإضاءة كويسة.", { error: true }); return; }
     if (!(r.gtins || []).length && !r.search) { setStatus("ما قدرناش نقرا اسم ولا باركود واضح من الصورة. جرّب صورة أقرب وأوضح.", { error: true }); return; }
     if (r.family) famBox(r.family);
+    else if (r.search && r.search.type !== "ingredient") famBox({ text: r.search.text });
 
     // 1) باركود صحيح = نفس المنتج بالظبط
     if ((r.gtins || []).length) {

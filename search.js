@@ -196,6 +196,7 @@ $("f").addEventListener("submit", async (e) => {
       if (sug.length) { showSuggestions(query, sug); hadSug = true; }
     }
     showMore(query, search_type, d.secondary);
+    if (window.famBox) window.famBox({ text: search_type === "ingredient" ? "" : query });
     const underReview = Array.isArray(d.pending_review) ? d.pending_review.length : 0;
     if (d.job_id && d.refresh_status !== "not_needed") {
       if (d.refresh_status === "completed" && shown) {
