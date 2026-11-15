@@ -131,16 +131,20 @@ const refocus = () => { if (active && document.activeElement !== inp) inp.focus(
 // القراءة بتتم جوه المتصفح: BarcodeDetector لو بيدعم الأنواع المطلوبة، وإلا مكتبة ZXing بتتحمّل أول مرة بس.
 // الفيديو ما بيتبعتش لأي سيرفر؛ النص اللي اتقرا بس بيعدّي على نفس مسار السكانر (parseScan -> drug-barcode).
 const WANT = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "itf", "qr_code", "data_matrix"];
-const ZX_URL = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
+const ZX_URLS = ["vendor/zxing-0.21.3.min.js", "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"]; // نسخة على موقعنا الأول، وبعدها CDN
 let zxPromise = null, stream = null, camOn = false, camGen = 0, seenText = "", seenAt = 0;
 
 const loadZx = () => zxPromise || (zxPromise = new Promise((res, rej) => {
   if (window.ZXing) return res(window.ZXing);
-  const s = document.createElement("script");
-  s.src = ZX_URL; s.crossOrigin = "anonymous";
-  s.onload = () => (window.ZXing ? res(window.ZXing) : rej(new Error("zxing_missing")));
-  s.onerror = () => { zxPromise = null; rej(new Error("zxing_load_failed")); };
-  document.head.append(s);
+  const tryLoad = (i) => {
+    if (i >= ZX_URLS.length) { zxPromise = null; return rej(new Error("zxing_load_failed")); }
+    const s = document.createElement("script");
+    s.src = ZX_URLS[i];
+    s.onload = () => (window.ZXing ? res(window.ZXing) : tryLoad(i + 1));
+    s.onerror = () => { s.remove(); tryLoad(i + 1); };
+    document.head.append(s);
+  };
+  tryLoad(0);
 }));
 
 async function makeDetector() {
@@ -192,12 +196,13 @@ async function camStart() {
   }
   if (gen !== camGen) { stream.getTracks().forEach((t) => t.stop()); stream = null; return; }
   video.srcObject = stream;
+  cam.classList.add("on"); camMsg.textContent = "الكاميرا اشتغلت. جاري تجهيز قارئ الباركود…";
   try { await video.play(); } catch { /* autoplay هيشتغل أول ما الفريم يجهز */ }
   let det;
   try { det = await makeDetector(); }
-  catch (e) { camStop(); camMsg.textContent = "تعذّر تحميل قارئ الباركود (" + e.message + "). استخدم السكانر أو ابحث بصورة المنتج."; return; }
+  catch (e) { camStop(); camMsg.textContent = "تعذّر تحميل قارئ الباركود (" + e.message + "). تأكد من الإنترنت وجرّب تاني، أو استخدم السكانر أو ابحث بصورة المنتج."; return; }
   if (gen !== camGen) return;
-  camOn = true; camBtn.disabled = false; camBtn.textContent = "إيقاف الكاميرا"; cam.classList.add("on");
+  camOn = true; camBtn.disabled = false; camBtn.textContent = "إيقاف الكاميرا";
   camMsg.textContent = "وجّه الباركود أو الـ QR ناحية الإطار.";
   const tick = async () => {
     if (gen !== camGen) return;
