@@ -151,7 +151,7 @@
   const open = (c) => { listY = window.scrollY; navd = true; location.hash = "#/p/" + c.dataset.i; };
   const REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)");
   function setOpen(c, on, animate) {
-    const OPT = { duration: 1500, easing: "cubic-bezier(.4,0,.2,1)" };
+    const OPT = { duration: 1250, easing: "cubic-bezier(.4,0,.2,1)" };
     const h = c.querySelector("h2"), pic = c.querySelector(".pic");
     const kids = () => Array.from(c.children).filter((n) => !n.matches(".pic,h2,.goto"));
     const can = animate && !REDUCE.matches && !!c.animate;
