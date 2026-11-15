@@ -102,6 +102,92 @@ function barcodeBlock(p) {
   return box;
 }
 
+// ===== زرار "مش صورة المنتج" و "دوّر على الصورة" =====
+// بيظهروا حسب p.image_check.can_report و p.image_import.can_import، وبيبعتوا { dwaprices_id } للدالتين drug-image-report و drug-image-import.
+function waitText(sec) {
+  const s = Number(sec);
+  if (!Number.isFinite(s) || s <= 0) return "";
+  return s < 90 ? " (بعد حوالي " + Math.ceil(s) + " ثانية)" : " (بعد حوالي " + Math.ceil(s / 60) + " دقيقة)";
+}
+function imgErrText(err) {
+  const base = ERR[err.code] || "حصلت مشكلة في الاتصال. جرّب تاني.";
+  return base + waitText(err.data && err.data.retry_after);
+}
+function dateAr(iso) { try { return new Date(iso).toLocaleDateString("ar-EG"); } catch { return ""; } }
+
+function imageActions(p) {
+  if (!Number.isInteger(p.dwaprices_id)) return null;
+  const canReport = !!(p.image_check && p.image_check.can_report);
+  const canImport = !!(p.image_import && p.image_import.can_import);
+  const imported = !!(p.image && p.image.imported);
+  if (!canReport && !canImport && !imported) return null;
+
+  const box = el("div", "img-actions");
+  const msg = el("div", "meta img-msg");
+  msg.setAttribute("role", "status");
+  const say = (t) => { msg.textContent = t; };
+  const swapPic = (url) => {
+    const old = box.parentElement && box.parentElement.querySelector(".pic");
+    if (old) old.replaceWith(picBlock({ ...p, image: { has_image: !!url, url } }));
+  };
+
+  if (imported) {
+    const src = p.image.source && p.image.source !== "imported" ? " من " + p.image.source : "";
+    say("الصورة دي اتجلبت تلقائي" + src + " ومش من المصدر الرسمي.");
+  }
+
+  if (canReport) {
+    const b = el("button", "img-btn", "مش صورة المنتج؟");
+    b.type = "button";
+    b.addEventListener("click", async () => {
+      b.disabled = true; b.textContent = "جاري فحص الصورة…"; say("");
+      try {
+        const r = await call("drug-image-report", { dwaprices_id: p.dwaprices_id });
+        if (r.status === "mismatch") {
+          swapPic(null);
+          say(r.reason === "strength_differs"
+            ? "الفحص لقى إن التركيز المكتوب على العلبة مختلف، فالصورة مش للمنتج ده."
+            : "الفحص لقى إن الصورة مش للمنتج ده، واتشالت.");
+        } else if (r.status === "match") {
+          say("الفحص أكد إن الصورة بتاعة المنتج" + (r.cached ? " (نتيجة محفوظة)" : "") + ".");
+        } else {
+          say("الصورة مش واضحة كفاية، فمقدرناش نحكم عليها.");
+        }
+        b.remove();
+      } catch (err) {
+        say(imgErrText(err));
+        b.disabled = false; b.textContent = "مش صورة المنتج؟";
+      }
+    });
+    box.append(b);
+  }
+
+  if (canImport) {
+    const b = el("button", "img-btn", "دوّر على الصورة");
+    b.type = "button";
+    b.addEventListener("click", async () => {
+      b.disabled = true; b.textContent = "جاري البحث عن صورة…"; say("ممكن ياخد حوالي دقيقة.");
+      try {
+        const r = await call("drug-image-import", { dwaprices_id: p.dwaprices_id });
+        if (r.status === "accepted" && r.image_url) {
+          swapPic(r.image_url);
+          say("لقينا صورة مطابقة" + (r.source_domain ? " من " + r.source_domain : "") + ". الصورة اتجلبت تلقائي ومش من المصدر الرسمي.");
+          b.remove();
+        } else {
+          say("ملقيناش صورة مطابقة للمنتج." + (r.next_allowed_at ? " تقدر تجرّب تاني بعد " + dateAr(r.next_allowed_at) + "." : ""));
+          b.remove();
+        }
+      } catch (err) {
+        say(imgErrText(err));
+        b.disabled = false; b.textContent = "دوّر على الصورة";
+      }
+    });
+    box.append(b);
+  }
+  box.append(msg);
+  return box;
+}
+
 // tier: 1 = معتمد من المصنع، 2 = من الصيدليات، 3 = غير مؤكد، undefined = من غير تصنيف
 function card(p, tier) {
   const c = el("article", "card" + (tier === 1 ? " official" : tier === 2 ? " pharm" : ""));
@@ -142,6 +228,7 @@ function card(p, tier) {
   chips.append(el("span", "chip " + regCls, regText));
   chips.append(el("span", "chip warn", "التوفر غير متحقق منه"));
   c.append(chips);
+  const ia = imageActions(p); if (ia) c.append(ia);
 
   if (p.doses_missing === true) {
     const dn = el("div", "dose-note");
