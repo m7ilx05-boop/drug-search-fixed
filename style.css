@@ -232,9 +232,8 @@ body[data-view=home] form{margin-top:-52px}
 #out .card>.alt-btn+.meta,#out .card>.alt-box+.meta{margin-top:12px}
 #out .card>:last-child{margin-bottom:18px}
 #out .card.official{border-inline-start:0}
-#out .card::after{content:"‹";position:absolute;top:18px;inset-inline-end:18px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#fff;color:var(--accent);font-size:22px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.14);transition:.2s ease-in-out;pointer-events:none;transform:rotate(90deg)}
 #out .card:active{transform:scale(.99)}
-@media (hover:hover){#out .card:hover{box-shadow:5px 5px 14px var(--cs1),-5px -5px 14px var(--cs2)}#out .card:hover::after{transform:rotate(90deg) scale(1.1) rotate(10deg)}}
+@media (hover:hover){#out .card:hover{box-shadow:5px 5px 14px var(--cs1),-5px -5px 14px var(--cs2)}}
 
 /* ===== صفحة المنتج ===== */
 .hero{position:relative;margin:0 -14px;padding:calc(var(--top) + 64px) 18px 56px;background:var(--fill);border-radius:0 0 36px 36px;display:flex;justify-content:center}
@@ -287,7 +286,6 @@ body[data-view=home] form{margin-top:-52px}
 #out .card>h2{order:2;margin:14px 20px 0;text-align:center;font-size:18px}
 #out .card:not(.open)>h2{margin-bottom:20px}
 #out .card:not(.open):not(.closing)>:not(.pic):not(h2){display:none}
-#out .card.open::after{display:none}
 #out .card.open{margin-top:calc(var(--hh,0px)*-1)}
 #out .card>*{flex-shrink:0}
 #out .card.open>h2{order:0;text-align:start;margin:0;padding:22px 20px 14px;padding-inline-end:150px}
