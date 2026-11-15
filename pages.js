@@ -78,36 +78,50 @@
   const open = (c) => { listY = window.scrollY; navd = true; location.hash = "#/p/" + c.dataset.i; };
   const REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)");
   function setOpen(c, on, animate) {
-    const h = c.querySelector("h2");
-    const firstH = animate && h ? h.getBoundingClientRect() : null;
-    const pic = c.querySelector(".pic");
-    const firstP = animate && pic ? pic.getBoundingClientRect() : null;
+    const OPT = { duration: 1500, easing: "cubic-bezier(.4,0,.2,1)" };
+    const h = c.querySelector("h2"), pic = c.querySelector(".pic");
+    const kids = () => Array.from(c.children).filter((n) => !n.matches(".pic,h2,.goto"));
+    const can = animate && !REDUCE.matches && !!c.animate;
+    const firstH = can && h ? h.getBoundingClientRect() : null;
+    const firstP = can && pic ? pic.getBoundingClientRect() : null;
+    const firstK = can ? kids().map((n) => n.getBoundingClientRect().top) : [];
     const hFrom = c.offsetHeight;
     c.classList.toggle("open", on);
     c.setAttribute("aria-expanded", on ? "true" : "false");
-    if (!animate || REDUCE.matches || !c.animate) return Promise.resolve();
+    if (!can) return Promise.resolve();
     const hTo = c.offsetHeight;
-    // 1) الاسم بيتحرك من مكانه القديم للجديد
-    if (firstH && h.animate) {
-      const last = h.getBoundingClientRect(), dx = firstH.left - last.left, dy = firstH.top - last.top;
-      if (dx || dy) {
-        // الاسم بيتحرك ومعاه خلفية الكارت (لوحة) فوق الصورة، والصورة بتتحرك عكسه، بدل ما الاسم يعدّي على الصورة لوحده
-        c.classList.add("swap");
-        const ha = h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 480, easing: "cubic-bezier(.4,0,.2,1)" });
-        const un = () => c.classList.remove("swap");
-        ha.addEventListener("finish", un); ha.addEventListener("cancel", un);
-      }
-    }
-    if (firstP && pic.animate) {
-      const lp = pic.getBoundingClientRect(), pdy = firstP.top - lp.top;
-      if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], { duration: 480, easing: "cubic-bezier(.4,0,.2,1)" });
-    }
-    // 2) ارتفاع الكارت بيتغيّر تدريجي بدل ما يقفز
     if (hFrom === hTo) return Promise.resolve();
-    c.classList.add("anim");
-    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: 480, easing: "cubic-bezier(.4,0,.2,1)" });
-    const done = () => c.classList.remove("anim");
-    a.addEventListener("finish", done); a.addEventListener("cancel", done);
+    // وقت القفل: التفاصيل بتفضل ظاهرة لحد ما الحركة تخلص عشان تطلع مع الخلفية الرمادي وهي بتصغر
+    if (!on) c.classList.add("closing");
+    c.classList.add("anim", "swap");
+    const lastH = h ? h.getBoundingClientRect() : null, lastP = pic ? pic.getBoundingClientRect() : null;
+    // 1) الاسم (ومعاه لوحة بلون الكارت) والصورة بيتبادلوا أماكنهم
+    if (firstH && lastH) {
+      const dx = firstH.left - lastH.left, dy = firstH.top - lastH.top;
+      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], OPT);
+    }
+    if (firstP && lastP) {
+      const pdy = firstP.top - lastP.top;
+      if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], OPT);
+    }
+    // 2) الكلام اللي تحت بيتحرك مع حافة الخلفية الرمادي وهي بتنزل (فتح) أو بتطلع (قفل)
+    const dH = hTo - hFrom;
+    kids().forEach((n, i) => {
+      if (on) n.animate([{ transform: "translateY(" + (-dH) + "px)" }, { transform: "none" }], OPT);
+      else if (firstK[i] != null) {
+        const o = firstK[i] - n.getBoundingClientRect().top;
+        n.animate([
+          { transform: "translateY(" + o + "px)", opacity: 1 },
+          { transform: "translateY(" + (o + dH) + "px)", opacity: 1, offset: 0.8 },
+          { transform: "translateY(" + (o + dH) + "px)", opacity: 0 }
+        ], OPT);
+      }
+    });
+    // 3) ارتفاع الكارت (الخلفية الرمادي) بيتغيّر تدريجي
+    const a = c.animate([{ height: hFrom + "px" }, { height: hTo + "px" }], { duration: OPT.duration, easing: OPT.easing, fill: "forwards" });
+    const done = () => c.classList.remove("anim", "swap", "closing");
+    a.addEventListener("finish", () => { done(); a.cancel(); });
+    a.addEventListener("cancel", done);
     return a.finished.catch(() => {});
   }
   function toggle(c) {
