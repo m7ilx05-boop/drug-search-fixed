@@ -3,9 +3,9 @@
    عشان كل كارت في النتايج يبقى ينفع تدوس عليه وتفتح صفحته. */
 (function () {
   const ITEMS = [];
-  const orig = { card: window.card, pendingCard: window.pendingCard };
+  const orig = { card: window.card, pendingCard: window.pendingCard, altBlock: window.altBlock, altItem: window.altItem };
   const HOME_SUB = $("ab-s").textContent;
-  let searched = false, navd = false, listY = 0, lastQ = "";
+  let searched = false, navd = false, listY = 0, lastQ = "", curIdx = -1;
 
   // كل كارت بيترسم بيتسجّل هنا، وبيتفتح في صفحته من نفس البيانات
   ["card", "pendingCard"].forEach((kind) => {
@@ -23,6 +23,20 @@
     };
   });
 
+  // البدائل: كل بديل بيحمل بياناته، وبيعرف المنتج الأصلي اللي طلع منه
+  window.altBlock = function (p) {
+    const w = orig.altBlock(p);
+    if (w) { w.classList.add("alt-wrap"); w._parent = p; }
+    return w;
+  };
+  window.altItem = function (a) {
+    const row = orig.altItem(a);
+    row._alt = a;
+    row.tabIndex = 0;
+    row.setAttribute("role", "link");
+    return row;
+  };
+
   const fmt = (v) => Number(v).toLocaleString("ar-EG") + " ج.م";
 
   function goBack() {
@@ -30,17 +44,20 @@
     else location.hash = document.body.dataset.view === "product" ? "#/r" : "#/";
   }
 
-  // صفحة المنتج: صورة كبيرة على خلفية سماوي، بعدها الاسم والسعر، وتحتهم بيانات المنتج كاملة
-  function detail(i) {
-    const it = ITEMS[i], p = it.p, root = $("pd");
-    root.replaceChildren();
+  function heroOf(pic) {
     const hero = el("div", "hero");
     const bk = el("button", "back hero-back", "→");
     bk.type = "button"; bk.setAttribute("aria-label", "رجوع");
     bk.addEventListener("click", goBack);
-    const pic = picBlock(p); pic.classList.add("big");
+    pic.classList.add("big");
     hero.append(bk, pic);
+    return hero;
+  }
 
+  // صفحة المنتج: صورة كبيرة على خلفية سماوي، بعدها الاسم والسعر، وتحتهم بيانات المنتج كاملة
+  function productPage(it) {
+    const p = it.p;
+    const hero = heroOf(picBlock(p));
     const sheet = el("div", "sheet");
     const h = el("h2", "pd-name", p.product_name || p.arabic_name || "منتج بدون اسم");
     h.dir = "auto";
@@ -56,7 +73,55 @@
     }
     sheet.append(el("h3", "pd-h", "عن المنتج"));
     sheet.append(orig[it.kind](p, it.t));
-    root.append(hero, sheet);
+    return [hero, sheet];
+  }
+
+  // صفحة البديل: من بيانات البديل نفسها (اسم، سعر، شركة، تركيز، شكل)، وزر يجيب بياناته الكاملة بالبحث
+  function altPage(it) {
+    const a = it.p, par = it.parent;
+    const hero = heroOf(picBlock({ product_name: a.trade_name, image: { has_image: !!a.image_url, url: a.image_url } }));
+    const sheet = el("div", "sheet");
+    const h = el("h2", "pd-name", a.trade_name || "منتج بدون اسم");
+    h.dir = "auto";
+    sheet.append(h);
+    if (par && (par.product_name || par.arabic_name)) sheet.append(el("div", "pd-ar", "بديل لـ " + (par.product_name || par.arabic_name)));
+    if (a.current_price != null) {
+      const row = el("div", "pd-price");
+      row.append(el("b", null, fmt(a.current_price)));
+      const diff = Number(a.price_diff);
+      if (a.price_diff != null && Number.isFinite(diff)) {
+        row.append(el("span", "alt-diff " + (diff < 0 ? "cheap" : diff > 0 ? "dear" : ""),
+          diff === 0 ? "نفس سعر المنتج الأصلي" : (diff < 0 ? "أرخص بـ " : "أغلى بـ ") + fmt(Math.abs(diff)) + " من المنتج الأصلي"));
+      }
+      if (a.price_updated_on) row.append(el("span", null, "آخر تحديث للسعر: " + new Date(a.price_updated_on).toLocaleDateString("ar-EG")));
+      sheet.append(row);
+    }
+    sheet.append(el("h3", "pd-h", "عن المنتج"));
+    const ul = el("ul", "ing");
+    [["الشركة", a.manufacturer], ["التركيز", a.strength], ["الشكل الدوائي", a.dosage_form], ["سعر الوحدة", a.price_per_unit != null ? fmt(a.price_per_unit) : null]]
+      .filter((r) => r[1]).forEach((r) => { const li = el("li"); li.append(el("span", null, r[0]), el("span", null, r[1])); ul.append(li); });
+    if (ul.childElementCount) sheet.append(ul);
+    const chips = el("div", "chips");
+    chips.append(el("span", "chip " + (a.pack_matched ? "ok" : "warn"), a.pack_matched ? "نفس حجم العبوة" : "حجم العبوة مختلف"));
+    if (a.match_level && a.match_level !== "strict") chips.append(el("span", "chip warn", "نفس المادة بس"));
+    sheet.append(chips);
+    const full = el("button", "alt-btn", "ابحث عن بياناته الكاملة");
+    full.type = "button";
+    full.addEventListener("click", () => {
+      $("q").value = a.trade_name;
+      const r = document.querySelector('input[name=t][value="auto"]');
+      if (r) r.checked = true;
+      $("f").requestSubmit();
+    });
+    sheet.append(full, el("div", "meta", "اسأل الصيدلي أو الدكتور قبل ما تستبدل الدواء."));
+    return [hero, sheet];
+  }
+
+  // الصفحة بتتبني مرة واحدة وتتحفظ، فلما ترجع من بديل لمنتجه الأصلي تلاقي كل حاجة زي ما سبتها
+  function detail(i) {
+    const it = ITEMS[i], root = $("pd");
+    if (!it.dom) it.dom = it.kind === "alt" ? altPage(it) : productPage(it);
+    root.replaceChildren(...it.dom);
   }
 
   function route() {
@@ -70,8 +135,16 @@
     document.body.dataset.view = v;
     $("ab-t").textContent = v === "results" ? "نتائج البحث" : "The Pharmacist";
     $("ab-s").textContent = v === "results" ? "«" + lastQ + "»" : HOME_SUB;
-    if (v === "product") detail(+m[1]);
-    window.scrollTo(0, v === "results" && prev === "product" ? listY : 0);
+    let y = 0;
+    if (v === "product") {
+      curIdx = +m[1];
+      detail(curIdx);
+      y = ITEMS[curIdx].y || 0; ITEMS[curIdx].y = 0;
+    } else {
+      curIdx = -1;
+      if (v === "results" && prev === "product") y = listY;
+    }
+    window.scrollTo(0, y);
   }
 
   // دوس على صورة الكارت أو اسمه = يتفتح في مكانه (الاسم بيطلع فوق وتحت التفاصيل). زرار «صفحة المنتج» بيفتح صفحته.
@@ -143,6 +216,26 @@
   });
   $("out").addEventListener("keydown", (e) => {
     if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card[data-i]")) { e.preventDefault(); toggle(e.target); }
+  });
+
+  // دوس على بديل = افتح صفحة البديل
+  const openAlt = (row) => {
+    if (row._i == null) {
+      const w = row.closest(".alt-wrap");
+      row._i = ITEMS.push({ kind: "alt", p: row._alt, parent: w && w._parent }) - 1;
+    }
+    if (curIdx >= 0) ITEMS[curIdx].y = window.scrollY;
+    else listY = window.scrollY;
+    navd = true;
+    location.hash = "#/p/" + row._i;
+  };
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("a, button")) return;
+    const row = e.target.closest(".alt-item");
+    if (row && row._alt) openAlt(row);
+  });
+  document.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && e.target && e.target.matches && e.target.matches(".alt-item") && e.target._alt) { e.preventDefault(); openAlt(e.target); }
   });
 
   // أي بحث (من الفورم أو الباركود أو الصورة) بيودّي لصفحة النتايج

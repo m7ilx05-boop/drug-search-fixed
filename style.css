@@ -301,3 +301,9 @@ body[data-view=results] #out{padding-inline:8px}
 #out .card.anim{will-change:height}
 #out .card.swap>h2{position:relative;z-index:4;background:var(--cbg);box-shadow:0 0 0 24px var(--cbg)}
 #out .card.swap>.pic{position:relative;z-index:3}
+
+/* ===== البدائل: الصف كله بيتدوس ويفتح صفحة البديل، ورابط "المصدر" مخفي ===== */
+.alt-item{position:relative;cursor:pointer;padding-inline-end:22px}
+.alt-item::after{content:"‹";position:absolute;inset-inline-end:0;top:50%;transform:translateY(-50%);color:var(--accent);font-size:24px;line-height:1}
+.alt-item:active{background:var(--soft)}
+.alt-item .alt-info>a{display:none}
