@@ -80,6 +80,8 @@
   function setOpen(c, on, animate) {
     const h = c.querySelector("h2");
     const firstH = animate && h ? h.getBoundingClientRect() : null;
+    const pic = c.querySelector(".pic");
+    const firstP = animate && pic ? pic.getBoundingClientRect() : null;
     const hFrom = c.offsetHeight;
     c.classList.toggle("open", on);
     c.setAttribute("aria-expanded", on ? "true" : "false");
@@ -88,7 +90,17 @@
     // 1) الاسم بيتحرك من مكانه القديم للجديد
     if (firstH && h.animate) {
       const last = h.getBoundingClientRect(), dx = firstH.left - last.left, dy = firstH.top - last.top;
-      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.4,0,.2,1)" });
+      if (dx || dy) {
+        // الاسم بيتحرك ومعاه خلفية الكارت (لوحة) فوق الصورة، والصورة بتتحرك عكسه، بدل ما الاسم يعدّي على الصورة لوحده
+        c.classList.add("swap");
+        const ha = h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.4,0,.2,1)" });
+        const un = () => c.classList.remove("swap");
+        ha.addEventListener("finish", un); ha.addEventListener("cancel", un);
+      }
+    }
+    if (firstP && pic.animate) {
+      const lp = pic.getBoundingClientRect(), pdy = firstP.top - lp.top;
+      if (pdy) pic.animate([{ transform: "translateY(" + pdy + "px)" }, { transform: "none" }], { duration: 300, easing: "cubic-bezier(.4,0,.2,1)" });
     }
     // 2) ارتفاع الكارت بيتغيّر تدريجي بدل ما يقفز
     if (hFrom === hTo) return Promise.resolve();
