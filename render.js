@@ -355,7 +355,7 @@ function renderAll(d, note) {
     list.forEach((p) => out.append(card(p, tiers ? tier : undefined)));
   };
   const src = d.source && d.source.name;
-  section(t1, 1, src ? "المصدر الرسمي: " + src : "معتمد من المصنع", src ? (d.disclaimer || "") : "بيانات من الموقع الرسمي للشركة المصنّعة.");
+  section(t1, 1, "تم مراجعته", src ? (d.disclaimer || "") : "بيانات من الموقع الرسمي للشركة المصنّعة.");
   section(tm, 1, "معتمد من المصنع", "بيانات من الموقع الرسمي للشركة المصنّعة.");
   section(t2, 2, "من الصيدليات", "بيانات من صيدليات على الإنترنت مش من المصنع. قارنها بمصدر رسمي.");
   section(t3, 3, "غير مؤكد", "لسه ما اتأكدش من مصدر موثوق.");
