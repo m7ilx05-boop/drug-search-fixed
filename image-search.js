@@ -110,6 +110,7 @@ async function handle(f) {
           if (d.ambiguous) out.append(el("div", "scan-msg warn", "الباركود ده مسجّل لأكتر من منتج في المصدر. راجع الاسم والحجم على العبوة."));
           (d.results || []).forEach((p) => out.append(card(p, 1)));
           setStatus("اتعرف على المنتج من الباركود المطبوع في الصورة.");
+          toast("success", "اتعرف على المنتج من الباركود.");
           return;
         }
       } catch { /* نكمّل بالاسم */ }
@@ -136,7 +137,9 @@ async function handle(f) {
       out.append(el("h3", "sec", "نفس المنتج اللي في الصورة (" + exact.length + ")"));
       out.append(el("p", "sec-note", "نفس الاسم" + (m.strength_checked ? " والتركيز (" + (m.required_strength || []).join(" + ") + ")" : "") + " والشكل الدوائي."));
       exact.forEach((p) => out.append(card(p, 1)));
+      toast("success", "لقينا نفس المنتج اللي في الصورة.");
     } else {
+      toast("warn", "ما لقيناش نفس المنتج بنفس التركيز والشكل.");
       out.append(el("div", "scan-msg warn", "ما لقيناش في السجل نفس المنتج بنفس التركيز والشكل."));
     }
     if (unv.length) {

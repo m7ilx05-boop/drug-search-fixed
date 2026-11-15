@@ -41,7 +41,28 @@ function showSkeleton() {
 }
 function hideSkeleton() { const s = document.getElementById("skel"); if (s) s.remove(); }
 
+// ===== تنبيه بيطلع من فوق الشاشة: success / info / warn / error (شكل مقتبس من Uiverse / Cybercom682) =====
+const TOAST_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M13 16h-1v-4h1m0-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+let toastTimer = 0;
+function toast(kind, text) {
+  if (!text) return;
+  let box = document.getElementById("toasts");
+  if (!box) { box = el("div"); box.id = "toasts"; document.body.append(box); }
+  clearTimeout(toastTimer);
+  const k = ["success", "info", "warn", "error"].includes(kind) ? kind : "info";
+  const t = el("div", "toast " + k);
+  t.setAttribute("role", k === "error" ? "alert" : "status");
+  const ic = el("span", "toast-ic"); ic.innerHTML = TOAST_ICON;
+  t.append(ic, el("p", null, text));
+  const close = () => { t.classList.add("out"); setTimeout(() => t.remove(), 260); };
+  t.addEventListener("click", close);
+  box.replaceChildren(t);                       // تنبيه واحد في كل مرة
+  toastTimer = setTimeout(close, k === "error" ? 6000 : 4000);
+}
+function foundMsg(n) { return n === 1 ? "لقينا منتج واحد." : "لقينا " + Number(n).toLocaleString("ar-EG") + " منتج."; }
+
 function setStatus(text, { error = false, progress = null } = {}) {
+  if (error && text) toast("error", text);
   if (error || (progress != null && progress >= 100)) hideSkeleton();
   const s = $("status");
   s.className = "show" + (error ? " error" : "");

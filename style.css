@@ -253,3 +253,24 @@ body[data-view=home] form{margin-top:-52px}
 .sk-row.half{width:50%}
 @keyframes skelPulse{50%{opacity:.5}}
 @media (prefers-reduced-motion:reduce){.skel{animation:none}}
+
+/* ===== التنبيهات: بتطلع من فوق الشاشة (شكل مقتبس من Uiverse / Cybercom682) ===== */
+#toasts{position:fixed;z-index:100;top:calc(var(--top) + 12px);inset-inline:12px;display:flex;justify-content:center;pointer-events:none}
+.toast{--tb:#22C55E;--tbg:#DCFCE7;--tbh:#BBF7D0;--tt:#14532D;--ti:#16A34A;pointer-events:auto;display:flex;align-items:center;gap:8px;width:100%;max-width:420px;padding:10px 12px;border-radius:12px;border-inline-start:4px solid var(--tb);background:var(--tbg);color:var(--tt);font-size:13px;font-weight:600;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.18);cursor:pointer;transition:background .3s,transform .3s;animation:toastIn .3s ease-out}
+.toast.info{--tb:#3B82F6;--tbg:#DBEAFE;--tbh:#BFDBFE;--tt:#1E3A8A;--ti:#2563EB}
+.toast.warn{--tb:#EAB308;--tbg:#FEF9C3;--tbh:#FEF08A;--tt:#713F12;--ti:#CA8A04}
+.toast.error{--tb:#EF4444;--tbg:#FEE2E2;--tbh:#FECACA;--tt:#7F1D1D;--ti:#DC2626}
+@media (prefers-color-scheme:dark){
+  .toast{--tb:#15803D;--tbg:#14532D;--tbh:#166534;--tt:#DCFCE7;--ti:#4ADE80}
+  .toast.info{--tb:#1D4ED8;--tbg:#1E3A8A;--tbh:#1E40AF;--tt:#DBEAFE;--ti:#60A5FA}
+  .toast.warn{--tb:#A16207;--tbg:#713F12;--tbh:#854D0E;--tt:#FEF9C3;--ti:#FACC15}
+  .toast.error{--tb:#B91C1C;--tbg:#7F1D1D;--tbh:#991B1B;--tt:#FEE2E2;--ti:#F87171}
+}
+.toast p{margin:0;flex:1;min-width:0}
+.toast-ic{flex:none;width:20px;height:20px;color:var(--ti);display:flex}
+.toast-ic svg{width:20px;height:20px}
+.toast.out{animation:toastOut .25s ease-in forwards}
+@media (hover:hover){.toast:hover{background:var(--tbh);transform:scale(1.05)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(-24px)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-24px)}}
+@media (prefers-reduced-motion:reduce){.toast,.toast.out{animation:none}}

@@ -148,18 +148,20 @@ async function poll(jobId, token, query, search_type) {
         appendSuggestions(items);
         recAdd(query, search_type);
         setStatus("اكتمل البحث على الإنترنت.", { progress: 100 });
+        toast("success", "اكتمل التحديث. " + foundMsg(shown));
         return;
       }
 
       if (pending.length) {
+        toast("info", "لقينا المنتج وهو في انتظار المراجعة.");
         showPending(j.message_ar || "لقينا المنتج ده، وهو في انتظار المراجعة قبل ما يتضاف لقاعدة البيانات.", pending);
         appendSuggestions(items);
         setStatus("اكتمل البحث على الإنترنت.", { progress: 100 });
       }
-      else if (items.length) { showSuggestions(query, items); setStatus("اكتمل البحث على الإنترنت.", { progress: 100 }); }
-      else if (j.message_ar) { render([], j.message_ar); setStatus("اكتمل البحث على الإنترنت.", { progress: 100 }); }
-      else if (code === "pending_review") { render([], "لقينا منتجات جديدة، وهي في انتظار المراجعة قبل ما تتضاف لقاعدة البيانات."); setStatus("اكتمل البحث على الإنترنت.", { progress: 100 }); }
-      else { render([], "اكتمل البحث على الإنترنت، لكن مفيش نتايج محفوظة لهذا الاسم."); setStatus("اكتمل البحث على الإنترنت.", { progress: 100 }); }
+      else if (items.length) { toast("warn", "مفيش نتايج بالاسم ده. جرّب الأسماء المقترحة."); showSuggestions(query, items); setStatus("اكتمل البحث على الإنترنت.", { progress: 100 }); }
+      else if (j.message_ar) { toast("warn", "اكتمل البحث ومفيش نتايج مؤكدة."); render([], j.message_ar); setStatus("اكتمل البحث على الإنترنت.", { progress: 100 }); }
+      else if (code === "pending_review") { toast("info", "لقينا منتجات جديدة في انتظار المراجعة."); render([], "لقينا منتجات جديدة، وهي في انتظار المراجعة قبل ما تتضاف لقاعدة البيانات."); setStatus("اكتمل البحث على الإنترنت.", { progress: 100 }); }
+      else { toast("warn", "اكتمل البحث ومفيش نتايج لهذا الاسم."); render([], "اكتمل البحث على الإنترنت، لكن مفيش نتايج محفوظة لهذا الاسم."); setStatus("اكتمل البحث على الإنترنت.", { progress: 100 }); }
       return;
     }
     if (j.status === "failed") { setStatus(j.message_ar || ERR[j.error_message] || "فشل تحديث البيانات من الإنترنت.", { error: true }); return; }
@@ -185,12 +187,13 @@ $("f").addEventListener("submit", async (e) => {
     const d = await call("drug-search", { query, search_type });
     const shown = renderAll(d, "مفيش منتجات محفوظة لهذا البحث لسه.");
     if (shown) recAdd(query, search_type);
+    let hadSug = false;
     if (!shown) {
       // typo of a name we already know (Cnor -> Concor): the server answers this before the web search finishes
       const sug = (Array.isArray(d.suggestions) ? d.suggestions : [])
         .filter((s) => s && typeof s.text === "string" && norm(s.text) !== norm(query))
         .map((s) => ({ text: s.text, type: s.search_type }));
-      if (sug.length) showSuggestions(query, sug);
+      if (sug.length) { showSuggestions(query, sug); hadSug = true; }
     }
     showMore(query, search_type, d.secondary);
     const underReview = Array.isArray(d.pending_review) ? d.pending_review.length : 0;
@@ -198,12 +201,18 @@ $("f").addEventListener("submit", async (e) => {
       if (d.refresh_status === "completed" && shown) {
         // an earlier search for this name already finished: what is stored is the answer, nothing more to wait for
         setStatus(underReview ? "ده اللي لقيناه. المنتجات «قيد المراجعة» لسه مش مؤكدة." : "");
+        toast("success", foundMsg(shown));
       } else {
+        if (shown) toast("info", "ده اللي محفوظ عندنا، وجاري تحديثه من المصادر.");
         setStatus(shown ? "ده اللي محفوظ عندنا. جاري تحديثه من المصادر…" : "جاري البحث في المصادر…", { progress: 5 });
         if (!shown && !$("out").querySelector(".suggest")) showSkeleton();
         poll(d.job_id, token, query, search_type);
       }
-    } else setStatus(d.cache_status === "fresh" ? "بيانات محدّثة." : "");
+    } else {
+      setStatus(d.cache_status === "fresh" ? "بيانات محدّثة." : "");
+      if (shown) toast("success", foundMsg(shown));
+      else toast("warn", hadSug ? "مفيش نتايج بالاسم ده. جرّب الأسماء المقترحة." : "مفيش نتايج لهذا البحث.");
+    }
   } catch (err) {
     setStatus(ERR[err.code] || "حصلت مشكلة في الاتصال. جرّب تاني.", { error: true });
   } finally { $("go").disabled = false; }
