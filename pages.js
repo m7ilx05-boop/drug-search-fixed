@@ -14,7 +14,11 @@
       if (kind === "pendingCard") c.prepend(picBlock(p));
       c.dataset.i = ITEMS.push({ kind, p, t }) - 1;
       c.tabIndex = 0;
-      c.setAttribute("role", "link");
+      c.setAttribute("role", "button");
+      c.setAttribute("aria-expanded", "false");
+      // زرار صفحة المنتج: بيظهر في الكارت المفتوح بس
+      const g = el("button", "goto", "صفحة المنتج ←"); g.type = "button";
+      c.prepend(g);
       return c;
     };
   });
@@ -70,15 +74,34 @@
     window.scrollTo(0, v === "results" && prev === "product" ? listY : 0);
   }
 
-  // دوس على كارت في النتايج = افتح صفحته
+  // دوس على صورة الكارت أو اسمه = يتفتح في مكانه (الاسم بيطلع فوق وتحت التفاصيل). زرار «صفحة المنتج» بيفتح صفحته.
   const open = (c) => { listY = window.scrollY; navd = true; location.hash = "#/p/" + c.dataset.i; };
+  const REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)");
+  function setOpen(c, on, animate) {
+    const h = c.querySelector("h2");
+    const first = animate && h ? h.getBoundingClientRect() : null;
+    c.classList.toggle("open", on);
+    c.setAttribute("aria-expanded", on ? "true" : "false");
+    if (first && !REDUCE.matches && h.animate) {
+      const last = h.getBoundingClientRect(), dx = first.left - last.left, dy = first.top - last.top;
+      if (dx || dy) h.animate([{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 380, easing: "cubic-bezier(.2,.8,.2,1)" });
+    }
+  }
+  function toggle(c) {
+    const on = !c.classList.contains("open");
+    if (on) $("out").querySelectorAll(".card.open").forEach((o) => { if (o !== c) setOpen(o, false, false); }); // كارت واحد مفتوح
+    setOpen(c, on, true);
+    if (on) c.scrollIntoView({ block: "start", behavior: REDUCE.matches ? "auto" : "smooth" });
+  }
   $("out").addEventListener("click", (e) => {
-    if (e.target.closest("a, button")) return;
     const c = e.target.closest(".card[data-i]");
-    if (c) open(c);
+    if (!c) return;
+    if (e.target.closest("button.goto")) { open(c); return; }
+    if (e.target.closest("a, button")) return;
+    if (e.target === c || e.target.closest(".pic, h2")) toggle(c);
   });
   $("out").addEventListener("keydown", (e) => {
-    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card[data-i]")) { e.preventDefault(); open(e.target); }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card[data-i]")) { e.preventDefault(); toggle(e.target); }
   });
 
   // أي بحث (من الفورم أو الباركود أو الصورة) بيودّي لصفحة النتايج
