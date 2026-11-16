@@ -1,0 +1,20 @@
+project_id = "clhtimetvykbjdhfdmig"
+
+[functions.drug-pre-verify]
+verify_jwt = false
+[functions.source-vet]
+verify_jwt = false
+[functions.drug-official]
+verify_jwt = false
+[functions.fc-key-check]
+verify_jwt = false
+[functions.tavily-key-check]
+verify_jwt = false
+[functions.firecrawl-key-check]
+verify_jwt = false
+[functions.llm-gateway]
+verify_jwt = false
+[functions.key-status]
+verify_jwt = false
+[functions.ops-feed]
+verify_jwt = false
