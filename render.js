@@ -202,7 +202,8 @@ function card(p, tier) {
   if (ings.length) {
     const ul = el("ul", "ing");
     ings.forEach((pi) => {
-      const li = el("li");
+      const li = el("li"); li.dir = "auto";
+      if (pi.active_ingredients?.inn) li.dataset.ing = pi.active_ingredients.inn;
       li.append(el("span", null, pi.active_ingredients?.inn || "مادة غير معروفة"), el("span", null, fmtStrength(pi)));
       ul.append(li);
     });
@@ -210,7 +211,7 @@ function card(p, tier) {
   } else if (p.scientific_name) {
     const ul = el("ul", "ing");
     String(p.scientific_name).split("+").map((s) => s.trim()).filter(Boolean).forEach((n) => {
-      const li = el("li");
+      const li = el("li"); li.dir = "auto"; li.dataset.ing = n;
       li.append(el("span", null, n));
       ul.append(li);
     });
