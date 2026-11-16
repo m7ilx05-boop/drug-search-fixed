@@ -39,10 +39,17 @@ function numbersKept(src: string, out: string): boolean {
   return true;
 }
 
-async function llm(prompt: string) {
+const arabicShare = (s: string) => {
+  const ar = (s.match(/[\u0600-\u06FF]/g) ?? []).length, la = (s.match(/[A-Za-z]/g) ?? []).length;
+  return ar + la === 0 ? 0 : ar / (ar + la);
+};
+
+// Tries Gemini, then Grok. An answer counts only when it is real Arabic (not the English echoed back) and every number survived.
+async function translate(text: string) {
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/llm-gateway`;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  let lastErr = "";
+  const prompt = `Translate the following FDA drug label text into Arabic. The output must be in Arabic script, not English.\nReturn only JSON: {"text": "<translated lines joined by \\n>"}\n\nTEXT:\n<<<\n${text}\n>>>`;
+  let code = "translation_unavailable";
   for (const provider of ["gemini", "grok"]) {
     try {
       const r = await fetch(url, {
@@ -52,11 +59,16 @@ async function llm(prompt: string) {
         signal: AbortSignal.timeout(45_000),
       });
       const b = await r.json().catch(() => ({}));
-      if (r.ok && b?.ok && typeof b.text === "string") return { ok: true as const, text: b.text as string };
-      lastErr = `${provider}:${b?.error ?? r.status}`;
-    } catch { lastErr = `${provider}:network`; }
+      if (!(r.ok && b?.ok && typeof b.text === "string")) { console.error("gateway", provider, b?.error ?? r.status); continue; }
+      let out = "";
+      try { out = String(JSON.parse(b.text.replace(/^```json|```$/gm, "").trim()).text ?? "").trim(); } catch { code = "bad_model_output"; continue; }
+      if (!out) { code = "bad_model_output"; continue; }
+      if (arabicShare(out) < 0.4) { console.error("not_arabic", provider); code = "not_translated"; continue; }
+      if (!numbersKept(text, out)) { console.error("numbers_mismatch", provider); code = "numbers_mismatch"; continue; }
+      return { ok: true as const, text: out };
+    } catch (e) { console.error("network", provider, String(e)); }
   }
-  return { ok: false as const, error: lastErr };
+  return { ok: false as const, code };
 }
 
 Deno.serve(async (req) => {
@@ -75,11 +87,7 @@ Deno.serve(async (req) => {
   if (rl.error) { console.error("rate_limit_error", rl.error.message); return json({ error: "internal_error" }, 500); }
   if (rl.data === false) return json({ error: "rate_limited" }, 429);
 
-  const r = await llm(text);
-  if (!r.ok) { console.error("translate_failed", r.error); return json({ error: "translation_unavailable" }, 503); }
-  let out = "";
-  try { out = String(JSON.parse(r.text.replace(/^```json|```$/gm, "").trim()).text ?? "").trim(); } catch { return json({ error: "bad_model_output" }, 502); }
-  if (!out) return json({ error: "bad_model_output" }, 502);
-  if (!numbersKept(text, out)) { console.error("numbers_mismatch"); return json({ error: "numbers_mismatch" }, 422); }
-  return json({ ok: true, text: out });
+  const r = await translate(text);
+  if (!r.ok) return json({ error: r.code }, r.code === "translation_unavailable" ? 503 : 422);
+  return json({ ok: true, text: r.text });
 });

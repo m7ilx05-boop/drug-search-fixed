@@ -19,7 +19,7 @@ const LBL_HEADS = ["Warnings", "Directions", "Uses", "Purpose", "Active ingredie
 const LBL_BREAKS = ["If pregnant or breast-feeding", "Keep out of reach of children", "In case of overdose"];
 const LBL_ROWS = ["adults and children 12 years and over", "children 6 to under 12 years", "children under 6 years", "children 2 to under 6 years", "adults"];
 function labelStructure(raw) {
-  let t = String(raw || "").replace(/\s+/g, " ").trim();
+  let t = String(raw || "").replace(/[\u25A0\u25AA\u25AB\u2022\u25CF]/g, "▪").replace(/\s+/g, " ").trim(); // openFDA بيستخدم ■ (U+25A0) كنقطة
   LBL_HEADS.forEach((h) => { t = t.replace(new RegExp("(^|[\\s.:])(" + h + ")(?=\\s|:|$)", "g"), "$1\n##$2\n"); });
   LBL_BREAKS.forEach((h) => { t = t.replace(new RegExp("(^|[\\s.])(" + h + ")(?=[\\s,.:]|$)", "g"), "$1\n$2"); });
   if (/\bage\s+Dose\b/i.test(t)) {
@@ -56,7 +56,7 @@ function labelBlock(textEn, textAr) {
     btn.disabled = true; btn.textContent = "...جاري الترجمة";
     try { const r = await call("translate-label", { text: struct, target: "ar" }); ar = String(r.text || ""); show(true); }
     catch (e) {
-      btn.textContent = e && e.code === "rate_limited" ? "حاول بعد دقيقة" : e && e.code === "numbers_mismatch" ? "الترجمة اترفضت (الأرقام مش متطابقة)، اقرأ الأصل" : "تعذّرت الترجمة، حاول تاني";
+      btn.textContent = e && e.code === "rate_limited" ? "حاول بعد دقيقة" : e && (e.code === "numbers_mismatch" || e.code === "not_translated") ? "الترجمة مش دقيقة كفاية واترفضت، اقرأ الأصل" : "تعذّرت الترجمة، حاول تاني";
       setTimeout(() => { if (!showAr) btn.textContent = "🌐 ترجمة للعربي"; }, 3500);
     }
     btn.disabled = false;
