@@ -82,7 +82,7 @@ function detailPanel(it) {
   row("تصنيف FDA الدوائي", epc, true);
   row("آلية العمل (MoA)", lines(it.moa), true);
   row("الغرض حسب ملصق FDA", (Array.isArray(it.fda_purpose) ? it.fda_purpose : []).map((x) => String(x).slice(0, 160)), true);
-  const srcs = String(it.source || "openfda").split("+").map((x) => x === "rxclass" ? "RxClass (المكتبة الطبية الأمريكية NLM)" : x === "openfda" ? "openFDA (ملصقات الأدوية الأمريكية)" : "").filter(Boolean);
+  const srcs = String(it.source || "openfda").split("+").map((x) => x === "rxclass" ? "RxClass (المكتبة الطبية الأمريكية NLM)" : x === "openfda" ? "openFDA (ملصقات الأدوية الأمريكية)" : x === "nutrient_rule" ? "قاعدة ثابتة في النظام (الفيتامينات والمعادن والأحماض الأمينية بتتصنف كمكمل غذائي، مش من مرجع طبي خارجي)" : "").filter(Boolean);
   box.append(el("p", "meta ing-src", "المصدر: " + srcs.join(" + ") + ". ده تصنيف عام للمادة الفعّالة مش لمنتج معيّن في السوق المصري، ومش بديل لرأي الصيدلي أو الطبيب."));
   return box;
 }
