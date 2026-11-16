@@ -26,9 +26,21 @@ button:disabled{opacity:.6}
 .num{white-space:nowrap;text-align:start;font-variant-numeric:tabular-nums;direction:ltr}
 .row.l{grid-template-columns:78px 1fr 40px}
 .err{color:var(--bad);font-size:13px}
+.tabs{display:flex;gap:6px;margin:4px 0 8px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:5}
+.tabs a{flex:1;text-align:center;padding:9px;border-radius:10px;background:var(--card);border:1px solid var(--ln);color:var(--mu);text-decoration:none;font-size:14px}
+.tabs a.on{background:var(--br);color:#fff;border-color:var(--br)}
+.op{border-top:1px solid var(--ln);padding:9px 0;font-size:13px}
+.op:first-of-type{border-top:0}
+.op b{font-weight:600;word-break:break-word}
+.op .meta{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px;color:var(--mu);font-size:12px}
+.tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;margin-inline-end:6px;background:var(--bg);color:var(--mu);border:1px solid var(--ln)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.mu{color:var(--mu);font-size:12px}
 </style>
 </head>
 <body>
+<div class="tabs"><a href="#keys" id="t-keys">المفاتيح</a><a href="#ops" id="t-ops">العمليات</a></div>
+<div id="pg-keys">
 <h1>حالة مفاتيح البحث</h1>
 <div class="sub"><span id="when">جاري التحميل…</span><button id="btn">افحص الآن</button></div>
 <div id="err" class="err"></div>
@@ -36,6 +48,14 @@ button:disabled{opacity:.6}
 <div class="card" id="fc"></div>
 <div class="card" id="gem"></div>
 <div class="card" id="grk"></div>
+</div>
+<div id="pg-ops" hidden>
+<h1>العمليات والاستهلاك</h1>
+<div class="sub"><span id="owhen">جاري التحميل…</span><button id="obtn">تحديث</button></div>
+<div id="oerr" class="err"></div>
+<div class="card" id="osum"></div>
+<div class="card" id="ofeed"></div>
+</div>
 <script>
 const SNAP={"checked_at":null,"tavily":[],"firecrawl":[],"llm":[]};
 const $=id=>document.getElementById(id);
@@ -93,6 +113,77 @@ async function load(force){
 }
 $("btn").onclick=()=>load(true);
 load(false);setInterval(()=>load(false),60000);
+
+/* ===== صفحة العمليات ===== */
+const OPS_API="https://clhtimetvykbjdhfdmig.supabase.co/functions/v1/ops-feed";
+const KIND={full:"بحث كامل",alternatives:"بدائل",secondary:"بحث ثانوي"};
+const OUTC={found:["ok","لقى نتيجة"],not_found:["bad","مفيش نتيجة"],under_review:["warn","قيد المراجعة"]};
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function ago(t){const s=Math.max(0,(Date.now()-Date.parse(t))/1000);if(s<60)return "من "+Math.round(s)+" ث";if(s<3600)return "من "+Math.round(s/60)+" د";if(s<86400)return "من "+Math.round(s/3600)+" س";return new Date(t).toLocaleDateString("ar-EG",{day:"numeric",month:"short"})}
+function clock(t){return new Date(t).toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+function stat(b,l){return '<div class="stat"><b>'+b+'</b><span>'+l+'</span></div>'}
+function urow(l,v,p){return '<div class="row"><span>'+l+'</span><div class="bar"><i style="width:'+(Math.min(Math.max(p,0),1)*100)+'%;background:'+col(1-p)+'"></i></div><span class="num">'+v+'</span></div>'}
+function trow(l,v){return '<div class="row"><span>'+l+'</span><span>'+v+'</span><span></span></div>'}
+function drawOps(d){
+  const s=d.summary,oc=s.outcomes_24h||{};
+  let h='<h2>آخر 24 ساعة</h2><div class="stats">'+stat(fmt(s.searches_24h),"عمليات بحث")+stat(fmt(s.jobs_24h),"مهام تشغيل")+stat(fmt(s.jobs_failed_24h),"مهام فاشلة")+'</div>';
+  h+='<div class="sub">لقى: '+fmt(oc.found||0)+' · مفيش نتيجة: '+fmt(oc.not_found||0)+' · قيد المراجعة: '+fmt(oc.under_review||0)+'</div>';
+  h+='<h2 style="margin-top:14px">الاستهلاك من كل المفاتيح</h2>';
+  h+=urow("Tavily",fmt(s.tavily_used)+" / "+fmt(s.tavily_limit),s.tavily_limit?s.tavily_used/s.tavily_limit:0);
+  h+=urow("Firecrawl",fmt(s.firecrawl_used)+" / "+fmt(s.firecrawl_limit),s.firecrawl_limit?s.firecrawl_used/s.firecrawl_limit:0);
+  h+=trow("Firecrawl 24س","~"+fmt(s.firecrawl_pages_24h)+" صفحة");
+  h+=trow("Gemini",fmt(s.gemini_calls_today)+" طلب النهاردة · "+fmt(s.gemini_calls_total)+" إجمالي");
+  h+=trow("Grok",fmt(s.grok_calls_today)+" طلب · $"+Number(s.grok_spent_today_usd).toFixed(4)+" النهاردة");
+  h+='<div class="sub" style="margin-top:8px">Tavily وFirecrawl: الاستهلاك الكلي من فحص المفاتيح (الباقة الحالية لكل المفاتيح). عدد توكنز Gemini وGrok لكل عملية لوحدها مش متسجل دلوقتي.</div>';
+  $("osum").innerHTML=h;
+  drawFeed(d.items||[]);
+  $("owhen").textContent="آخر تحديث: "+clock(d.generated_at);
+}
+function drawFeed(items){
+  let h='<h2>كل العمليات (الأحدث أولاً)</h2>';
+  if(!items.length)h+='<div class="mu">مفيش عمليات.</div>';
+  for(const o of items){
+    let tag,st,meta=[];
+    if(o.type==="job"){
+      tag=KIND[o.kind]||o.kind||"مهمة";
+      st=o.status==="failed"?["bad","فشلت"]:(o.status==="completed"?(OUTC[o.outcome]||["ok","تمت"]):["warn",esc(o.status||"—")]);
+      if(o.secs!=null)meta.push("⏱ "+o.secs+" ث");
+      if(o.pages)meta.push("صفحات: "+o.pages);
+      if(o.results!=null)meta.push("نتائج: "+o.results);
+      if(o.tavily&&o.tavily.length)meta.push("Tavily: "+esc(o.tavily.join("، ")));
+      if(o.firecrawl&&o.firecrawl.length)meta.push("Firecrawl: "+esc(o.firecrawl.join("، ")));
+    }else{
+      tag="بحث"+(o.cache?" · "+esc(o.cache):"");
+      st=OUTC[o.outcome]||["warn",esc(o.outcome||"—")];
+      if(o.results!=null)meta.push("نتائج: "+o.results);
+    }
+    h+='<div class="op"><div><span class="tag">'+esc(tag)+'</span><b dir="auto">'+esc(o.query)+'</b></div>'
+      +'<div class="meta"><span class="'+st[0]+'">'+st[1]+'</span><span>'+clock(o.t)+' ('+ago(o.t)+')</span>'+meta.map(x=>'<span>'+x+'</span>').join("")+'</div>'
+      +(o.error?'<div class="err">'+esc(o.error)+'</div>':'')+'</div>';
+  }
+  $("ofeed").innerHTML=h;
+}
+let obusy=false;
+async function loadOps(){
+  if(obusy)return;obusy=true;const b=$("obtn");b.disabled=true;$("oerr").textContent="";
+  try{
+    const r=await fetch(OPS_API,{cache:"no-store"});
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();drawOps(d);
+    if(d.warnings&&d.warnings.length)$("oerr").textContent="تنبيه: "+d.warnings.join(" | ");
+  }catch(e){$("oerr").textContent="تعذر التحميل ("+e.message+")"}
+  obusy=false;b.disabled=false;
+}
+function tab(){
+  const ops=location.hash==="#ops";
+  $("pg-keys").hidden=ops;$("pg-ops").hidden=!ops;
+  $("t-keys").className=ops?"":"on";$("t-ops").className=ops?"on":"";
+  if(ops)loadOps();
+}
+$("obtn").onclick=loadOps;
+window.addEventListener("hashchange",tab);
+setInterval(()=>{if(location.hash==="#ops"&&!document.hidden)loadOps()},15000);
+tab();
 </script>
 </body>
 </html>
