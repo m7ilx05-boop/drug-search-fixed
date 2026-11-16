@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حالة مفاتيح Tavily و Firecrawl</title>
+<style>
+:root{--bg:#f4f7f7;--card:#fff;--tx:#1b2b2b;--mu:#6b7c7c;--ln:#e3eaea;--ok:#1f9d63;--bad:#d64545;--warn:#d9902f;--br:#0f6b62}
+@media(prefers-color-scheme:dark){:root{--bg:#10191a;--card:#182424;--tx:#e6f0ef;--mu:#8fa5a3;--ln:#263838;--ok:#3fcf8e;--bad:#ff6b6b;--warn:#f0b04e;--br:#3bb5a8}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,"Segoe UI",Tahoma,sans-serif;padding:14px;max-width:760px;margin-inline:auto}
+h1{font-size:19px;margin:6px 0 2px}
+.sub{color:var(--mu);font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button{background:var(--br);color:#fff;border:0;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px}
+button:disabled{opacity:.6}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:12px;margin:12px 0}
+.card h2{font-size:16px;margin:0 0 8px}
+.stats{display:flex;gap:8px;margin-bottom:8px}
+.stat{flex:1;background:var(--bg);border-radius:8px;padding:8px;text-align:center}
+.stat b{display:block;font-size:18px}
+.stat span{font-size:12px;color:var(--mu)}
+.row{display:grid;grid-template-columns:92px 1fr minmax(64px,auto);gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--ln);font-size:13px}
+.bar{height:8px;background:var(--ln);border-radius:5px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:5px}
+.num{white-space:nowrap;text-align:start;font-variant-numeric:tabular-nums;direction:ltr}
+.row.l{grid-template-columns:78px 1fr 40px}
+.err{color:var(--bad);font-size:13px}
+</style>
+</head>
+<body>
+<h1>حالة مفاتيح البحث</h1>
+<div class="sub"><span id="when">جاري التحميل…</span><button id="btn">افحص الآن</button></div>
+<div id="err" class="err"></div>
+<div class="card" id="tav"></div>
+<div class="card" id="fc"></div>
+<div class="card" id="gem"></div>
+<div class="card" id="grk"></div>
+<script>
+const SNAP={"checked_at":null,"tavily":[],"firecrawl":[],"llm":[]};
+const $=id=>document.getElementById(id);
+const fmt=n=>Number(n).toLocaleString("en");
+const col=p=>p<=0?"var(--bad)":p<.25?"var(--warn)":"var(--ok)";
+function render(el,title,list,unit){
+  const live=list.filter(k=>k.state==="active");
+  const total=live.reduce((s,k)=>s+Math.max(k.left,0),0);
+  let h=`<h2>${title}</h2><div class="stats">
+  <div class="stat"><b>${fmt(total)}</b><span>إجمالي المتبقي</span></div>
+  <div class="stat"><b>${live.length} / ${list.length}</b><span>مفاتيح شغالة</span></div></div>`;
+  for(const k of list){
+    const left=Math.max(k.left,0),p=k.cap?left/k.cap:0;
+    h+=`<div class="row"><span>${k.slot}</span><div class="bar"><i style="width:${Math.min(p,1)*100}%;background:${col(k.state==="active"?p:0)}"></i></div><span class="num">${k.state==="active"?fmt(left):k.state==="exhausted"?(k.renews?"يتجدد "+fd(k.renews):"خلص"):"تعذر الفحص"}</span></div>`;
+  }
+  el.innerHTML=h;
+}
+const fd=t=>t?new Date(t.replace(" ","T")).toLocaleDateString("ar-EG",{day:"numeric",month:"short"}):"—";
+function llmState(r){
+  const bl=r.blocked_until&&Date.parse(String(r.blocked_until).replace(" ","T"))>Date.now();
+  if(Number(r.last_status)===401)return["bad","مفتاح مرفوض (401)"];
+  if(r.block_reason==="credits_exhausted")return bl?["bad","الرصيد خلص"]:["warn","الرصيد خلص (آخر مرة "+fd(r.last_used_at)+")"];
+  if(bl)return["warn","محظور مؤقتاً"];
+  return["ok","شغال"];
+}
+function renderLLM(el,title,list,note){
+  const today=new Date().toISOString().slice(0,10);
+  const used=r=>r.usage_day===today?Number(r.used_today):0;
+  const ok=list.filter(r=>llmState(r)[0]==="ok").length;
+  let h=`<h2>${title}</h2><div class="stats"><div class="stat"><b>${ok} / ${list.length}</b><span>مفاتيح سليمة</span></div><div class="stat"><b>${fmt(list.reduce((s,r)=>s+used(r),0))}</b><span>طلبات النهاردة</span></div></div>`;
+  for(const r of list){const[c,t]=llmState(r);h+=`<div class="row l"><span>${r.slot}</span><span style="color:var(--${c==="ok"?"ok":c==="warn"?"warn":"bad"})">${t}</span><span class="num">${used(r)}</span></div>`}
+  el.innerHTML=h+`<div class="sub" style="margin-top:8px">${note}</div>`;
+}
+function draw(d,live){
+  render($("tav"),"Tavily",d.tavily.map(k=>({slot:k.slot,state:k.state,cap:k.limit||1000,left:(k.limit||1000)-k.used,renews:k.renews})));
+  render($("fc"),"Firecrawl",d.firecrawl.map(k=>({slot:k.slot,state:k.state,cap:k.plan||1000,left:k.remaining,renews:k.renews})));
+  const g=(d.llm||[]).filter(r=>r.provider==="gemini"),x=(d.llm||[]).filter(r=>r.provider==="grok");
+  renderLLM($("gem"),"Gemini",g,"جوجل مبتعرضش الرصيد المتبقي. العمود الأخير = طلبات النهاردة. إجمالي الطلبات: "+fmt(g.reduce((s,r)=>s+Number(r.total_used),0)));
+  renderLLM($("grk"),"Grok",x,"الحالة من آخر محاولة استخدام. رصيد xAI مش متاح من المفتاح. X_6 وX_8 مش مسجلين.");
+  const t=d.checked_at?new Date(d.checked_at):null;
+  $("when").textContent=(live?"آخر فحص: ":"لقطة قديمة من: ")+(t?t.toLocaleString("ar-EG"):"—");
+}
+const API="https://clhtimetvykbjdhfdmig.supabase.co/functions/v1/key-status";
+let busy=false;
+async function load(force){
+  if(busy)return;busy=true;const b=$("btn");b.disabled=true;
+  if(force)b.textContent="جاري الفحص…";
+  $("err").textContent="";
+  try{
+    const r=await fetch(API+(force?"?refresh=1":""),{cache:"no-store"});
+    if(!r.ok)throw new Error(r.status);
+    draw(await r.json(),true);
+  }catch(e){$("err").textContent="تعذر التحميل ("+e.message+")، المعروض آخر ما وصل."}
+  busy=false;b.disabled=false;b.textContent="افحص الآن";
+}
+$("btn").onclick=()=>load(true);
+load(false);setInterval(()=>load(false),60000);
+</script>
+</body>
+</html>
