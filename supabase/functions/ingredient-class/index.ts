@@ -249,6 +249,31 @@ const shape = (r: ClassRow) => ({
   source: r.source ?? null,
 });
 
+// Curated class / subclass / max daily dose (tables ingredient_reference + ingredient_max_dose).
+// Only rows with review_status = 'reviewed' are returned, doses also need a source. Nothing here is generated: no row -> no "reference" key.
+type RefOut = { review_status: string | null; class_en?: string | null; class_ar?: string | null; subclass_en?: string | null; subclass_ar?: string | null;
+  source_title?: string | null; source_url?: string | null; doses: Record<string, unknown>[] };
+async function loadRefs(db: ReturnType<typeof createClient>, comps: string[]): Promise<Record<string, RefOut>> {
+  const out: Record<string, RefOut> = {};
+  if (!comps.length) return out;
+  const [r, d] = await Promise.all([
+    db.from("ingredient_reference").select("component,class_en,class_ar,subclass_en,subclass_ar,source_title,source_url,review_status")
+      .in("component", comps).eq("review_status", "reviewed"),
+    db.from("ingredient_max_dose").select("component,age_group,age_min_years,age_max_years,max_daily_dose,max_single_dose,unit,route,notes_ar,source_title,source_url,review_status")
+      .in("component", comps).eq("review_status", "reviewed").not("source_title", "is", null),
+  ]);
+  if (r.error || d.error) { console.error("reference_error", r.error?.message ?? d.error?.message); return out; } // the card still works without it
+  for (const x of (r.data ?? []) as Record<string, string | null>[]) {
+    out[x.component as string] = { review_status: x.review_status, class_en: x.class_en, class_ar: x.class_ar, subclass_en: x.subclass_en,
+      subclass_ar: x.subclass_ar, source_title: x.source_title, source_url: x.source_url, doses: [] };
+  }
+  for (const x of (d.data ?? []) as Record<string, unknown>[]) {
+    const c = x.component as string;
+    (out[c] ??= { review_status: null, doses: [] }).doses.push(x);
+  }
+  return out;
+}
+
 // a name is accepted for fill_for only when it is an ingredient this database already knows (so arbitrary text cannot spend the API quota)
 async function isKnownComponent(db: ReturnType<typeof createClient>, comp: string): Promise<boolean> {
   const like = comp.replace(/[\\%_]/g, (m) => "\\" + m);
@@ -288,6 +313,8 @@ Deno.serve(async (req) => {
     if (q.error) { console.error("get_error", q.error.message); return json({ error: "internal_error" }, 500); }
     const items: Record<string, unknown> = {};
     for (const r of q.data ?? []) items[r.component as string] = shape(r as ClassRow);
+    const refs = await loadRefs(db, Object.keys(items));
+    for (const c of Object.keys(refs)) (items[c] as Record<string, unknown>).reference = refs[c];
     return json({ items });
   }
 
@@ -344,6 +371,8 @@ Deno.serve(async (req) => {
       if (row.status === "error") sum.errors++; else out[comp] = shape(row as ClassRow);
       await new Promise((r) => setTimeout(r, 250));
     }
+    const refs = await loadRefs(db, Object.keys(out));
+    for (const c of Object.keys(refs)) (out[c] as Record<string, unknown>).reference = refs[c];
     return json({ ...sum, items: out });
   }
 
