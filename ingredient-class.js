@@ -53,7 +53,7 @@ async function runFill() {
         const r = await call("ingredient-class", { action: "fill_for", names: batch });
         const items = (r && r.items) || {};
         batch.forEach((n) => { if (items[n]) { cache.set(n, items[n]); (refreshers.get(n) || []).forEach((f) => f()); } });
-        if (r && r.stopped === "openfda_rate_limited") { fillBlockedUntil = Date.now() + 60000; }
+        if (r && (r.stopped === "api_rate_limited" || r.stopped === "openfda_rate_limited")) { fillBlockedUntil = Date.now() + 60000; }
       } catch (e) {
         if (e && e.code === "rate_limited") { batch.forEach((n) => tried.delete(n)); fillQueue.unshift(...batch); fillBlockedUntil = Date.now() + 60000; break; }
         /* أي خطأ تاني: الصفحة بتفضل شغالة من غير تصنيف */
