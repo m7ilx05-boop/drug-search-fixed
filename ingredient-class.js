@@ -104,7 +104,10 @@ function detailPanel(it) {
       const d = el("details", "ing-sec"); d.append(el("summary", null, s.title_ar));
       if (s.text_ar) { d.append(el("p", null, s.text_ar)); d.append(el("p", "meta ing-src", "ترجمة آلية من نص FDA فقط")); }
       if (s.text_en) { const o = el("details", "ing-orig"); o.append(el("summary", null, "النص الأصلي من FDA")); o.append(el("p", "ltr", s.text_en)); d.append(o); }
-      d.append(el("p", "meta ing-src", "المصدر: openFDA label" + (s.set_id ? " (" + s.set_id + ")" : "") + (s.effective_time ? "، بتاريخ " + s.effective_time : "")));
+      const src = el("p", "meta ing-src", "المصدر: openFDA label");
+      if (s.effective_time) { const t = String(s.effective_time), nice = /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t; src.append("، بتاريخ "); src.append(el("span", "ing-id", nice)); }
+      d.append(src);
+      if (s.set_id) d.append(el("p", "meta ing-src ing-setid", s.set_id)); // معرّف الملصق في سطر لوحده، شمال-لليمين
       more.append(d);
     });
     const btn = el("button", "ing-more-btn", "تفاصيل أكتر"); btn.type = "button";
