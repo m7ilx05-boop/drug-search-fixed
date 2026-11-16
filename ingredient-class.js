@@ -78,10 +78,39 @@ function detailPanel(it) {
     box.append(d);
   };
   row("التصنيف المختصر", [it.purpose_ar, it.purpose_en].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i));
+  // السب كلاس والجرعة القصوى: بتظهر بس لو الصف متراجع (review_status = reviewed) وليه مصدر. أي حاجة تانية مبتظهرش.
+  const ref = it.reference && it.reference.review_status === "reviewed" ? it.reference : null;
+  if (ref) row("السب كلاس", [ref.subclass_ar, ref.subclass_en].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i));
+  const doses = ((it.reference && it.reference.doses) || []).filter((d) => d && d.review_status === "reviewed" && Number(d.max_daily_dose) > 0 && d.source_title);
+  if (doses.length) {
+    const AG = { adult: "بالغ", child: "أطفال", elderly: "كبار السن" };
+    const wrap = el("div", "ing-row"); wrap.append(el("b", null, "الحد الأقصى اليومي (راجعه صيدلي)"));
+    doses.forEach((d) => {
+      const age = d.age_min_years != null || d.age_max_years != null ? " (" + (d.age_min_years ?? "") + "–" + (d.age_max_years ?? "") + " سنة)" : "";
+      wrap.append(el("span", null, (AG[d.age_group] || d.age_group) + age + ": " + d.max_daily_dose + " " + (d.unit || "mg") + " / يوم"));
+      wrap.append(el("span", "meta ing-src", "المصدر: " + d.source_title));
+    });
+    box.append(wrap);
+  }
   const epc = lines(it.epc && it.epc.length ? it.epc : [it.fda_class]);
   row("تصنيف FDA الدوائي", epc, true);
   row("آلية العمل (MoA)", lines(it.moa), true);
   row("الغرض حسب ملصق FDA", (Array.isArray(it.fda_purpose) ? it.fda_purpose : []).map((x) => String(x).slice(0, 160)), true);
+  // تفاصيل أكتر: أقسام ملصق FDA (نص أصلي + ترجمة لو موجودة). الزرار مبيظهرش لو مفيش أقسام متخزّنة.
+  const secs = (Array.isArray(it.sections) ? it.sections : []).filter((s) => s && s.title_ar && (s.text_en || s.text_ar));
+  if (secs.length) {
+    const more = el("div", "ing-more"); more.hidden = true;
+    secs.forEach((s) => {
+      const d = el("details", "ing-sec"); d.append(el("summary", null, s.title_ar));
+      if (s.text_ar) { d.append(el("p", null, s.text_ar)); d.append(el("p", "meta ing-src", "ترجمة آلية من نص FDA فقط")); }
+      if (s.text_en) { const o = el("details", "ing-orig"); o.append(el("summary", null, "النص الأصلي من FDA")); o.append(el("p", "ltr", s.text_en)); d.append(o); }
+      d.append(el("p", "meta ing-src", "المصدر: openFDA label" + (s.set_id ? " (" + s.set_id + ")" : "") + (s.effective_time ? "، بتاريخ " + s.effective_time : "")));
+      more.append(d);
+    });
+    const btn = el("button", "ing-more-btn", "تفاصيل أكتر"); btn.type = "button";
+    btn.addEventListener("click", () => { more.hidden = !more.hidden; btn.textContent = more.hidden ? "تفاصيل أكتر" : "إخفاء التفاصيل"; });
+    box.append(btn, more);
+  }
   const srcs = String(it.source || "openfda").split("+").map((x) => x === "rxclass" ? "RxClass (المكتبة الطبية الأمريكية NLM)" : x === "openfda" ? "openFDA (ملصقات الأدوية الأمريكية)" : x === "nutrient_rule" ? "قاعدة ثابتة في النظام (الفيتامينات والمعادن والأحماض الأمينية بتتصنف كمكمل غذائي، مش من مرجع طبي خارجي)" : "").filter(Boolean);
   box.append(el("p", "meta ing-src", "المصدر: " + srcs.join(" + ") + ". ده تصنيف عام للمادة الفعّالة مش لمنتج معيّن في السوق المصري، ومش بديل لرأي الصيدلي أو الطبيب."));
   return box;
