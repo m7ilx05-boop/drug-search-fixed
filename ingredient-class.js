@@ -12,6 +12,59 @@ const cache = new Map();      // اسم مُطبَّع -> العنصر الرا�
 const inflight = new Map();   // اسم مُطبَّع -> Promise
 const clean = (s) => String(s || "").replace(/\s*\[(EPC|MoA|PE|CS)\]\s*$/i, "").trim();
 
+// ---- تنظيم نص ملصق FDA (عناوين + نقط + جدول الجرعات) وزرار الترجمة ----
+const LBL_HEADS = ["Warnings", "Directions", "Uses", "Purpose", "Active ingredients?", "Inactive ingredients",
+  "Do not use", "Ask a doctor or pharmacist before use if you are", "Ask a doctor before use if you have",
+  "When using this product", "Stop use and ask a doctor if"];
+const LBL_BREAKS = ["If pregnant or breast-feeding", "Keep out of reach of children", "In case of overdose"];
+const LBL_ROWS = ["adults and children 12 years and over", "children 6 to under 12 years", "children under 6 years", "children 2 to under 6 years", "adults"];
+function labelStructure(raw) {
+  let t = String(raw || "").replace(/\s+/g, " ").trim();
+  LBL_HEADS.forEach((h) => { t = t.replace(new RegExp("(^|[\\s.:])(" + h + ")(?=\\s|:|$)", "g"), "$1\n##$2\n"); });
+  LBL_BREAKS.forEach((h) => { t = t.replace(new RegExp("(^|[\\s.])(" + h + ")(?=[\\s,.:]|$)", "g"), "$1\n$2"); });
+  if (/\bage\s+Dose\b/i.test(t)) {
+    t = t.replace(/\bage\s+Dose\b/i, "\n##age Dose\n");
+    LBL_ROWS.forEach((r) => { t = t.replace(new RegExp("(^|[\\s\\n])(" + r + ")(?=\\s+(?:\\d|do not))", "gi"), "$1\n▪ $2"); });
+  }
+  t = t.replace(/\s*▪\s*/g, "\n▪ ");
+  return t.split("\n").map((x) => x.trim()).filter(Boolean).join("\n");
+}
+function labelNodes(struct) {
+  const frag = document.createDocumentFragment(); let ul = null;
+  String(struct).split("\n").forEach((line) => {
+    if (line.startsWith("##")) { ul = null; frag.append(el("h5", "ing-h", line.slice(2).trim())); }
+    else if (line.startsWith("▪")) { if (!ul) { ul = el("ul", "ing-ul"); frag.append(ul); } ul.append(el("li", null, line.slice(1).trim())); }
+    else { ul = null; frag.append(el("p", "ing-p", line)); }
+  });
+  return frag;
+}
+function labelBlock(textEn, textAr) {
+  const wrap = el("div", "ing-lblwrap");
+  const struct = labelStructure(textEn);
+  const box = el("div", "ing-lbl"); box.dir = "ltr"; box.append(labelNodes(struct));
+  const btn = el("button", "ing-tr-btn", "🌐 ترجمة للعربي"); btn.type = "button";
+  const note = el("p", "meta ing-src", ""); note.hidden = true;
+  let ar = textAr ? labelStructure(textAr) : null, showAr = false;
+  const show = (isAr) => {
+    showAr = isAr; box.replaceChildren(labelNodes(isAr ? ar : struct)); box.dir = isAr ? "rtl" : "ltr";
+    btn.textContent = isAr ? "↩ النص الأصلي (English)" : "🌐 ترجمة للعربي";
+    note.hidden = !isAr; note.textContent = "ترجمة آلية للنص الأصلي، الأرقام والجرعات متطابقة معاه. الأصل بالإنجليزي هو المرجع.";
+  };
+  btn.addEventListener("click", async () => {
+    if (showAr) return show(false);
+    if (ar) return show(true);
+    btn.disabled = true; btn.textContent = "...جاري الترجمة";
+    try { const r = await call("translate-label", { text: struct, target: "ar" }); ar = String(r.text || ""); show(true); }
+    catch (e) {
+      btn.textContent = e && e.code === "rate_limited" ? "حاول بعد دقيقة" : e && e.code === "numbers_mismatch" ? "الترجمة اترفضت (الأرقام مش متطابقة)، اقرأ الأصل" : "تعذّرت الترجمة، حاول تاني";
+      setTimeout(() => { if (!showAr) btn.textContent = "🌐 ترجمة للعربي"; }, 3500);
+    }
+    btn.disabled = false;
+  });
+  wrap.append(btn, box, note);
+  return wrap;
+}
+
 async function load(names) {
   const all = [...new Set(names.map(norm))].filter(Boolean);
   const waits = all.map((n) => inflight.get(n)).filter(Boolean);
@@ -103,7 +156,7 @@ function detailPanel(it) {
     secs.forEach((s) => {
       const d = el("details", "ing-sec"); d.append(el("summary", null, s.title_ar));
       if (s.text_ar) { d.append(el("p", null, s.text_ar)); d.append(el("p", "meta ing-src", "ترجمة آلية من نص FDA فقط")); }
-      if (s.text_en) { const o = el("details", "ing-orig"); o.append(el("summary", null, "النص الأصلي من FDA")); o.append(el("p", "ltr", s.text_en)); d.append(o); }
+      if (s.text_en) { const o = el("details", "ing-orig"); o.append(el("summary", null, "النص الأصلي من FDA")); o.append(labelBlock(s.text_en, null)); d.append(o); }
       const src = el("p", "meta ing-src", "المصدر: openFDA label");
       if (s.effective_time) { const t = String(s.effective_time), nice = /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t; src.append("، بتاريخ "); src.append(el("span", "ing-id", nice)); }
       d.append(src);
