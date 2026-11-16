@@ -36,6 +36,16 @@ button:disabled{opacity:.6}
 .tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;margin-inline-end:6px;background:var(--bg);color:var(--mu);border:1px solid var(--ln)}
 .ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
 .mu{color:var(--mu);font-size:12px}
+.usage{margin-top:8px;background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:8px 10px}
+.usage .uh{font-size:12px;font-weight:600;margin-bottom:4px}
+.krow{display:grid;grid-template-columns:78px 62px 1fr;gap:6px 8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--ln);font-size:12.5px}
+.krow:first-of-type{border-top:0}
+.kp{font-weight:700;font-size:12px}
+.kp-tavily{color:#2f7ddb}.kp-firecrawl{color:#e0722b}.kp-gemini{color:#8a5cf5}.kp-grok{color:var(--mu)}
+.kslot{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;direction:ltr;text-align:start;word-break:break-all}
+.kv{color:var(--tx)}
+.utot{margin-top:6px;padding-top:6px;border-top:1px dashed var(--ln);font-size:12px;color:var(--mu)}
+.utot b{color:var(--tx);font-weight:600}
 </style>
 </head>
 <body>
@@ -134,32 +144,61 @@ function drawOps(d){
   h+=trow("Firecrawl 24س","~"+fmt(s.firecrawl_pages_24h)+" صفحة");
   h+=trow("Gemini",fmt(s.gemini_calls_today)+" طلب النهاردة · "+fmt(s.gemini_calls_total)+" إجمالي");
   h+=trow("Grok",fmt(s.grok_calls_today)+" طلب · $"+Number(s.grok_spent_today_usd).toFixed(4)+" النهاردة");
-  h+='<div class="sub" style="margin-top:8px">Tavily وFirecrawl: الاستهلاك الكلي من فحص المفاتيح (الباقة الحالية لكل المفاتيح). عدد توكنز Gemini وGrok لكل عملية لوحدها مش متسجل دلوقتي.</div>';
+  h+='<div class="sub" style="margin-top:8px">Tavily وFirecrawl: الاستهلاك الكلي من فحص المفاتيح (الباقة الحالية لكل المفاتيح). استهلاك كل مفتاح في كل عملية لوحدها ظاهر تحت كل عملية (من أول ما اتفعّل التسجيل). علامة ~ = رقم تقديري لأن المزوّد مبيرجعوش.</div>';
   $("osum").innerHTML=h;
   drawFeed(d.items||[]);
   $("owhen").textContent="آخر تحديث: "+clock(d.generated_at);
+}
+const PNAME={tavily:"Tavily",firecrawl:"Firecrawl",gemini:"Gemini",grok:"Grok"};
+function usageHtml(u){
+  if(!u||!u.keys||!u.keys.length)return "";
+  let h='<div class="usage"><div class="uh">المفاتيح اللي اشتغلت في العملية دي وكل مفتاح استهلك كام</div>';
+  for(const k of u.keys){
+    const p=[fmt(k.calls)+" طلب"+(k.failed?' (<span class="bad">'+fmt(k.failed)+" فشل</span>)":"")];
+    if(k.provider==="tavily"||k.provider==="firecrawl")p.push((k.credits_estimated?"~":"")+fmt(k.credits)+" كريدت");
+    else{
+      p.push(k.tokens_total?fmt(k.tokens_in)+" دخل + "+fmt(k.tokens_out)+" خرج = <b>"+fmt(k.tokens_total)+"</b> توكن":"التوكنز مش متاحة");
+      if(k.provider==="grok"&&k.usd_estimated!=null)p.push("~$"+Number(k.usd_estimated).toFixed(4));
+    }
+    if(k.models&&k.models.length)p.push('<span class="mu" dir="ltr">'+esc(k.models.join(", "))+"</span>");
+    h+='<div class="krow"><span class="kp kp-'+esc(k.provider)+'">'+esc(PNAME[k.provider]||k.provider)+'</span><b class="kslot">'+esc(k.slot)+'</b><span class="kv">'+p.join(" · ")+"</span></div>";
+  }
+  const t=u.totals||{},tt=[];
+  if(t.tavily_credits)tt.push("Tavily <b>"+fmt(t.tavily_credits)+"</b> كريدت");
+  if(t.firecrawl_credits)tt.push("Firecrawl <b>"+fmt(t.firecrawl_credits)+"</b> كريدت");
+  if(t.gemini_tokens)tt.push("Gemini <b>"+fmt(t.gemini_tokens)+"</b> توكن");
+  if(t.grok_tokens)tt.push("Grok <b>"+fmt(t.grok_tokens)+"</b> توكن (~$"+Number(t.grok_usd_estimated).toFixed(4)+")");
+  if(tt.length)h+='<div class="utot">إجمالي العملية: '+tt.join(" · ")+"</div>";
+  return h+"</div>";
 }
 function drawFeed(items){
   let h='<h2>كل العمليات (الأحدث أولاً)</h2>';
   if(!items.length)h+='<div class="mu">مفيش عمليات.</div>';
   for(const o of items){
-    let tag,st,meta=[];
+    let tag,st,meta=[],title=esc(o.query),usage="",note="";
     if(o.type==="job"){
       tag=KIND[o.kind]||o.kind||"مهمة";
       st=o.status==="failed"?["bad","فشلت"]:(o.status==="completed"?(OUTC[o.outcome]||["ok","تمت"]):["warn",esc(o.status||"—")]);
       if(o.secs!=null)meta.push("⏱ "+o.secs+" ث");
       if(o.pages)meta.push("صفحات: "+o.pages);
       if(o.results!=null)meta.push("نتائج: "+o.results);
-      if(o.tavily&&o.tavily.length)meta.push("Tavily: "+esc(o.tavily.join("، ")));
-      if(o.firecrawl&&o.firecrawl.length)meta.push("Firecrawl: "+esc(o.firecrawl.join("، ")));
+      if(o.usage&&o.usage.keys&&o.usage.keys.length)usage=usageHtml(o.usage);
+      else{
+        if(o.tavily&&o.tavily.length)meta.push("Tavily: "+esc(o.tavily.join("، ")));
+        if(o.firecrawl&&o.firecrawl.length)meta.push("Firecrawl: "+esc(o.firecrawl.join("، ")));
+        if((o.tavily&&o.tavily.length)||(o.firecrawl&&o.firecrawl.length))note='<div class="mu" style="margin-top:4px">اتنفذت قبل تفعيل تسجيل الاستهلاك: أسماء المفاتيح بس من غير أرقام.</div>';
+      }
+    }else if(o.type==="background"){
+      tag="خلفية";title=esc(o.label);st=["ok","عمل جانبي"];
+      usage=usageHtml(o.usage);
     }else{
       tag="بحث"+(o.cache?" · "+esc(o.cache):"");
       st=OUTC[o.outcome]||["warn",esc(o.outcome||"—")];
       if(o.results!=null)meta.push("نتائج: "+o.results);
     }
-    h+='<div class="op"><div><span class="tag">'+esc(tag)+'</span><b dir="auto">'+esc(o.query)+'</b></div>'
+    h+='<div class="op"><div><span class="tag">'+esc(tag)+'</span><b dir="auto">'+title+'</b></div>'
       +'<div class="meta"><span class="'+st[0]+'">'+st[1]+'</span><span>'+clock(o.t)+' ('+ago(o.t)+')</span>'+meta.map(x=>'<span>'+x+'</span>').join("")+'</div>'
-      +(o.error?'<div class="err">'+esc(o.error)+'</div>':'')+'</div>';
+      +usage+note+(o.error?'<div class="err">'+esc(o.error)+'</div>':'')+'</div>';
   }
   $("ofeed").innerHTML=h;
 }
