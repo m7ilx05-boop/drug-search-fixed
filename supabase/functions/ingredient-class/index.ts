@@ -17,6 +17,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 //   2) openFDA (secret FDA_key_1): the label "purpose" text, and EPC/MoA when RxClass had none. A label counts ONLY when its single substance name is the
 //      same substance as the searched name (salts ignored): "PYRITHIONE ZINC" is not "zinc". Oral labels are tried first.
 //      A purpose is kept only when most of the matching labels agree on it. There is no fallback to combination labels.
+//   3) EMA (table ema_medicine, official EU data): ONLY when RxClass and openFDA both found nothing. Single-substance, human, centrally authorised medicines;
+//      the pharmacotherapeutic group is kept when most of them agree. Stored with source = "ema".
 // The simple tag is chosen by the patterns in class_purpose_map. No AI is involved. A wrong tag is fixed with purpose_override_en / purpose_override_ar.
 //
 // Label sections (table ingredient_label_section): original FDA text (+ an Arabic translation when one was stored). Returned as "sections" by get / fill_for. Nothing is generated here.
@@ -173,7 +175,21 @@ function pickTag(text: string, map: MapRow[]): MapRow | null {
   return null;
 }
 
-async function lookup(component: string, key: string, map: MapRow[]) {
+// ---- EMA fallback (only when RxClass and openFDA found nothing) ----
+async function emaLookup(db: ReturnType<typeof createClient>, cands: string[]) {
+  try {
+    const names = [...new Set(cands.flatMap((c) => [c.toLowerCase(), stripSalts(c)]))].filter(Boolean);
+    const q = await db.from("ema_medicine").select("substances,atc_code,pharmacotherapeutic_group")
+      .eq("n_substances", 1).eq("category", "human").overlaps("substances", names).limit(40);
+    if (q.error || !q.data?.length) return null;
+    const rows = q.data as { substances: string[]; atc_code: string | null; pharmacotherapeutic_group: string | null }[];
+    const group = top(rows.map((r) => (r.pharmacotherapeutic_group ? [r.pharmacotherapeutic_group.slice(0, 160)] : [])), 1, 0.5);
+    if (!group.length) return null;
+    return { group: group[0], used: rows.length, name: rows[0].substances[0] };
+  } catch (e) { console.error("ema_lookup_error", e instanceof Error ? e.message : e); return null; }
+}
+
+async function lookup(component: string, key: string, map: MapRow[], db: ReturnType<typeof createClient>) {
   // 0) nutrients (vitamins / minerals / amino acids): fixed tag, no API call
   const nut = nutrientTag(component);
   if (nut) {
@@ -220,6 +236,15 @@ async function lookup(component: string, key: string, map: MapRow[]) {
   if (empty && rxErr) throw rxErr;
 
   if (empty) {
+    const ema = await emaLookup(db, cands);
+    if (ema) {
+      const t = pickTag(ema.group, map);
+      return {
+        component, status: "found", purpose_en: t?.purpose_en ?? null, purpose_ar: t?.purpose_ar ?? null,
+        pharm_class_epc: [ema.group], pharm_class_moa: [] as string[], fda_purpose: [] as string[],
+        matched_name: ema.name, labels_used: ema.used, error: null, source: "ema", fetched_at: new Date().toISOString(),
+      };
+    }
     return {
       component, status: "not_found", purpose_en: null, purpose_ar: null,
       pharm_class_epc: [] as string[], pharm_class_moa: [] as string[], fda_purpose: [] as string[],
@@ -405,7 +430,7 @@ Deno.serve(async (req) => {
       if (!(await isKnownComponent(db, comp))) { sum.skipped_unknown++; continue; }
       let row: Awaited<ReturnType<typeof lookup>> | Record<string, unknown>;
       try {
-        row = await lookup(comp, key, map);
+        row = await lookup(comp, key, map, db);
       } catch (e) {
         if (e instanceof RateLimited) { sum.stopped = "api_rate_limited"; break; }
         row = {
@@ -439,7 +464,7 @@ Deno.serve(async (req) => {
     if (Date.now() > deadline) { sum.stopped = "time_budget"; break; }
     let row: Awaited<ReturnType<typeof lookup>> | Record<string, unknown>;
     try {
-      row = await lookup(t.component, key, map);
+      row = await lookup(t.component, key, map, db);
     } catch (e) {
       if (e instanceof RateLimited) { sum.stopped = "api_rate_limited"; break; }
       row = {
