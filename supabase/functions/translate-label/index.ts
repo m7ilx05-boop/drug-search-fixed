@@ -18,8 +18,8 @@ const SYSTEM = [
   "You translate text from a US FDA drug label into clear Modern Standard Arabic for pharmacists and patients in Egypt.",
   "Rules, all mandatory:",
   "1. Translate faithfully. Do not add, remove, soften, summarize or explain anything.",
-  "2. Keep every number, dose, unit (ml, mg, hours), age and frequency exactly as written, using Western digits 0-9.",
-  "3. Keep drug and ingredient names in English.",
+  "2. Keep every number, dose, unit (ml, mg, hours), age and frequency exactly as written, always as Western digits 0-9. Never spell a number as a word and never use the Arabic dual form: write '1 tablet' as '1 قرص', '2 tablets' as '2 أقراص', '12 hours' as '12 ساعة', '24 hours' as '24 ساعة'.",
+  "3. Keep only drug, brand and ingredient names in English. Translate everything else into Arabic, including diseases, conditions and symptoms (for example Urticaria -> الشرى, Allergic Rhinitis -> التهاب الأنف التحسسي, Drug Hypersensitivity -> فرط الحساسية للدواء). Never leave a condition name in English.",
   "4. The input has one item per line. Return exactly one translated line for each input line, in the same order.",
   "5. A line that starts with ## (a heading) or with ▪ (a bullet) must keep that same prefix in the output.",
   "6. Keep phone numbers and label ids as they are.",
@@ -44,31 +44,50 @@ const arabicShare = (s: string) => {
   return ar + la === 0 ? 0 : ar / (ar + la);
 };
 
-// Tries Gemini, then Grok. An answer counts only when it is real Arabic (not the English echoed back) and every number survived.
+// Tries Gemini, then Grok; each provider gets a second attempt that tells it what was wrong with the first one.
+// An answer counts only when it is real Arabic (not the English echoed back) and every number survived.
 async function translate(text: string) {
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/llm-gateway`;
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const prompt = `Translate the following FDA drug label text into Arabic. The output must be in Arabic script, not English.\nReturn only JSON: {"text": "<translated lines joined by \\n>"}\n\nTEXT:\n<<<\n${text}\n>>>`;
+  const base = `Translate the following FDA drug label text into Arabic. The output must be in Arabic script, not English.\nReturn only JSON: {"text": "<translated lines joined by \\n>"}`;
   let code = "translation_unavailable";
+  let quota = 0;
   for (const provider of ["gemini", "grok"]) {
-    try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ provider, prompt, system: SYSTEM, json: true, purpose: "translate_label" }),
-        signal: AbortSignal.timeout(45_000),
-      });
-      const b = await r.json().catch(() => ({}));
-      if (!(r.ok && b?.ok && typeof b.text === "string")) { console.error("gateway", provider, b?.error ?? r.status); continue; }
-      let out = "";
-      try { out = String(JSON.parse(b.text.replace(/^```json|```$/gm, "").trim()).text ?? "").trim(); } catch { code = "bad_model_output"; continue; }
-      if (!out) { code = "bad_model_output"; continue; }
-      if (arabicShare(out) < 0.4) { console.error("not_arabic", provider); code = "not_translated"; continue; }
-      if (!numbersKept(text, out)) { console.error("numbers_mismatch", provider); code = "numbers_mismatch"; continue; }
-      return { ok: true as const, text: out };
-    } catch (e) { console.error("network", provider, String(e)); }
+    let hint = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ provider, prompt: `${base}${hint}\n\nTEXT:\n<<<\n${text}\n>>>`, system: SYSTEM, json: true, purpose: "translate_label" }),
+          signal: AbortSignal.timeout(45_000),
+        });
+        const b = await r.json().catch(() => ({}));
+        if (!(r.ok && b?.ok && typeof b.text === "string")) { console.error("gateway", provider, b?.error ?? r.status);
+          if (b?.error === "quota_exhausted") quota++;
+          if (b?.error === "provider_overloaded" && attempt === 0) { await new Promise((res) => setTimeout(res, 2500)); continue; } // busy for a moment: same provider once more
+          break;
+        }
+        let out = "";
+        try { out = String(JSON.parse(b.text.replace(/^```json|```$/gm, "").trim()).text ?? "").trim(); } catch { code = "bad_model_output"; hint = "\nYour previous answer was not valid JSON. Return only the JSON object."; continue; }
+        if (!out) { code = "bad_model_output"; hint = "\nYour previous answer was empty."; continue; }
+        if (arabicShare(out) < 0.4) {
+          console.error("not_arabic", provider, attempt); code = "not_translated";
+          hint = "\nYour previous answer was still mostly English. Translate EVERY word except drug names into Arabic script.";
+          continue;
+        }
+        if (!numbersKept(text, out)) {
+          const have = new Set(nums(out));
+          const missing = [...new Set(nums(text))].filter((n) => !have.has(n));
+          console.error("numbers_mismatch", provider, attempt, missing.join(",")); code = "numbers_mismatch";
+          hint = `\nYour previous answer changed or spelled out numbers. These digits must appear exactly as digits in every place they occur: ${[...new Set(nums(text))].join(", ")}. Write 'tablets' with digits, e.g. '2 أقراص', never 'قرصين'.`;
+          continue;
+        }
+        return { ok: true as const, text: out };
+      } catch (e) { console.error("network", provider, String(e)); break; }
+    }
   }
-  return { ok: false as const, code };
+  return { ok: false as const, code: quota >= 1 && code === "translation_unavailable" ? "translation_unavailable" : code };
 }
 
 Deno.serve(async (req) => {
