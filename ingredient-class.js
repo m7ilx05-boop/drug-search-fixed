@@ -214,7 +214,9 @@ function detailPanel(it) {
       const src = el("p", "meta ing-src", fda ? "المصدر: openFDA label" : "المصدر: ChEMBL (قاعدة بيانات بحثية، مش نشرة دوا رسمية). ده تصنيف مش دواعي استعمال معتمدة، ومش بديل لرأي الطبيب أو الصيدلي.");
       if (s.effective_time) { const t = String(s.effective_time), nice = /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t; src.append("، بتاريخ "); src.append(el("span", "ing-id", nice)); }
       d.append(src);
-      if (!fda && s.source_ref) d.append(el("p", "meta ing-src ing-setid", String(s.source_ref).slice(0, 200)));
+      if (/^https?:\/\/\S+$/i.test(String(s.source_ref || ""))) { // رابط المرجع: بيظهر لكل قسم (مفيش قسم بيتحفظ من غير رابط)
+        const lp = el("p", "meta ing-src"); const la = el("a", null, "فتح المرجع"); la.href = String(s.source_ref); la.target = "_blank"; la.rel = "noopener noreferrer"; lp.append(la); d.append(lp);
+      }
       if (s.set_id) d.append(el("p", "meta ing-src ing-setid", s.set_id)); // معرّف الملصق في سطر لوحده، شمال-لليمين
       more.append(d);
     });
