@@ -30,5 +30,6 @@ jobs:
           echo "::add-mask::$KEY"
           curl -s -m 150 -X POST "https://$PROJECT_REF.supabase.co/functions/v1/$FN" \
             -H "Authorization: Bearer $KEY" -H "apikey: $KEY" -H "Content-Type: application/json" \
-            -d "$BODY" | head -c 6000
-          echo
+            -d "$BODY" | head -c 6000 > resp.txt
+          cat resp.txt; echo
+          echo "::notice title=result::$(head -c 1800 resp.txt | tr '\n' ' ')"
