@@ -18,6 +18,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 //      same substance as the searched name (salts ignored): "PYRITHIONE ZINC" is not "zinc". Oral labels are tried first.
 //      A purpose is kept only when most of the matching labels agree on it. There is no fallback to combination labels.
 // The simple tag is chosen by the patterns in class_purpose_map. No AI is involved. A wrong tag is fixed with purpose_override_en / purpose_override_ar.
+//
+// Label sections (table ingredient_label_section): original FDA text (+ an Arabic translation when one was stored). Returned as "sections" by get / fill_for. Nothing is generated here.
+// RxClass facts (table ingredient_rxclass_fact, filled by the ingredient-rxclass function): uses / prevention / contraindications from MED-RT. Returned as "rxclass" by get / fill_for. Nothing is generated here.
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -69,9 +72,9 @@ const AMINO_RE = /^(lysine|l-lysine|arginine|l-arginine|taurine|glutamine|l-glut
 function nutrientTag(component: string): { en: string; ar: string } | null {
   const base = normComp(component.replace(/\([^)]*\)/g, " "));
   if (!base) return null;
-  if (MINERAL_RE.test(base)) return { en: "Mineral / dietary supplement", ar: "\u0645\u0639\u062F\u0646 / \u0645\u0643\u0645\u0644 \u063A\u0630\u0627\u0626\u064A" };
-  if (VITAMIN_RE.test(base)) return { en: "Vitamin / dietary supplement", ar: "\u0641\u064A\u062A\u0627\u0645\u064A\u0646 / \u0645\u0643\u0645\u0644 \u063A\u0630\u0627\u0626\u064A" };
-  if (AMINO_RE.test(base)) return { en: "Amino acid / dietary supplement", ar: "\u062D\u0645\u0636 \u0623\u0645\u064A\u0646\u064A / \u0645\u0643\u0645\u0644 \u063A\u0630\u0627\u0626\u064A" };
+  if (MINERAL_RE.test(base)) return { en: "Mineral / dietary supplement", ar: "معدن / مكمل غذائي" };
+  if (VITAMIN_RE.test(base)) return { en: "Vitamin / dietary supplement", ar: "فيتامين / مكمل غذائي" };
+  if (AMINO_RE.test(base)) return { en: "Amino acid / dietary supplement", ar: "حمض أميني / مكمل غذائي" };
   return null;
 }
 
@@ -274,6 +277,50 @@ async function loadRefs(db: ReturnType<typeof createClient>, comps: string[]): P
   return out;
 }
 
+// FDA label sections stored in ingredient_label_section (original text + a translation when one exists). No row -> no "sections" key.
+async function loadSections(db: ReturnType<typeof createClient>, comps: string[]): Promise<Record<string, Record<string, unknown>[]>> {
+  const out: Record<string, Record<string, unknown>[]> = {};
+  if (!comps.length) return out;
+  const q = await db.from("ingredient_label_section")
+    .select("component,section_key,title_ar,text_en,text_ar,set_id,effective_time,sort_order")
+    .in("component", comps).order("sort_order", { ascending: true });
+  if (q.error) { console.error("sections_error", q.error.message); return out; } // the card still works without it
+  for (const x of (q.data ?? []) as Record<string, unknown>[]) {
+    const c = x.component as string;
+    (out[c] ??= []).push({ section_key: x.section_key, title_ar: x.title_ar, text_en: x.text_en, text_ar: x.text_ar, set_id: x.set_id, effective_time: x.effective_time });
+  }
+  return out;
+}
+
+// RxClass (MED-RT) uses / prevention / contraindications stored in ingredient_rxclass_fact (filled by the ingredient-rxclass function).
+// Class-level facts about the active ingredient, English MeSH names (name_ar only when a translation was stored). No row -> no "rxclass" key.
+type RxItem = { id: string; name: string; name_ar: string | null };
+type RxOut = { rxcui: string | null; name: string | null; source: string; note_ar: string; fetched_at: string | null; indications: RxItem[]; prevention: RxItem[]; contraindications: RxItem[] };
+const RX_NOTE_AR = "معلومات عامة عن المادة الفعّالة من تصنيف MED-RT (المكتبة الطبية الأمريكية عبر RxClass)، مش لمنتج معيّن في السوق المصري، ومش بديل لرأي الصيدلي أو الطبيب.";
+async function loadRxclass(db: ReturnType<typeof createClient>, comps: string[]): Promise<Record<string, RxOut>> {
+  const out: Record<string, RxOut> = {};
+  if (!comps.length) return out;
+  const [f, m] = await Promise.all([
+    db.from("ingredient_rxclass_fact").select("component,fact_kind,class_id,class_name,name_ar").in("component", comps).order("class_name", { ascending: true }),
+    db.from("ingredient_rxclass_fetch").select("component,rxcui,rxnorm_name,fetched_at").in("component", comps).eq("status", "found"),
+  ]);
+  if (f.error || m.error) { console.error("rxclass_error", f.error?.message ?? m.error?.message); return out; } // the card still works without it
+  const meta = new Map<string, { rxcui: string | null; rxnorm_name: string | null; fetched_at: string | null }>();
+  for (const r of (m.data ?? []) as { component: string; rxcui: string | null; rxnorm_name: string | null; fetched_at: string | null }[]) meta.set(r.component, r);
+  for (const r of (f.data ?? []) as { component: string; fact_kind: string; class_id: string; class_name: string; name_ar: string | null }[]) {
+    const mt = meta.get(r.component);
+    const o = (out[r.component] ??= {
+      rxcui: mt?.rxcui ?? null, name: mt?.rxnorm_name ?? null, source: "RxClass (MED-RT)", note_ar: RX_NOTE_AR, fetched_at: mt?.fetched_at ?? null,
+      indications: [], prevention: [], contraindications: [],
+    });
+    const it = { id: r.class_id, name: r.class_name, name_ar: r.name_ar ?? null };
+    if (r.fact_kind === "indication") o.indications.push(it);
+    else if (r.fact_kind === "prevention") o.prevention.push(it);
+    else if (r.fact_kind === "contraindication") o.contraindications.push(it);
+  }
+  return out;
+}
+
 // a name is accepted for fill_for only when it is an ingredient this database already knows (so arbitrary text cannot spend the API quota)
 async function isKnownComponent(db: ReturnType<typeof createClient>, comp: string): Promise<boolean> {
   const like = comp.replace(/[\\%_]/g, (m) => "\\" + m);
@@ -313,8 +360,10 @@ Deno.serve(async (req) => {
     if (q.error) { console.error("get_error", q.error.message); return json({ error: "internal_error" }, 500); }
     const items: Record<string, unknown> = {};
     for (const r of q.data ?? []) items[r.component as string] = shape(r as ClassRow);
-    const refs = await loadRefs(db, Object.keys(items));
+    const [refs, secs, rxs] = await Promise.all([loadRefs(db, Object.keys(items)), loadSections(db, Object.keys(items)), loadRxclass(db, Object.keys(items))]);
     for (const c of Object.keys(refs)) (items[c] as Record<string, unknown>).reference = refs[c];
+    for (const c of Object.keys(secs)) (items[c] as Record<string, unknown>).sections = secs[c];
+    for (const c of Object.keys(rxs)) (items[c] as Record<string, unknown>).rxclass = rxs[c];
     return json({ items });
   }
 
@@ -371,8 +420,10 @@ Deno.serve(async (req) => {
       if (row.status === "error") sum.errors++; else out[comp] = shape(row as ClassRow);
       await new Promise((r) => setTimeout(r, 250));
     }
-    const refs = await loadRefs(db, Object.keys(out));
+    const [refs, secs, rxs] = await Promise.all([loadRefs(db, Object.keys(out)), loadSections(db, Object.keys(out)), loadRxclass(db, Object.keys(out))]);
     for (const c of Object.keys(refs)) (out[c] as Record<string, unknown>).reference = refs[c];
+    for (const c of Object.keys(secs)) (out[c] as Record<string, unknown>).sections = secs[c];
+    for (const c of Object.keys(rxs)) (out[c] as Record<string, unknown>).rxclass = rxs[c];
     return json({ ...sum, items: out });
   }
 

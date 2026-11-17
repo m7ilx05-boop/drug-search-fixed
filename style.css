@@ -367,3 +367,11 @@ ul.ing li .ing-detail .ing-id{direction:ltr;unicode-bidi:isolate;display:inline;
 .ing-sec .ing-lbl p{color:inherit;font-size:13.5px;direction:inherit;text-align:inherit}
 .ing-tr-btn{display:block;margin:0 0 6px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--accent);font:inherit;font-size:13px;cursor:pointer}
 .ing-tr-btn:disabled{opacity:.6}
+
+/* كارت RxClass */
+.ing-rx-body{padding-top:6px}
+.ing-rx .ing-h{margin:12px 0 4px;font-size:13px;font-weight:600;color:var(--accent)}
+.ing-rx .ing-h-warn{color:#e5a13a}
+.ing-rx .ing-ul{margin:2px 0 6px;padding-inline-start:20px}
+.ing-rx li{margin:3px 0;line-height:1.6;font-size:13.5px}
+.ing-rx .ing-rx-warn{margin-top:10px;padding:8px 10px;border:1px solid #e5a13a55;border-radius:10px;background:#e5a13a14;color:inherit;font-size:12.5px;line-height:1.6}

@@ -65,6 +65,58 @@ function labelBlock(textEn, textAr) {
   return wrap;
 }
 
+// ---- كارت RxClass: الاستخدامات والوقاية والموانع (MED-RT) ----
+// الأسماء إنجليزي (MeSH). لو name_ar متخزّن بيظهر، وغير كده زرار ترجمة بيترجم الأسماء كلها في طلب واحد (دالة translate-label).
+const RX_GROUPS = [["indications", "الاستخدامات"], ["prevention", "الوقاية"], ["contraindications", "موانع الاستعمال"]];
+function rxCard(rx) {
+  const groups = RX_GROUPS.map(([k, t]) => [k, t, (Array.isArray(rx[k]) ? rx[k] : []).filter((x) => x && x.name)]).filter((g) => g[2].length);
+  if (!groups.length) return null;
+  const d = el("details", "ing-sec ing-rx"); d.append(el("summary", null, "الاستخدامات والموانع (RxClass)"));
+  const body = el("div", "ing-rx-body");
+  const btn = el("button", "ing-tr-btn", "🌐 ترجمة الأسماء للعربي"); btn.type = "button";
+  const note = el("p", "meta ing-src", ""); note.hidden = true;
+  const lis = []; // [{li, item}]
+  groups.forEach(([k, title, items]) => {
+    body.append(el("h5", "ing-h" + (k === "contraindications" ? " ing-h-warn" : ""), title));
+    const ul = el("ul", "ing-ul");
+    items.forEach((x) => { const li = el("li", null, x.name_ar || x.name); li.dir = x.name_ar ? "rtl" : "ltr"; ul.append(li); lis.push({ li, x }); });
+    body.append(ul);
+  });
+  const allAr = lis.every(({ x }) => x.name_ar);
+  let ar = null, showAr = allAr;
+  const apply = (isAr) => {
+    showAr = isAr;
+    lis.forEach(({ li, x }, i) => { const t = isAr ? (x.name_ar || (ar && ar[i]) || x.name) : x.name; li.textContent = t; li.dir = isAr && (x.name_ar || (ar && ar[i])) ? "rtl" : "ltr"; });
+    btn.textContent = isAr ? "↩ الأسماء بالإنجليزي" : "🌐 ترجمة الأسماء للعربي";
+    note.hidden = !isAr || allAr; note.textContent = "ترجمة آلية لأسماء الأمراض، والأصل بالإنجليزي هو المرجع.";
+  };
+  if (!allAr) {
+    btn.addEventListener("click", async () => {
+      if (showAr) return apply(false);
+      if (ar) return apply(true);
+      btn.disabled = true; btn.textContent = "...جاري الترجمة";
+      try {
+        const r = await call("translate-label", { text: lis.map(({ x }) => "▪ " + x.name).join("\n"), target: "ar" });
+        const out = String(r.text || "").split("\n").map((l) => l.replace(/^\s*[▪■•]\s*/, "").trim()).filter(Boolean);
+        if (out.length !== lis.length) throw Object.assign(new Error("lines"), { code: "not_translated" });
+        ar = out; apply(true);
+      } catch (e) {
+        btn.textContent = e && e.code === "rate_limited" ? "حاول بعد دقيقة" : "تعذّرت الترجمة، حاول تاني";
+        setTimeout(() => { if (!showAr) btn.textContent = "🌐 ترجمة الأسماء للعربي"; }, 3500);
+      }
+      btn.disabled = false;
+    });
+    body.prepend(btn);
+  }
+  body.append(note);
+  if (groups.some((g) => g[0] === "contraindications")) {
+    body.append(el("p", "meta ing-src ing-rx-warn", "⚠ الموانع دي على مستوى المادة الفعّالة من المصدر وما اتراجعتش بواسطة صيدلي. بعضها ممكن يخص منتجات مركّبة (مادة + مادة تانية)، فراجع نشرة المنتج قبل الاعتماد عليها."));
+  }
+  body.append(el("p", "meta ing-src", "المصدر: " + (rx.source || "RxClass (MED-RT)") + ". " + (rx.note_ar || "")));
+  d.append(body);
+  return d;
+}
+
 async function load(names) {
   const all = [...new Set(names.map(norm))].filter(Boolean);
   const waits = all.map((n) => inflight.get(n)).filter(Boolean);
@@ -151,7 +203,8 @@ function detailPanel(it) {
   row("الغرض حسب ملصق FDA", (Array.isArray(it.fda_purpose) ? it.fda_purpose : []).map((x) => String(x).slice(0, 160)), true);
   // تفاصيل أكتر: أقسام ملصق FDA (نص أصلي + ترجمة لو موجودة). الزرار مبيظهرش لو مفيش أقسام متخزّنة.
   const secs = (Array.isArray(it.sections) ? it.sections : []).filter((s) => s && s.title_ar && (s.text_en || s.text_ar));
-  if (secs.length) {
+  const rxEl = it.rxclass ? rxCard(it.rxclass) : null;
+  if (secs.length || rxEl) {
     const more = el("div", "ing-more"); more.hidden = true;
     secs.forEach((s) => {
       const d = el("details", "ing-sec"); d.append(el("summary", null, s.title_ar));
@@ -163,6 +216,7 @@ function detailPanel(it) {
       if (s.set_id) d.append(el("p", "meta ing-src ing-setid", s.set_id)); // معرّف الملصق في سطر لوحده، شمال-لليمين
       more.append(d);
     });
+    if (rxEl) more.append(rxEl);
     const btn = el("button", "ing-more-btn", "تفاصيل أكتر"); btn.type = "button";
     btn.addEventListener("click", () => { more.hidden = !more.hidden; btn.textContent = more.hidden ? "تفاصيل أكتر" : "إخفاء التفاصيل"; });
     box.append(btn, more);
