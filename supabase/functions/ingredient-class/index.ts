@@ -307,12 +307,12 @@ async function loadSections(db: ReturnType<typeof createClient>, comps: string[]
   const out: Record<string, Record<string, unknown>[]> = {};
   if (!comps.length) return out;
   const q = await db.from("ingredient_label_section")
-    .select("component,section_key,title_ar,text_en,text_ar,set_id,effective_time,sort_order")
+    .select("component,section_key,title_ar,text_en,text_ar,set_id,effective_time,sort_order,source,source_ref")
     .in("component", comps).order("sort_order", { ascending: true });
   if (q.error) { console.error("sections_error", q.error.message); return out; } // the card still works without it
   for (const x of (q.data ?? []) as Record<string, unknown>[]) {
     const c = x.component as string;
-    (out[c] ??= []).push({ section_key: x.section_key, title_ar: x.title_ar, text_en: x.text_en, text_ar: x.text_ar, set_id: x.set_id, effective_time: x.effective_time });
+    (out[c] ??= []).push({ section_key: x.section_key, title_ar: x.title_ar, text_en: x.text_en, text_ar: x.text_ar, set_id: x.set_id, effective_time: x.effective_time, source: x.source ?? null, source_ref: x.source_ref ?? null });
   }
   return out;
 }

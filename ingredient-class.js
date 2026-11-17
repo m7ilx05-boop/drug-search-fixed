@@ -207,12 +207,14 @@ function detailPanel(it) {
   if (secs.length || rxEl) {
     const more = el("div", "ing-more"); more.hidden = true;
     secs.forEach((s) => {
-      const d = el("details", "ing-sec"); d.append(el("summary", null, s.title_ar));
-      if (s.text_ar) { d.append(el("p", null, s.text_ar)); d.append(el("p", "meta ing-src", "ترجمة آلية من نص FDA فقط")); }
-      if (s.text_en) { const o = el("details", "ing-orig"); o.append(el("summary", null, "النص الأصلي من FDA")); o.append(labelBlock(s.text_en, null)); d.append(o); }
-      const src = el("p", "meta ing-src", "المصدر: openFDA label");
+      const fda = !s.source || s.source === "openfda"; // أي مصدر غير FDA بيتعلّم بوضوح ومبيتعرضش كدواعي استعمال معتمدة
+      const d = el("details", "ing-sec"); d.append(el("summary", null, fda ? s.title_ar : "تصنيف دوائي من ChEMBL (غير معتمد)"));
+      if (s.text_ar) { d.append(el("p", null, s.text_ar)); d.append(el("p", "meta ing-src", fda ? "ترجمة آلية من نص FDA فقط" : "ترجمة آلية")); }
+      if (s.text_en) { const o = el("details", "ing-orig"); o.append(el("summary", null, fda ? "النص الأصلي من FDA" : "النص الأصلي من ChEMBL")); o.append(labelBlock(s.text_en, null)); d.append(o); }
+      const src = el("p", "meta ing-src", fda ? "المصدر: openFDA label" : "المصدر: ChEMBL (قاعدة بيانات بحثية، مش نشرة دوا رسمية). ده تصنيف مش دواعي استعمال معتمدة، ومش بديل لرأي الطبيب أو الصيدلي.");
       if (s.effective_time) { const t = String(s.effective_time), nice = /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t; src.append("، بتاريخ "); src.append(el("span", "ing-id", nice)); }
       d.append(src);
+      if (!fda && s.source_ref) d.append(el("p", "meta ing-src ing-setid", String(s.source_ref).slice(0, 200)));
       if (s.set_id) d.append(el("p", "meta ing-src ing-setid", s.set_id)); // معرّف الملصق في سطر لوحده، شمال-لليمين
       more.append(d);
     });
