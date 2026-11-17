@@ -29,8 +29,14 @@ const toDate = (v: unknown): string | null => {
 };
 
 async function download(): Promise<{ top: string[]; items: Record<string, unknown>[] }> {
-  const res = await fetch(EMA_URL, { headers: { "User-Agent": "Mozilla/5.0 (compatible; drug-knowledge-bot)", Accept: "application/json" }, signal: AbortSignal.timeout(90_000) });
-  if (!res.ok) { await res.body?.cancel(); throw new Error("ema_http_" + res.status); }
+  const res = await fetch(EMA_URL, { headers: {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    Accept: "application/json,text/plain,*/*", "Accept-Language": "en-US,en;q=0.9",
+  }, signal: AbortSignal.timeout(90_000) });
+  if (!res.ok) {
+    const snippet = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
+    throw new Error(`ema_http_${res.status} retry-after=${res.headers.get("retry-after") ?? "-"} server=${res.headers.get("server") ?? "-"} ${snippet}`);
+  }
   const d = await res.json();
   let arr: unknown = d;
   let top: string[] = [];
