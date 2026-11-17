@@ -45,5 +45,12 @@ jobs:
           for s in $list; do
             [ -d "supabase/functions/$s" ] || { echo "skip $s"; continue; }
             echo "Deploying $s"
-            supabase functions deploy "$s" --project-ref "$PROJECT_REF" --use-api
+            if ! supabase functions deploy "$s" --project-ref "$PROJECT_REF" --use-api > out.txt 2>&1; then
+              cat out.txt
+              echo "::error title=deploy $s failed::$(tail -c 700 out.txt | tr '\n' ' ' | tr -d '\r')"
+              failed=1
+            else
+              tail -n 3 out.txt
+            fi
           done
+          [ -z "$failed" ] || exit 1
