@@ -170,7 +170,89 @@ async function runFill() {
 const tagOf = (it) => it && it.status === "found" ? (it.purpose_ar || it.purpose_en || clean(it.fda_class) || "") : "";
 const lines = (arr) => (Array.isArray(arr) ? arr : []).map(clean).filter(Boolean);
 
-function detailPanel(it) {
+// ---- ترتيب نص ملصق FDA: فواصل أسطر وعناوين ونقط. الكلمات نفسها مبتتغيّرش (بس بنكسر الأسطر ونعمل عناوين) ----
+const BULLET = "\u25AA";
+const HEADS = "Do not use|Ask a doctor or pharmacist before use if you are|Ask a doctor before use if you have|Ask a doctor before use if|Ask a doctor or pharmacist before use if|When using this product|Stop use and ask a doctor if|If pregnant or breast-feeding|If pregnant or breast feeding|Do not exceed recommended dosage|Other information";
+const BREAKS = "Do not use|Ask a doctor|Stop use|When using|If pregnant|Keep out of reach|In case of overdose|Liver warning|Allergy alert|Sore throat warning|Reye's syndrome|Stomach bleeding warning|Directions|Warnings|Other information|Inactive ingredients|Questions";
+const LEAD = /^(Uses|Directions|Warnings|Purpose|Indications and usage|Indications & usage|Dosage and administration|Contraindications|Adverse reactions|Drug interactions|Warnings and precautions|Warnings and cautions)\s*:?\s+(?=\S)/i;
+function fdaLines(text, isEn) {
+  let t = String(text || "").replace(/\s+/g, " ").trim();
+  if (isEn) {
+    t = t.replace(LEAD, "");
+    t = t.replace(new RegExp("(" + HEADS + ")\\s*:?\\s*(?=" + BULLET + ")", "g"), "\n\u00A7$1\n");
+    t = t.replace(new RegExp("([.!?])\\s+(?=(?:" + BREAKS + ")\\b)", "g"), "$1\n");
+  }
+  t = t.split(BULLET).join("\n" + BULLET + " ");
+  return t.split("\n").map((x) => x.trim()).filter(Boolean);
+}
+function fdaBody(text, isEn) {
+  const root = el("div", "ing-text" + (isEn ? " ltr" : ""));
+  let ul = null;
+  fdaLines(text, isEn).forEach((ln) => {
+    if (ln.charAt(0) === "\u00A7") { ul = null; root.append(el("h4", "ing-h", ln.slice(1))); return; }
+    if (ln.charAt(0) === BULLET) {
+      if (!ul) { ul = el("ul", "ing-bl"); root.append(ul); }
+      ul.append(el("li", null, ln.slice(1).trim()));
+      return;
+    }
+    ul = null; root.append(el("p", null, ln));
+  });
+  return root;
+}
+
+const TR_ERR = {
+  rate_limited: "الطلبات كتير، استنى دقيقة وجرّب تاني.",
+  translation_unavailable: "الترجمة مش متاحة دلوقتي أو ماعدّتش فحص الدقة. اقرا النص الأصلي، وجرّب تاني بعد شوية.",
+  section_not_found: "القسم ده مش موجود."
+};
+
+// قسم واحد: عنوان + نص مترتب + زرار ترجمة/النص الأصلي + المصدر
+function sectionBox(s, key) {
+  const d = el("details", "ing-sec"); d.append(el("summary", null, s.title_ar));
+  const holder = el("div", "ing-view");
+  const note = el("p", "meta ing-src ing-warnbox"); note.hidden = true; // خارج صندوق التمرير عشان التحذير يفضل ظاهر
+  const tools = el("div", "ing-tools");
+  const tbtn = el("button", "ing-tr-btn", ""); tbtn.type = "button";
+  const msg = el("p", "meta ing-trmsg"); msg.hidden = true;
+  let mode = "en";
+  const paint = () => {
+    holder.replaceChildren(); note.hidden = true;
+    if (mode === "ar" && s.text_ar) {
+      holder.append(fdaBody(s.text_ar, false));
+      note.textContent = "ترجمة آلية اتعملت بالذكاء الاصطناعي واتراجعت آليًا بموديل تاني، ومفيش مراجعة بشرية، فممكن فيها أخطاء. المرجع هو النص الأصلي بالإنجليزي، ومش بديل لرأي الصيدلي أو الطبيب.";
+      note.hidden = false;
+      tbtn.textContent = "عرض النص الأصلي (English)";
+    } else {
+      if (s.text_en) holder.append(fdaBody(s.text_en, true));
+      tbtn.textContent = s.text_ar ? "عرض الترجمة العربية" : "ترجمة للعربي";
+    }
+    tbtn.hidden = !(s.text_en || s.text_ar) || (!s.text_en && mode === "ar");
+  };
+  tbtn.addEventListener("click", async () => {
+    msg.hidden = true;
+    if (s.text_ar) { mode = mode === "ar" ? "en" : "ar"; paint(); return; }
+    if (!s.section_key) return;
+    const old = tbtn.textContent; tbtn.disabled = true; tbtn.textContent = "جاري الترجمة… (ممكن تاخد نص دقيقة)";
+    try {
+      const r = await call("ingredient-translate", { component: key, section_key: s.section_key });
+      if (r && r.text_ar) { s.text_ar = r.text_ar; mode = "ar"; paint(); }
+      else throw new Error("empty");
+    } catch (e) {
+      tbtn.textContent = old;
+      msg.textContent = TR_ERR[e && e.code] || "الترجمة مش متاحة دلوقتي. جرّب تاني بعد شوية.";
+      msg.hidden = false;
+    } finally { tbtn.disabled = false; }
+  });
+  tools.append(tbtn); d.append(tools, msg, holder, note);
+  paint();
+  const src = el("p", "meta ing-src", "المصدر: openFDA label");
+  if (s.effective_time) { const t = String(s.effective_time), nice = /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t; src.append("، بتاريخ "); src.append(el("span", "ing-id", nice)); }
+  d.append(src);
+  if (s.set_id) d.append(el("p", "meta ing-src ing-setid", s.set_id));
+  return d;
+}
+
+function detailPanel(it, key) {
   const box = el("div", "ing-detail");
   if (!it || it.status !== "found" || !(tagOf(it) || it.fda_class || (it.fda_purpose && it.fda_purpose.length))) {
     box.append(el("p", "meta", "لسه مفيش بيانات تصنيف مؤكدة لهذه المادة."));
@@ -201,26 +283,11 @@ function detailPanel(it) {
   row("تصنيف FDA الدوائي", epc, true);
   row("آلية العمل (MoA)", lines(it.moa), true);
   row("الغرض حسب ملصق FDA", (Array.isArray(it.fda_purpose) ? it.fda_purpose : []).map((x) => String(x).slice(0, 160)), true);
-  // تفاصيل أكتر: أقسام ملصق FDA (نص أصلي + ترجمة لو موجودة). الزرار مبيظهرش لو مفيش أقسام متخزّنة.
+  // تفاصيل أكتر: أقسام ملصق FDA (نص أصلي مترتب + زرار ترجمة لو الترجمة مش متخزّنة). الزرار مبيظهرش لو مفيش أقسام متخزّنة.
   const secs = (Array.isArray(it.sections) ? it.sections : []).filter((s) => s && s.title_ar && (s.text_en || s.text_ar));
-  const rxEl = it.rxclass ? rxCard(it.rxclass) : null;
-  if (secs.length || rxEl) {
+  if (secs.length) {
     const more = el("div", "ing-more"); more.hidden = true;
-    secs.forEach((s) => {
-      const fda = !s.source || s.source === "openfda"; // أي مصدر غير FDA بيتعلّم بوضوح ومبيتعرضش كدواعي استعمال معتمدة
-      const d = el("details", "ing-sec"); d.append(el("summary", null, fda ? s.title_ar : "تصنيف دوائي من ChEMBL (غير معتمد)"));
-      if (s.text_ar) { d.append(el("p", null, s.text_ar)); d.append(el("p", "meta ing-src", fda ? "ترجمة آلية من نص FDA فقط" : "ترجمة آلية")); }
-      if (s.text_en) { const o = el("details", "ing-orig"); o.append(el("summary", null, fda ? "النص الأصلي من FDA" : "النص الأصلي من ChEMBL")); o.append(labelBlock(s.text_en, null)); d.append(o); }
-      const src = el("p", "meta ing-src", fda ? "المصدر: openFDA label" : "المصدر: ChEMBL (قاعدة بيانات بحثية، مش نشرة دوا رسمية). ده تصنيف مش دواعي استعمال معتمدة، ومش بديل لرأي الطبيب أو الصيدلي.");
-      if (s.effective_time) { const t = String(s.effective_time), nice = /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t; src.append("، بتاريخ "); src.append(el("span", "ing-id", nice)); }
-      d.append(src);
-      if (/^https?:\/\/\S+$/i.test(String(s.source_ref || ""))) { // رابط المرجع: بيظهر لكل قسم (مفيش قسم بيتحفظ من غير رابط)
-        const lp = el("p", "meta ing-src"); const la = el("a", null, "فتح المرجع"); la.href = String(s.source_ref); la.target = "_blank"; la.rel = "noopener noreferrer"; lp.append(la); d.append(lp);
-      }
-      if (s.set_id) d.append(el("p", "meta ing-src ing-setid", s.set_id)); // معرّف الملصق في سطر لوحده، شمال-لليمين
-      more.append(d);
-    });
-    if (rxEl) more.append(rxEl);
+    secs.forEach((s) => more.append(sectionBox(s, key)));
     const btn = el("button", "ing-more-btn", "تفاصيل أكتر"); btn.type = "button";
     btn.addEventListener("click", () => { more.hidden = !more.hidden; btn.textContent = more.hidden ? "تفاصيل أكتر" : "إخفاء التفاصيل"; });
     box.append(btn, more);
@@ -245,7 +312,7 @@ function decorate(li) {
   let panel = null;
   const refresh = () => {
     fillTag();
-    if (panel && li.classList.contains("ing-open")) { const np = detailPanel(cache.get(key)); panel.replaceWith(np); panel = np; }
+    if (panel && li.classList.contains("ing-open")) { const np = detailPanel(cache.get(key), key); panel.replaceWith(np); panel = np; }
   };
   (refreshers.get(key) || refreshers.set(key, []).get(key)).push(refresh);
   load([li.dataset.ing]).then(fillTag);
@@ -254,7 +321,7 @@ function decorate(li) {
     main.setAttribute("aria-expanded", "true"); li.classList.add("ing-open");
     await load([li.dataset.ing]);
     if (!li.classList.contains("ing-open")) return;
-    panel = detailPanel(cache.get(key)); li.append(panel); fillTag();
+    panel = detailPanel(cache.get(key), key); li.append(panel); fillTag();
   };
   main.addEventListener("click", toggle);
   main.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
