@@ -63,14 +63,19 @@ button:disabled{opacity:.55;cursor:wait}
 .recent .rc-clear{display:inline-flex;align-items:center;gap:6px;background:none;color:var(--accent);padding:0 6px;min-height:34px;font-size:14px;font-weight:500;text-decoration:underline}
 .recent .rc-clear::before{content:"";width:17px;height:17px;background:var(--accent);-webkit-mask:var(--ic-trash) center/contain no-repeat;mask:var(--ic-trash) center/contain no-repeat}
 
-/* اقتراحات سريعة: أيقونات صغيرة بس (الأزرار بيضيفها JS جوه .qs) */
-.qs{display:flex;justify-content:center;gap:14px;margin-top:16px;padding:0;background:none;border:0;border-radius:0}
+/* اقتراحات سريعة: زرّين مستطيلين جنب بعض (الباركود | بحث بصورة). الأزرار بيضيفها JS جوه .qs */
+.qs{position:relative;display:flex;gap:10px;margin-top:16px;padding:0;background:none;border:0;border-radius:0}
 .qs-h{display:none}
-form .qs .scan-btn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:52px;height:52px;min-height:52px;margin:0;padding:0;font-size:0;line-height:0;background:var(--surface);color:var(--accent);border:1px solid var(--line);border-radius:50%;box-shadow:0 2px 8px rgba(20,90,160,.08)}
+form .qs .scan-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;flex:1 1 0;min-width:0;width:auto;height:68px;min-height:68px;margin:0;padding:0 8px;font-size:13.5px;font-weight:500;line-height:1.2;text-align:center;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 8px rgba(20,90,160,.08)}
 form .qs .scan-btn::before{content:"";flex:none;width:26px;height:26px;background:var(--accent);-webkit-mask:var(--ic-barcode) center/contain no-repeat;mask:var(--ic-barcode) center/contain no-repeat}
-form .qs .scan-btn:nth-of-type(2)::before{-webkit-mask-image:var(--ic-camera);mask-image:var(--ic-camera)}
-form .qs .scan-btn:nth-of-type(3)::before{-webkit-mask-image:var(--ic-gallery);mask-image:var(--ic-gallery)}
+form .qs .scan-btn.img-pick::before{-webkit-mask-image:var(--ic-camera);mask-image:var(--ic-camera)}
 form .qs .scan-btn::after{display:none}
+.img-menu{position:absolute;z-index:30;inset-inline:0;top:calc(100% + 8px);padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+.img-menu[hidden]{display:none}
+.img-opt{display:flex;width:100%;align-items:center;justify-content:flex-start;gap:12px;background:none;color:var(--ink);border:0;border-radius:12px;padding:0 12px;min-height:48px;font-size:15.5px;font-weight:500;text-align:start}
+.img-opt:hover,.img-opt:active{background:var(--soft)}
+.img-opt::before{content:"";flex:none;width:22px;height:22px;background:var(--accent);-webkit-mask:var(--ic-camera) center/contain no-repeat;mask:var(--ic-camera) center/contain no-repeat}
+.img-opt.gal::before{-webkit-mask-image:var(--ic-gallery);mask-image:var(--ic-gallery)}
 
 @media (max-width:380px){.bubble{padding:16px 12px}}
 

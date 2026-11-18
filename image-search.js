@@ -15,12 +15,21 @@ $("out").after(fam); // بعد النتايج مباشرة، وفوق زر ال�
 
 const mkInput = (capture) => { const i = el("input"); i.type = "file"; i.accept = "image/*"; if (capture) i.setAttribute("capture", "environment"); i.hidden = true; return i; };
 const camIn = mkInput(true), galIn = mkInput(false);
-const camBtn = el("button", "scan-btn", "افتح الكاميرا وصوّر العلبة"); camBtn.type = "button";
-const galBtn = el("button", "scan-btn", "ابحث بصورة من المعرض"); galBtn.type = "button";
-$("f").append(camBtn, galBtn, camIn, galIn);
-camBtn.addEventListener("click", () => camIn.click());
-galBtn.addEventListener("click", () => galIn.click());
-const busy = (v) => { camBtn.disabled = galBtn.disabled = v; };
+const imgBtn = el("button", "scan-btn img-pick", "بحث بصورة"); imgBtn.type = "button";
+imgBtn.setAttribute("aria-haspopup", "menu"); imgBtn.setAttribute("aria-expanded", "false");
+const menu = el("div", "img-menu"); menu.hidden = true; menu.setAttribute("role", "menu");
+const closeMenu = () => { menu.hidden = true; imgBtn.setAttribute("aria-expanded", "false"); };
+const opt = (cls, text, input) => {
+  const o = el("button", "img-opt " + cls, text); o.type = "button"; o.setAttribute("role", "menuitem");
+  o.addEventListener("click", () => { closeMenu(); input.click(); });
+  return o;
+};
+menu.append(opt("cam", "تصوير بالكاميرا", camIn), opt("gal", "اختيار من المعرض", galIn));
+$("f").append(imgBtn, menu, camIn, galIn);
+imgBtn.addEventListener("click", () => { menu.hidden = !menu.hidden; imgBtn.setAttribute("aria-expanded", String(!menu.hidden)); });
+document.addEventListener("pointerdown", (e) => { if (!e.target.closest(".img-menu, .img-pick")) closeMenu(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+const busy = (v) => { imgBtn.disabled = v; };
 
 // أي بحث مش جاي من الصورة بيمسح صندوق العائلة
 $("f").addEventListener("submit", () => { if (!window.__keepImg) fam.replaceChildren(); }, true);

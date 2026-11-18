@@ -127,6 +127,7 @@
   var h = document.createElement("div"); h.className = "qs-h"; h.textContent = "اقتراحات سريعة";
   box.appendChild(h);
   Array.prototype.forEach.call(bs, function (b) { var t = (b.textContent || "").trim(); b.setAttribute("aria-label", t); b.title = t; box.appendChild(b); }); // أيقونات بس: الاسم للقارئ والـ tooltip
+  var m = f.querySelector(".img-menu"); if (m) box.appendChild(m);
   f.appendChild(box);
 })();
 </script>
