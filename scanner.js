@@ -102,8 +102,10 @@ const box = el("div", "scan-box");
 const top = el("div", "scan-top");
 const state = el("span", "scan-state", "جاهز للمسح");
 const camBtn = el("button", null, "تشغيل الكاميرا"); camBtn.type = "button";
+const phoneBtn = el("button", null, "📷 كاميرا الجوال"); phoneBtn.type = "button"; // بيفتح تطبيق كاميرا الجوال نفسه ويقرا الباركود من الصورة
+const phoneIn = el("input"); phoneIn.type = "file"; phoneIn.accept = "image/*"; phoneIn.setAttribute("capture", "environment"); phoneIn.hidden = true;
 const stop = el("button", null, "إيقاف وضع المسح"); stop.type = "button";
-top.append(state, camBtn, stop);
+top.append(state, camBtn, phoneBtn, stop);
 const cam = el("div", "cam"); cam.append(Object.assign(el("video"), { muted: true, autoplay: true }), el("div", "frame"));
 const video = cam.firstChild; video.setAttribute("playsinline", "");
 const camMsg = el("div", "meta");
@@ -113,7 +115,7 @@ inp.setAttribute("aria-label", "حقل استقبال السكانر"); inp.plac
 const optL = el("label", "scan-opt"); const noEnter = el("input"); noEnter.type = "checkbox";
 optL.append(noEnter, "السكانر لا يرسل Enter بعد المسح (الاكتشاف التلقائي بالسرعة)");
 const note = el("div", "meta");
-box.append(top, cam, camMsg, inp, optL, note);
+box.append(top, cam, camMsg, inp, optL, note, phoneIn);
 const outBox = el("div"); outBox.setAttribute("aria-live", "polite");
 const logTitle = el("h3", "sec", "آخر عمليات المسح"); const logList = el("div", "scan-log");
 panel.append(box, outBox, logTitle, logList);
@@ -165,8 +167,9 @@ async function makeDetector() {
   const cv = document.createElement("canvas"), ctx = cv.getContext("2d", { willReadFrequently: true });
   return {
     read: async (v) => {
-      const k = Math.min(1, 960 / (v.videoWidth || 960));
-      cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
+      const W = v.videoWidth || v.width, H = v.videoHeight || v.height; // فيديو أو صورة ثابتة (ImageBitmap)
+      const k = Math.min(1, (v.videoWidth ? 960 : 1600) / (W || 960));
+      cv.width = Math.round(W * k); cv.height = Math.round(H * k);
       ctx.drawImage(v, 0, 0, cv.width, cv.height);
       try { return mfr.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)))).getText(); }
       catch { return null; } // مفيش كود في الفريم ده
@@ -221,6 +224,25 @@ async function camStart() {
   tick();
 }
 camBtn.addEventListener("click", () => (camOn ? camStop() : camStart()));
+// كاميرا الجوال: بيفتح تطبيق الكاميرا الأصلي، وبعد التصوير بنقرا الباركود من الصورة (جوه المتصفح، الصورة مبتتبعتش لأي سيرفر)
+phoneBtn.addEventListener("click", () => { phoneIn.value = ""; phoneIn.click(); });
+phoneIn.addEventListener("change", async () => {
+  const f = phoneIn.files && phoneIn.files[0]; if (!f) return;
+  if (camOn) camStop();
+  phoneBtn.disabled = true; camMsg.textContent = "جاري قراءة الباركود من الصورة…";
+  try {
+    const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
+    const det = await makeDetector();
+    let text = null;
+    try { text = await det.read(bmp); } catch { /* مفيش كود */ }
+    if (bmp.close) bmp.close();
+    if (text) { try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ } camMsg.textContent = "تم قراءة الباركود من الصورة."; submit(text); }
+    else camMsg.textContent = "ما لقيناش باركود واضح في الصورة. قرّب وصوّر الباركود لوحده بإضاءة كويسة وجرّب تاني.";
+  } catch (e) {
+    camMsg.textContent = "تعذّر قراءة الصورة (" + (e && e.message ? e.message : "خطأ") + "). جرّب تاني.";
+  }
+  phoneBtn.disabled = false; phoneIn.value = "";
+});
 document.addEventListener("visibilitychange", () => { if (document.hidden && camOn) { camStop(); camMsg.textContent = "الكاميرا اتقفلت لأنك سبت الصفحة. شغّلها تاني لو عايز."; } });
 
 function start() {
