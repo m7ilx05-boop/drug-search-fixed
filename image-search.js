@@ -4,6 +4,7 @@
 (() => {
 "use strict";
 const MAX_SIDE = 1280;
+let lastShot = { w: 0, h: 0 };
 ERR.vision_unavailable = "قراءة الصورة مش متاحة دلوقتي. جرّب تاني بعد شوية.";
 ERR.vision_bad_output = "ما قدرناش نقرا الصورة. جرّب صورة أوضح.";
 ERR.invalid_image = "الصورة مش صالحة أو كبيرة قوي. جرّب صورة تانية.";
@@ -105,6 +106,7 @@ async function toJpegBase64(f) {
   if (!w0 || !h0) throw new Error("image_decode_failed");
   const k = Math.min(1, MAX_SIDE / Math.max(w0, h0));
   const cv = document.createElement("canvas"); cv.width = Math.round(w0 * k); cv.height = Math.round(h0 * k);
+  lastShot = { w: cv.width, h: cv.height };
   cv.getContext("2d").drawImage(src, 0, 0, cv.width, cv.height);
   const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.85));
   if (!blob) throw new Error("image_encode_failed");
@@ -155,19 +157,38 @@ function famBox(family) {
 
 window.famBox = famBox; // search.js بيستخدمه بعد أي بحث عادي
 
-// قائمة خطوات البحث بالصورة: كل خطوة (مستنية / شغّالة / خلصت / فشلت) وتحتها سطر تفاصيل لما يكون فيه
+// قائمة خطوات البحث بالصورة: الخطوة بتظهر بحركة لما دورها يجي، ولما تخلص بتفضل سطر واحد مختصر.
+// الضغط على أي خطوة بيفتح تفاصيل اللي حصل فيها (ودي بيانات حقيقية من الرد، مش كلام ثابت).
 function stepsUI() {
   const w = el("div", "img-steps"); w.setAttribute("role", "status"); w.setAttribute("aria-live", "polite");
   const items = {}; let cur = null;
-  const add = (k, text) => { const li = el("div", "st pend"); li.append(el("i"), el("span", null, text)); w.append(li); items[k] = li; return li; };
+  const add = (k) => {
+    const li = el("div", "st pend"); li.hidden = true;
+    const head = el("button", "st-h"); head.type = "button"; head.append(el("i"), el("span", "st-t"), el("b", "st-c"));
+    const body = el("div", "st-b"); const inner = el("div", "st-bi"); body.append(inner);
+    li.append(head, body);
+    head.addEventListener("click", () => { if (li.classList.contains("has-d")) { const o = li.classList.toggle("open"); head.setAttribute("aria-expanded", o ? "true" : "false"); } });
+    w.append(li); items[k] = { li, head, inner };
+  };
   const set = (k, state, text) => {
-    const li = items[k]; if (!li) return;
-    li.className = "st " + state; if (text != null) li.lastChild.textContent = text;
+    const it = items[k]; if (!it) return;
+    const was = it.li.className;
+    it.li.className = "st " + state + (was.includes("has-d") ? " has-d" : "") + (was.includes(" open") ? " open" : "");
+    if (it.li.hidden) { it.li.hidden = false; it.li.classList.add("in"); }
+    if (text != null) it.head.querySelector(".st-t").textContent = text;
     if (state === "run") cur = k; else if (cur === k) cur = null;
   };
-  const detail = (k, text) => { const li = items[k]; if (!li || !text) return; let d = li.querySelector(".st-d"); if (!d) { d = el("div", "st-d"); li.append(d); } d.textContent = text; };
-  const fail = (text) => { if (cur) set(cur, "bad", text); };
-  return { w, add, set, detail, fail };
+  // تفاصيل الخطوة: [[التسمية, القيمة], ...] والقيم الفاضية بتتشال
+  const lines = (k, rows) => {
+    const it = items[k]; if (!it) return;
+    const rs = (rows || []).filter((r) => r && r[1] != null && String(r[1]).trim() !== "");
+    it.inner.replaceChildren();
+    rs.forEach(([l, v]) => { const d = el("div", "st-r"); d.append(el("span", "st-l", l), el("span", "st-v", String(v))); it.inner.append(d); });
+    it.li.classList.toggle("has-d", rs.length > 0);
+    it.head.setAttribute("aria-expanded", it.li.classList.contains("open") ? "true" : "false");
+  };
+  const fail = (text, rows) => { if (cur) { set(cur, "bad", text); if (rows) lines(cur, rows); } };
+  return { w, add, set, lines, fail };
 }
 
 async function handle(f) {
@@ -176,33 +197,35 @@ async function handle(f) {
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
   busy(true); setStatus("جاري قراءة الصورة…"); showSkeleton();
-  const st = stepsUI(); st.add("prep", "تجهيز الصورة"); st.add("read", "قراءة نص الصورة واستخراج الاسم والتركيز"); st.set("prep", "run"); box.append(st.w);
+  const st = stepsUI(); st.add("prep"); st.add("read"); st.set("prep", "run", "جاري تجهيز الصورة…"); box.append(st.w);
   if (window.showResultsPage) window.showResultsPage("بحث بالصورة"); // من غيرها النتيجة بتتملي في صفحة مخفية
   const ffPrev = window.__ff; window.__ff = ""; // فلتر الشكل الدوائي مش بيأثر على البحث بالصورة
   try {
     const b64 = await toJpegBase64(f);
     if (token !== polling) return;
-    st.set("prep", "done"); st.set("read", "run");
+    st.set("prep", "done", "اتجهّزت الصورة");
+    st.lines("prep", [["الأبعاد بعد التصغير", lastShot.w + " × " + lastShot.h + " بكسل"], ["الحجم المبعوت", Math.round(b64.length * 0.75 / 1024) + " كيلوبايت (JPEG)"], ["ملحوظة", "الصورة بتتصغّر وبتتبعت للقراءة بس، ومش بتتحفظ."]]);
+    st.set("read", "run", "جاري قراءة نص الصورة…");
     const r = await call("drug-image-search", { image: b64, mime: "image/jpeg" });
     if (token !== polling) return;
     box.append(readCard(r));
     const x = r.extracted || {};
-    st.set("read", "done");
     const nm = x.brand_name || x.arabic_name || (x.active_ingredients || [])[0];
-    st.detail("read", nm ? "الاسم: " + nm + " — التركيز: " + (x.strength || "مش مكتوب في الصورة") : "");
-    if (!x.is_medicine_pack) { st.set("read", "bad", "مش باين في الصورة علبة دواء"); setStatus("مش باين في الصورة علبة دواء. صوّر العلبة من قدّام وبإضاءة كويسة.", { error: true }); return; }
-    if (!(r.gtins || []).length && !r.search) { st.set("read", "bad", "ما قدرناش نقرا اسم ولا باركود واضح"); setStatus("ما قدرناش نقرا اسم ولا باركود واضح من الصورة. جرّب صورة أقرب وأوضح.", { error: true }); return; }
+    st.set("read", "done", nm ? "اتقرا: " + nm + (x.strength ? " " + x.strength : "") : "اتقرا النص");
+    st.lines("read", [["الاسم التجاري", x.brand_name], ["الاسم بالعربي", x.arabic_name], ["المادة الفعّالة", (x.active_ingredients || []).join("، ")], ["التركيز", x.strength || "مش مكتوب في الصورة"], ["الشكل الدوائي", x.dosage_form], ["الشركة", x.manufacturer], ["الباركود", r.barcode_read ? ((r.gtins || []).length ? r.gtins[0] + " (رقم المراجعة صحيح)" : "اتقرا بس رقم المراجعة مش مطابق") : "ما اتقراش"], ["علبة دواء؟", x.is_medicine_pack ? "أيوه" : "لأ"]]);
+    if (!x.is_medicine_pack) { st.set("read", "bad", "مش باين في الصورة علبة دواء"); st.lines("read", [["اللي حصل", "القراءة خلصت بس مفيش علبة دواء واضحة في الصورة. صوّر العلبة من قدّام وبإضاءة كويسة."]]); setStatus("مش باين في الصورة علبة دواء. صوّر العلبة من قدّام وبإضاءة كويسة.", { error: true }); return; }
+    if (!(r.gtins || []).length && !r.search) { st.set("read", "bad", "ما قدرناش نقرا اسم ولا باركود واضح"); st.lines("read", [["اللي حصل", "القراءة خلصت بس مفيش اسم ولا باركود واضح. جرّب صورة أقرب وأوضح."]]); setStatus("ما قدرناش نقرا اسم ولا باركود واضح من الصورة. جرّب صورة أقرب وأوضح.", { error: true }); return; }
     if (r.family) famBox(r.family);
     else if (r.search && r.search.type !== "ingredient") famBox({ text: r.search.text });
 
     // 1) باركود صحيح = نفس المنتج بالظبط
     if ((r.gtins || []).length) {
-      st.add("bc", "فحص الباركود المطبوع في الصورة"); st.set("bc", "run");
+      st.add("bc"); st.set("bc", "run", "جاري فحص الباركود…");
       try {
         const d = await call("drug-barcode", { gtins: r.gtins });
         if (token !== polling) return;
         if (d.found > 0) {
-          st.set("bc", "done", "اتعرف على المنتج من الباركود");
+          st.set("bc", "done", "اتعرف على المنتج من الباركود"); st.lines("bc", [["الباركود", (r.gtins || []).join("، ")], ["عدد المنتجات اللي لقيناها", d.found]]);
           const out = $("out");
           out.replaceChildren(el("h3", "sec", "نفس المنتج اللي في الصورة (" + d.found + ")"));
           if (d.ambiguous) out.append(el("div", "scan-msg warn", "الباركود ده مسجّل لأكتر من منتج في المصدر. راجع الاسم والحجم على العبوة."));
@@ -211,22 +234,24 @@ async function handle(f) {
           toast("success", "اتعرف على المنتج من الباركود.");
           return;
         }
-        st.set("bc", "done", "الباركود مش موجود في القاعدة، هنكمّل بالاسم");
-      } catch { st.set("bc", "done", "تعذّر فحص الباركود، هنكمّل بالاسم"); /* نكمّل بالاسم */ }
+        st.set("bc", "done", "الباركود مش موجود في القاعدة"); st.lines("bc", [["الباركود", (r.gtins || []).join("، ")], ["النتيجة", "مش مسجّل في قاعدة البيانات، فكمّلنا بالبحث بالاسم."]]);
+      } catch { st.set("bc", "done", "تعذّر فحص الباركود"); st.lines("bc", [["النتيجة", "حصلت مشكلة في فحص الباركود، فكمّلنا بالبحث بالاسم."]]); /* نكمّل بالاسم */ }
     }
 
     // 2) الاسم + التركيز + الشكل: الباك اند حدّد مين هو نفس المنتج، ومخفي أي تركيز أو شكل مختلف
-    if (!r.search) { st.add("nm", "البحث بالاسم"); st.set("nm", "bad", "مفيش اسم واضح في الصورة نبحث بيه"); setStatus("الباركود المقروء مش موجود في قاعدة البيانات، ومفيش اسم واضح في الصورة نبحث بيه.", { error: true }); return; }
-    st.add("srch", "البحث عن «" + r.search.text + "» في قاعدة البيانات"); st.add("match", "مطابقة الاسم والتركيز والشكل الدوائي"); st.set("srch", "run"); setStatus("جاري البحث عن المنتج في قاعدة البيانات…");
+    if (!r.search) { st.add("nm"); st.set("nm", "bad", "مفيش اسم واضح نبحث بيه"); st.lines("nm", [["اللي حصل", "الباركود مش موجود في القاعدة ومفيش اسم واضح في الصورة."]]); setStatus("الباركود المقروء مش موجود في قاعدة البيانات، ومفيش اسم واضح في الصورة نبحث بيه.", { error: true }); return; }
+    st.add("srch"); st.add("match"); st.set("srch", "run", "جاري البحث عن «" + r.search.text + "»…"); setStatus("جاري البحث عن المنتج في قاعدة البيانات…");
     const d = await call("drug-search", { query: r.search.text, search_type: r.search.type === "ingredient" ? "ingredient" : "brand" });
     if (token !== polling) return;
-    st.set("srch", "done"); st.set("match", "run");
+    st.set("srch", "done", "البحث عن «" + r.search.text + "» خلص");
+    st.lines("srch", [["الاستعلام", r.search.text], ["نوع البحث", r.search.type === "ingredient" ? "مادة فعّالة" : "اسم تجاري"], ["عدد النتايج اللي رجعت", ((d.tiers && d.tiers.official) || d.results || []).length]]);
+    st.set("match", "run", "جاري مطابقة الاسم والتركيز والشكل…");
     const list = (d.tiers && d.tiers.official) || d.results || [];
     const m = r.match || {};
     const out = $("out"); out.replaceChildren();
 
     if (!Array.isArray(m.exact_ids)) {
-      st.set("match", "bad", "ما قدرناش نتحقق من التركيز والشكل");
+      st.set("match", "bad", "ما قدرناش نتحقق من التركيز والشكل"); st.lines("match", [["اللي حصل", "التحقق من التركيز والشكل ماتمّش، فالنتايج ممكن تكون لمنتجات مشابهة. قارنها بالعلبة."]]);
       out.append(el("div", "scan-msg warn", "ما قدرناش نتحقق من التركيز والشكل، فالنتايج دي ممكن تكون لمنتجات مشابهة. قارنها بالعلبة."));
       list.forEach((p) => out.append(card(p, 1)));
       setStatus("");
@@ -250,10 +275,11 @@ async function handle(f) {
       unv.forEach((p) => out.append(card(p, 3)));
     }
     st.set("match", "done", exact.length ? "لقينا " + exact.length + " مطابق بنفس الاسم والتركيز والشكل" : "ما لقيناش مطابق بنفس التركيز والشكل");
+    st.lines("match", [["التركيز المطلوب", m.strength_checked ? (m.required_strength || []).join(" + ") : "مش متحقق منه"], ["مطابق تمامًا", exact.length], ["نفس الاسم والتركيز مش مسجّل", unv.length], ["اتخفّى لاختلاف التركيز أو الشكل أو النوع", m.hidden_count || 0]]);
     if (m.hidden_count > 0) out.append(el("p", "sec-note", "اتخفّى " + m.hidden_count + " منتج بنفس العائلة بتركيز أو شكل أو نوع مختلف. تقدر تشوفهم من البحث بالعائلة تحت."));
     setStatus("");
   } catch (err) {
-    st.fail("حصلت مشكلة في الخطوة دي");
+    st.fail("حصلت مشكلة في الخطوة دي", [["كود الخطأ", (err && (err.code || err.message)) || "unknown"]]);
     const gw = err && err.data && err.data.gateway_error;
     const known = ERR[err && err.code];
     setStatus(known || "حصلت مشكلة في قراءة الصورة (" + ((err && (err.code || err.message)) || "unknown") + (gw ? " / " + gw : "") + ").", { error: true });
