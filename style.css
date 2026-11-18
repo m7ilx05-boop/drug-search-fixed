@@ -455,3 +455,16 @@ body[data-view=image] .appbar{padding-bottom:18px}
 .img-opt[disabled]{opacity:.6;cursor:default}
 .img-opt[disabled]:hover,.img-opt[disabled]:active{background:none}
 .img-soon{flex:none;font-size:11px;font-weight:500;color:var(--muted);background:var(--soft);border-radius:999px;padding:2px 9px}
+
+/* خطوات البحث بالصورة */
+.img-steps{margin:0 0 12px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;gap:9px;font-size:14px}
+.img-steps .st{display:grid;grid-template-columns:20px 1fr;column-gap:10px;align-items:start;line-height:1.5}
+.img-steps .st i{grid-row:1;width:18px;height:18px;margin-top:2px;border-radius:50%;border:2px solid var(--line);box-sizing:border-box}
+.img-steps .st.pend{color:var(--muted)}
+.img-steps .st.run i{border-color:var(--accent);border-top-color:transparent;animation:stSpin .8s linear infinite}
+.img-steps .st.done i{border-color:var(--ok);background:var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat}
+.img-steps .st.bad{color:var(--bad)}
+.img-steps .st.bad i{border-color:var(--bad);background:var(--bad)}
+.img-steps .st-d{grid-column:2;color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+@keyframes stSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.img-steps .st.run i{animation:none;border-top-color:var(--accent)}}

@@ -155,31 +155,54 @@ function famBox(family) {
 
 window.famBox = famBox; // search.js بيستخدمه بعد أي بحث عادي
 
+// قائمة خطوات البحث بالصورة: كل خطوة (مستنية / شغّالة / خلصت / فشلت) وتحتها سطر تفاصيل لما يكون فيه
+function stepsUI() {
+  const w = el("div", "img-steps"); w.setAttribute("role", "status"); w.setAttribute("aria-live", "polite");
+  const items = {}; let cur = null;
+  const add = (k, text) => { const li = el("div", "st pend"); li.append(el("i"), el("span", null, text)); w.append(li); items[k] = li; return li; };
+  const set = (k, state, text) => {
+    const li = items[k]; if (!li) return;
+    li.className = "st " + state; if (text != null) li.lastChild.textContent = text;
+    if (state === "run") cur = k; else if (cur === k) cur = null;
+  };
+  const detail = (k, text) => { const li = items[k]; if (!li || !text) return; let d = li.querySelector(".st-d"); if (!d) { d = el("div", "st-d"); li.append(d); } d.textContent = text; };
+  const fail = (text) => { if (cur) set(cur, "bad", text); };
+  return { w, add, set, detail, fail };
+}
+
 async function handle(f) {
   if (!f) return;
   if (!/^image\//.test(f.type)) { setStatus("الملف ده مش صورة.", { error: true }); return; }
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
   busy(true); setStatus("جاري قراءة الصورة…"); showSkeleton();
+  const st = stepsUI(); st.add("prep", "تجهيز الصورة"); st.add("read", "قراءة نص الصورة واستخراج الاسم والتركيز"); st.set("prep", "run"); box.append(st.w);
   if (window.showResultsPage) window.showResultsPage("بحث بالصورة"); // من غيرها النتيجة بتتملي في صفحة مخفية
   const ffPrev = window.__ff; window.__ff = ""; // فلتر الشكل الدوائي مش بيأثر على البحث بالصورة
   try {
     const b64 = await toJpegBase64(f);
+    if (token !== polling) return;
+    st.set("prep", "done"); st.set("read", "run");
     const r = await call("drug-image-search", { image: b64, mime: "image/jpeg" });
     if (token !== polling) return;
-    box.replaceChildren(readCard(r));
+    box.append(readCard(r));
     const x = r.extracted || {};
-    if (!x.is_medicine_pack) { setStatus("مش باين في الصورة علبة دواء. صوّر العلبة من قدّام وبإضاءة كويسة.", { error: true }); return; }
-    if (!(r.gtins || []).length && !r.search) { setStatus("ما قدرناش نقرا اسم ولا باركود واضح من الصورة. جرّب صورة أقرب وأوضح.", { error: true }); return; }
+    st.set("read", "done");
+    const nm = x.brand_name || x.arabic_name || (x.active_ingredients || [])[0];
+    st.detail("read", nm ? "الاسم: " + nm + " — التركيز: " + (x.strength || "مش مكتوب في الصورة") : "");
+    if (!x.is_medicine_pack) { st.set("read", "bad", "مش باين في الصورة علبة دواء"); setStatus("مش باين في الصورة علبة دواء. صوّر العلبة من قدّام وبإضاءة كويسة.", { error: true }); return; }
+    if (!(r.gtins || []).length && !r.search) { st.set("read", "bad", "ما قدرناش نقرا اسم ولا باركود واضح"); setStatus("ما قدرناش نقرا اسم ولا باركود واضح من الصورة. جرّب صورة أقرب وأوضح.", { error: true }); return; }
     if (r.family) famBox(r.family);
     else if (r.search && r.search.type !== "ingredient") famBox({ text: r.search.text });
 
     // 1) باركود صحيح = نفس المنتج بالظبط
     if ((r.gtins || []).length) {
+      st.add("bc", "فحص الباركود المطبوع في الصورة"); st.set("bc", "run");
       try {
         const d = await call("drug-barcode", { gtins: r.gtins });
         if (token !== polling) return;
         if (d.found > 0) {
+          st.set("bc", "done", "اتعرف على المنتج من الباركود");
           const out = $("out");
           out.replaceChildren(el("h3", "sec", "نفس المنتج اللي في الصورة (" + d.found + ")"));
           if (d.ambiguous) out.append(el("div", "scan-msg warn", "الباركود ده مسجّل لأكتر من منتج في المصدر. راجع الاسم والحجم على العبوة."));
@@ -188,18 +211,22 @@ async function handle(f) {
           toast("success", "اتعرف على المنتج من الباركود.");
           return;
         }
-      } catch { /* نكمّل بالاسم */ }
+        st.set("bc", "done", "الباركود مش موجود في القاعدة، هنكمّل بالاسم");
+      } catch { st.set("bc", "done", "تعذّر فحص الباركود، هنكمّل بالاسم"); /* نكمّل بالاسم */ }
     }
 
     // 2) الاسم + التركيز + الشكل: الباك اند حدّد مين هو نفس المنتج، ومخفي أي تركيز أو شكل مختلف
-    if (!r.search) { setStatus("الباركود المقروء مش موجود في قاعدة البيانات، ومفيش اسم واضح في الصورة نبحث بيه.", { error: true }); return; }
+    if (!r.search) { st.add("nm", "البحث بالاسم"); st.set("nm", "bad", "مفيش اسم واضح في الصورة نبحث بيه"); setStatus("الباركود المقروء مش موجود في قاعدة البيانات، ومفيش اسم واضح في الصورة نبحث بيه.", { error: true }); return; }
+    st.add("srch", "البحث عن «" + r.search.text + "» في قاعدة البيانات"); st.add("match", "مطابقة الاسم والتركيز والشكل الدوائي"); st.set("srch", "run"); setStatus("جاري البحث عن المنتج في قاعدة البيانات…");
     const d = await call("drug-search", { query: r.search.text, search_type: r.search.type === "ingredient" ? "ingredient" : "brand" });
     if (token !== polling) return;
+    st.set("srch", "done"); st.set("match", "run");
     const list = (d.tiers && d.tiers.official) || d.results || [];
     const m = r.match || {};
     const out = $("out"); out.replaceChildren();
 
     if (!Array.isArray(m.exact_ids)) {
+      st.set("match", "bad", "ما قدرناش نتحقق من التركيز والشكل");
       out.append(el("div", "scan-msg warn", "ما قدرناش نتحقق من التركيز والشكل، فالنتايج دي ممكن تكون لمنتجات مشابهة. قارنها بالعلبة."));
       list.forEach((p) => out.append(card(p, 1)));
       setStatus("");
@@ -222,9 +249,11 @@ async function handle(f) {
       out.append(el("p", "sec-note", "مش قادرين نأكد إنه نفس التركيز. قارنه بالعلبة."));
       unv.forEach((p) => out.append(card(p, 3)));
     }
+    st.set("match", "done", exact.length ? "لقينا " + exact.length + " مطابق بنفس الاسم والتركيز والشكل" : "ما لقيناش مطابق بنفس التركيز والشكل");
     if (m.hidden_count > 0) out.append(el("p", "sec-note", "اتخفّى " + m.hidden_count + " منتج بنفس العائلة بتركيز أو شكل أو نوع مختلف. تقدر تشوفهم من البحث بالعائلة تحت."));
     setStatus("");
   } catch (err) {
+    st.fail("حصلت مشكلة في الخطوة دي");
     const gw = err && err.data && err.data.gateway_error;
     const known = ERR[err && err.code];
     setStatus(known || "حصلت مشكلة في قراءة الصورة (" + ((err && (err.code || err.message)) || "unknown") + (gw ? " / " + gw : "") + ").", { error: true });
