@@ -27,7 +27,7 @@ button:disabled{opacity:.6}
 .row.l{grid-template-columns:78px 1fr 40px}
 .err{color:var(--bad);font-size:13px}
 .tabs{display:flex;gap:6px;margin:4px 0 8px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:5}
-.tabs a{flex:1;text-align:center;padding:9px;border-radius:10px;background:var(--card);border:1px solid var(--ln);color:var(--mu);text-decoration:none;font-size:14px}
+.tabs a{flex:1;text-align:center;padding:9px 4px;border-radius:10px;background:var(--card);border:1px solid var(--ln);color:var(--mu);text-decoration:none;font-size:13px}
 .tabs a.on{background:var(--br);color:#fff;border-color:var(--br)}
 .op{border-top:1px solid var(--ln);padding:9px 0;font-size:13px}
 .op:first-of-type{border-top:0}
@@ -36,20 +36,19 @@ button:disabled{opacity:.6}
 .tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;margin-inline-end:6px;background:var(--bg);color:var(--mu);border:1px solid var(--ln)}
 .ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
 .mu{color:var(--mu);font-size:12px}
-.usage{margin-top:8px;background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:8px 10px}
-.usage .uh{font-size:12px;font-weight:600;margin-bottom:4px}
-.krow{display:grid;grid-template-columns:78px 62px 1fr;gap:6px 8px;align-items:baseline;padding:5px 0;border-top:1px solid var(--ln);font-size:12.5px}
-.krow:first-of-type{border-top:0}
-.kp{font-weight:700;font-size:12px}
-.kp-tavily{color:#2f7ddb}.kp-firecrawl{color:#e0722b}.kp-gemini{color:#8a5cf5}.kp-grok{color:var(--mu)}
-.kslot{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;direction:ltr;text-align:start;word-break:break-all}
-.kv{color:var(--tx)}
-.utot{margin-top:6px;padding-top:6px;border-top:1px dashed var(--ln);font-size:12px;color:var(--mu)}
-.utot b{color:var(--tx);font-weight:600}
+.use{font-size:12px;margin-top:4px;color:var(--mu)}
+.cr{color:var(--ok)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip{padding:5px 11px;border-radius:20px;border:1px solid var(--ln);background:var(--bg);color:var(--mu);font-size:12px;cursor:pointer}
+.chip.on{background:var(--br);color:#fff;border-color:var(--br)}
+.sev{display:inline-block;width:9px;height:9px;border-radius:50%;margin-inline-end:6px}
+.sev.error{background:var(--bad)}.sev.warn{background:var(--warn)}.sev.info{background:var(--mu)}
+.krow{display:grid;grid-template-columns:1fr auto auto auto;gap:4px 10px;font-size:12px;padding:3px 0;border-top:1px solid var(--ln)}
+.expl{font-size:12px;color:var(--mu);margin-top:3px}
 </style>
 </head>
 <body>
-<div class="tabs"><a href="#keys" id="t-keys">المفاتيح</a><a href="#ops" id="t-ops">العمليات</a></div>
+<div class="tabs"><a href="#keys" id="t-keys">المفاتيح</a><a href="#ops" id="t-ops">العمليات</a><a href="#errors" id="t-err">الأخطاء</a></div>
 <div id="pg-keys">
 <h1>حالة مفاتيح البحث</h1>
 <div class="sub"><span id="when">جاري التحميل…</span><button id="btn">افحص الآن</button></div>
@@ -65,6 +64,13 @@ button:disabled{opacity:.6}
 <div id="oerr" class="err"></div>
 <div class="card" id="osum"></div>
 <div class="card" id="ofeed"></div>
+</div>
+<div id="pg-err" hidden>
+<h1>الأخطاء والمشاكل</h1>
+<div class="sub"><span id="ewhen">جاري التحميل…</span><button id="ebtn">تحديث</button></div>
+<div id="eerr" class="err"></div>
+<div class="card" id="esum"></div>
+<div class="card" id="elist"></div>
 </div>
 <script>
 const SNAP={"checked_at":null,"tavily":[],"firecrawl":[],"llm":[]};
@@ -124,81 +130,108 @@ async function load(force){
 $("btn").onclick=()=>load(true);
 load(false);setInterval(()=>load(false),60000);
 
-/* ===== صفحة العمليات ===== */
+/* ===== صفحات العمليات والأخطاء ===== */
 const OPS_API="https://clhtimetvykbjdhfdmig.supabase.co/functions/v1/ops-feed";
+const ERR_API="https://clhtimetvykbjdhfdmig.supabase.co/functions/v1/errors-feed";
 const KIND={full:"بحث كامل",alternatives:"بدائل",secondary:"بحث ثانوي"};
 const OUTC={found:["ok","لقى نتيجة"],not_found:["bad","مفيش نتيجة"],under_review:["warn","قيد المراجعة"]};
+const PROV={tavily:"Tavily",firecrawl:"Firecrawl",gemini:"Gemini",grok:"Grok"};
+const STYPE={auto:"تلقائي",brand:"براند",ingredient:"مادة فعّالة",brand_family:"عائلة براند"};
+const ORIGIN={text:"كتابة",barcode:"باركود",image:"صورة",system:"نظام"};
+const CALLK={search:"بحث",scrape_json:"قراءة صفحة (JSON)",scrape_markdown:"قراءة صفحة (نص)",llm:"ذكاء اصطناعي"};
+const JOBX={firecrawl_unavailable:"كل مفاتيح Firecrawl مش متاحة (حد طلبات أو رصيد): اتجابت العناوين بس ومفيش صفحات اتقرأت",extraction_failed:"كل الصفحات اللي اتحاولت فشلت",provider_exhausted:"مفاتيح Tavily مش متاحة (رصيد أو حد طلبات)",all_pages_failed:"كل الصفحات فشلت",discovery_failed:"فشل في مرحلة البحث عن الروابط",no_enabled_sources:"مفيش مصادر مفعّلة للبحث",no_pages_on_enabled_sources:"مفيش صفحات على المصادر المفعّلة",alt_source_page_failed:"فشل تحميل صفحة المنتج الأصلي لجلب البدائل"};
+const DATAX={new_ingredient_unreviewed:"مادة فعّالة جديدة لسه مش متراجعة",zero_strength:"تركيز صفر",official_non_accepted_source:"مصدر رسمي غير مقبول",official_duplicate_payload:"بيانات رسمية مكررة",official_ingredient_mismatch:"اختلاف مادة فعّالة مع المصدر الرسمي",official_pending_payloads:"بيانات رسمية لسه معلّقة",official_pack_variant:"اختلاف حجم عبوة",official_import_incomplete:"استيراد رسمي ناقص",product_without_ingredients:"منتج بدون مواد فعّالة"};
+const IMGX={mismatch:"الصورة ما طابقتش المنتج",brand_differs:"اسم البراند في الصورة مختلف",import_failed:"فشل استيراد الصورة",import_rejected:"الصورة اترفضت"};
+const CATS=[["all","الكل"],["api","مزوّدين"],["job","مهام بحث"],["empty","بدون نتيجة"],["image","صور"],["barcode","باركود"],["data","بيانات"]];
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const n0=x=>fmt(Number(x)||0);
 function ago(t){const s=Math.max(0,(Date.now()-Date.parse(t))/1000);if(s<60)return "من "+Math.round(s)+" ث";if(s<3600)return "من "+Math.round(s/60)+" د";if(s<86400)return "من "+Math.round(s/3600)+" س";return new Date(t).toLocaleDateString("ar-EG",{day:"numeric",month:"short"})}
 function clock(t){return new Date(t).toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
 function stat(b,l){return '<div class="stat"><b>'+b+'</b><span>'+l+'</span></div>'}
 function urow(l,v,p){return '<div class="row"><span>'+l+'</span><div class="bar"><i style="width:'+(Math.min(Math.max(p,0),1)*100)+'%;background:'+col(1-p)+'"></i></div><span class="num">'+v+'</span></div>'}
 function trow(l,v){return '<div class="row"><span>'+l+'</span><span>'+v+'</span><span></span></div>'}
+function apiExpl(s){
+  if(s===429)return "حد الطلبات (Rate limit): المفتاح بيرتاح شوية والنظام بيجرّب مفتاح تاني";
+  if(s===402||s===432||s===433)return "رصيد المفتاح خلص";
+  if(s===401)return "المفتاح غير صالح";
+  if(s===403)return "الوصول مرفوض (حظر أو صلاحية أو رصيد)";
+  if(s===408)return "انتهت مهلة الطلب";
+  if(s===0)return "فشل الاتصال بالمزوّد";
+  if(s>=500)return "المزوّد مشغول أو فيه عطل عنده";
+  return "خطأ HTTP "+s;
+}
+/* كل مفتاح استخدمته العملية وكام صرف منه */
+function usageHtml(rows){
+  const g={};
+  rows.forEach(r=>{
+    const k=r.provider+"|"+r.slot;
+    const a=g[k]||(g[k]={s:r.slot,parts:[],cr:0,f:0});
+    if(r.ok){
+      if(r.provider==="tavily")a.parts.push(r.ok+" بحث");
+      else if(r.kind==="scrape_json")a.parts.push(r.ok+" صفحة (استخراج JSON)");
+      else a.parts.push(r.ok+" صفحة (نص)");
+    }
+    a.cr+=r.credits;a.f+=r.failed;
+  });
+  return Object.keys(g).map(k=>{
+    const a=g[k];
+    return '<div class="use"><b>'+esc(a.s)+'</b> — '+(a.parts.length?a.parts.join(" + "):"بدون نجاح")+' · <span class="cr">'+n0(a.cr)+' كريديت</span>'+(a.f?' · <span class="bad">'+a.f+' فشل</span>':'')+'</div>';
+  }).join("");
+}
 function drawOps(d){
-  const s=d.summary,oc=s.outcomes_24h||{};
-  let h='<h2>آخر 24 ساعة</h2><div class="stats">'+stat(fmt(s.searches_24h),"عمليات بحث")+stat(fmt(s.jobs_24h),"مهام تشغيل")+stat(fmt(s.jobs_failed_24h),"مهام فاشلة")+'</div>';
-  h+='<div class="sub">لقى: '+fmt(oc.found||0)+' · مفيش نتيجة: '+fmt(oc.not_found||0)+' · قيد المراجعة: '+fmt(oc.under_review||0)+'</div>';
-  h+='<h2 style="margin-top:14px">الاستهلاك من كل المفاتيح</h2>';
-  h+=urow("Tavily",fmt(s.tavily_used)+" / "+fmt(s.tavily_limit),s.tavily_limit?s.tavily_used/s.tavily_limit:0);
-  h+=urow("Firecrawl",fmt(s.firecrawl_used)+" / "+fmt(s.firecrawl_limit),s.firecrawl_limit?s.firecrawl_used/s.firecrawl_limit:0);
-  h+=trow("Firecrawl 24س","~"+fmt(s.firecrawl_pages_24h)+" صفحة");
-  h+=trow("Gemini",fmt(s.gemini_calls_today)+" طلب النهاردة · "+fmt(s.gemini_calls_total)+" إجمالي");
-  h+=trow("Grok",fmt(s.grok_calls_today)+" طلب · $"+Number(s.grok_spent_today_usd).toFixed(4)+" النهاردة");
-  h+='<div class="sub" style="margin-top:8px">Tavily وFirecrawl: الاستهلاك الكلي من فحص المفاتيح (الباقة الحالية لكل المفاتيح). استهلاك كل مفتاح في كل عملية لوحدها ظاهر تحت كل عملية (من أول ما اتفعّل التسجيل). علامة ~ = رقم تقديري لأن المزوّد مبيرجعوش.</div>';
+  const s=d.summary,oc=s.outcomes_24h||{},sp=s.spent_24h||{};
+  let h='<h2>آخر 24 ساعة</h2><div class="stats">'+stat(n0(s.searches_24h),"عمليات بحث")+stat(n0(s.jobs_24h),"مهام تشغيل")+stat(n0(s.jobs_failed_24h),"مهام فاشلة")+'</div>';
+  h+='<div class="sub">لقى: '+n0(oc.found)+' · مفيش نتيجة: '+n0(oc.not_found)+' · قيد المراجعة: '+n0(oc.under_review)+'</div>';
+  h+='<h2 style="margin-top:14px">اللي اتصرف فعلاً (آخر 24 ساعة)</h2>';
+  h+=trow("Tavily",n0(sp.tavily_calls)+" بحث · "+n0(sp.tavily_credits)+" كريديت");
+  h+=trow("Firecrawl",n0(sp.firecrawl_calls)+" طلب ("+n0(sp.firecrawl_failed)+" فشل) · "+n0(sp.firecrawl_credits)+" كريديت");
+  h+=trow("Gemini",n0(sp.gemini_calls)+" طلب ("+n0(sp.gemini_failed)+" فشل) · "+n0(sp.gemini_tokens)+" توكن");
+  h+=trow("Grok",n0(sp.grok_calls)+" طلب ("+n0(sp.grok_failed)+" فشل) · "+n0(sp.grok_tokens)+" توكن");
+  h+='<h2 style="margin-top:14px">كل مفتاح لوحده (24 ساعة)</h2>';
+  ["tavily","firecrawl","gemini","grok"].forEach(p=>{
+    const ks=(d.keys||[]).filter(k=>k.provider===p);
+    if(!ks.length)return;
+    h+='<div class="mu" style="margin-top:8px"><b>'+PROV[p]+'</b></div>';
+    ks.forEach(k=>{
+      const cost=(p==="gemini"||p==="grok")?n0(k.tokens_total)+" توكن":n0(k.credits)+" كريديت";
+      h+='<div class="krow"><span>'+esc(k.slot)+'</span><span>'+n0(k.calls)+' طلب</span><span class="'+(k.failed?'bad':'mu')+'">'+n0(k.failed)+' فشل</span><span>'+cost+'</span></div>';
+    });
+  });
+  h+='<h2 style="margin-top:14px">الباقة الكلية (كل المفاتيح)</h2>';
+  h+=urow("Tavily",n0(s.tavily_used)+" / "+n0(s.tavily_limit),s.tavily_limit?s.tavily_used/s.tavily_limit:0);
+  h+=urow("Firecrawl",n0(s.firecrawl_used)+" / "+n0(s.firecrawl_limit),s.firecrawl_limit?s.firecrawl_used/s.firecrawl_limit:0);
+  h+='<div class="sub" style="margin-top:8px">الأرقام فوق من سجل كل طلب فعلي. Tavily وFirecrawl بالكريديت (تقديري لو الـ API ما ذكرش الرقم: بحث = 1، صفحة نص = 1، صفحة JSON = 5)، وGemini وGrok بالتوكن اللي الـ API بيرجّعه. السجل بدأ من وقت تفعيله، فالعمليات القديمة ما لهاش تفصيل.</div>';
   $("osum").innerHTML=h;
   drawFeed(d.items||[]);
   $("owhen").textContent="آخر تحديث: "+clock(d.generated_at);
-}
-const PNAME={tavily:"Tavily",firecrawl:"Firecrawl",gemini:"Gemini",grok:"Grok"};
-function usageHtml(u){
-  if(!u||!u.keys||!u.keys.length)return "";
-  let h='<div class="usage"><div class="uh">المفاتيح اللي اشتغلت في العملية دي وكل مفتاح استهلك كام</div>';
-  for(const k of u.keys){
-    const p=[fmt(k.calls)+" طلب"+(k.failed?' (<span class="bad">'+fmt(k.failed)+" فشل</span>)":"")];
-    if(k.provider==="tavily"||k.provider==="firecrawl")p.push((k.credits_estimated?"~":"")+fmt(k.credits)+" كريدت");
-    else{
-      p.push(k.tokens_total?fmt(k.tokens_in)+" دخل + "+fmt(k.tokens_out)+" خرج = <b>"+fmt(k.tokens_total)+"</b> توكن":"التوكنز مش متاحة");
-      if(k.provider==="grok"&&k.usd_estimated!=null)p.push("~$"+Number(k.usd_estimated).toFixed(4));
-    }
-    if(k.models&&k.models.length)p.push('<span class="mu" dir="ltr">'+esc(k.models.join(", "))+"</span>");
-    h+='<div class="krow"><span class="kp kp-'+esc(k.provider)+'">'+esc(PNAME[k.provider]||k.provider)+'</span><b class="kslot">'+esc(k.slot)+'</b><span class="kv">'+p.join(" · ")+"</span></div>";
-  }
-  const t=u.totals||{},tt=[];
-  if(t.tavily_credits)tt.push("Tavily <b>"+fmt(t.tavily_credits)+"</b> كريدت");
-  if(t.firecrawl_credits)tt.push("Firecrawl <b>"+fmt(t.firecrawl_credits)+"</b> كريدت");
-  if(t.gemini_tokens)tt.push("Gemini <b>"+fmt(t.gemini_tokens)+"</b> توكن");
-  if(t.grok_tokens)tt.push("Grok <b>"+fmt(t.grok_tokens)+"</b> توكن (~$"+Number(t.grok_usd_estimated).toFixed(4)+")");
-  if(tt.length)h+='<div class="utot">إجمالي العملية: '+tt.join(" · ")+"</div>";
-  return h+"</div>";
 }
 function drawFeed(items){
   let h='<h2>كل العمليات (الأحدث أولاً)</h2>';
   if(!items.length)h+='<div class="mu">مفيش عمليات.</div>';
   for(const o of items){
-    let tag,st,meta=[],title=esc(o.query),usage="",note="";
+    let tag,st,meta=[],title,extra="";
     if(o.type==="job"){
-      tag=KIND[o.kind]||o.kind||"مهمة";
+      tag=KIND[o.kind]||o.kind||"مهمة";title=esc(o.query);
       st=o.status==="failed"?["bad","فشلت"]:(o.status==="completed"?(OUTC[o.outcome]||["ok","تمت"]):["warn",esc(o.status||"—")]);
       if(o.secs!=null)meta.push("⏱ "+o.secs+" ث");
       if(o.pages)meta.push("صفحات: "+o.pages);
       if(o.results!=null)meta.push("نتائج: "+o.results);
-      if(o.usage&&o.usage.keys&&o.usage.keys.length)usage=usageHtml(o.usage);
-      else{
-        if(o.tavily&&o.tavily.length)meta.push("Tavily: "+esc(o.tavily.join("، ")));
-        if(o.firecrawl&&o.firecrawl.length)meta.push("Firecrawl: "+esc(o.firecrawl.join("، ")));
-        if((o.tavily&&o.tavily.length)||(o.firecrawl&&o.firecrawl.length))note='<div class="mu" style="margin-top:4px">اتنفذت قبل تفعيل تسجيل الاستهلاك: أسماء المفاتيح بس من غير أرقام.</div>';
-      }
-    }else if(o.type==="background"){
-      tag="خلفية";title=esc(o.label);st=["ok","عمل جانبي"];
-      usage=usageHtml(o.usage);
+      if(o.usage&&o.usage.length)extra=usageHtml(o.usage);
+      else if((o.tavily&&o.tavily.length)||(o.firecrawl&&o.firecrawl.length))extra='<div class="use">الاستهلاك مش متسجل للعملية دي (قبل تفعيل السجل)</div>';
+    }else if(o.type==="llm"){
+      tag=PROV[o.provider]||o.provider;title="استدعاء ذكاء اصطناعي"+(o.purpose?" — "+esc(o.purpose):"");
+      st=o.status===200?["ok","نجح"]:["bad","فشل "+o.status];
+      meta.push(esc(o.slot));if(o.model)meta.push(esc(o.model));
+      if(o.ttot)meta.push("دخل "+n0(o.tin)+" · خرج "+n0(o.tout)+" · إجمالي "+n0(o.ttot)+" توكن");
+      if(o.err)extra='<div class="use bad" dir="auto">'+esc(o.err)+'</div>';
     }else{
-      tag="بحث"+(o.cache?" · "+esc(o.cache):"");
+      tag="بحث"+(o.cache?" · "+esc(o.cache):"");title=esc(o.query);
       st=OUTC[o.outcome]||["warn",esc(o.outcome||"—")];
       if(o.results!=null)meta.push("نتائج: "+o.results);
     }
     h+='<div class="op"><div><span class="tag">'+esc(tag)+'</span><b dir="auto">'+title+'</b></div>'
       +'<div class="meta"><span class="'+st[0]+'">'+st[1]+'</span><span>'+clock(o.t)+' ('+ago(o.t)+')</span>'+meta.map(x=>'<span>'+x+'</span>').join("")+'</div>'
-      +usage+note+(o.error?'<div class="err">'+esc(o.error)+'</div>':'')+'</div>';
+      +extra+(o.error?'<div class="err">'+esc(o.error)+'</div>':'')+'</div>';
   }
   $("ofeed").innerHTML=h;
 }
@@ -213,15 +246,85 @@ async function loadOps(){
   }catch(e){$("oerr").textContent="تعذر التحميل ("+e.message+")"}
   obusy=false;b.disabled=false;
 }
-function tab(){
-  const ops=location.hash==="#ops";
-  $("pg-keys").hidden=ops;$("pg-ops").hidden=!ops;
-  $("t-keys").className=ops?"":"on";$("t-ops").className=ops?"on":"";
-  if(ops)loadOps();
+/* ===== صفحة الأخطاء ===== */
+let EDATA=null,EF="all",EHIDE=false;
+function errItem(o){
+  const dot='<span class="sev '+o.sev+'"></span>';
+  const org='<span class="tag">'+esc(ORIGIN[o.origin]||o.origin)+'</span>';
+  const when='<span>'+clock(o.t)+' ('+ago(o.t)+')</span>';
+  let title="",body="";
+  if(o.cat==="api"){
+    title=esc(PROV[o.provider]||o.provider)+' · '+esc(o.slot)+' — '+esc(CALLK[o.kind]||o.kind||"")+' — خطأ '+o.status;
+    body='<div class="expl">'+apiExpl(o.status)+'</div>'+(o.detail?'<div class="mu" dir="auto">'+esc(o.detail)+'</div>':'');
+  }else if(o.cat==="job"){
+    title='مهمة بحث ('+esc(KIND[o.kind]||o.kind||"")+') — '+(JOBX[o.code]?'مشكلة':'فشلت');
+    body='<div dir="auto"><b>'+esc(o.query)+'</b></div><div class="expl">'+esc(JOBX[o.code]||o.code||"")+'</div>'+(o.fails&&o.fails.length?'<div class="mu" dir="auto">'+o.fails.map(esc).join(" · ")+'</div>':'');
+  }else if(o.cat==="empty"){
+    title='بحث بدون نتيجة';
+    body='<div dir="auto"><b>'+esc(o.query)+'</b></div><div class="mu">نوع البحث: '+esc(STYPE[o.stype]||o.stype||"—")+'</div>';
+  }else if(o.cat==="image"){
+    title='مشكلة في صورة منتج: '+esc(IMGX[o.code]||o.code);
+    body='<div class="mu" dir="auto">'+(o.brand?'البراند اللي اتقرأ من الصورة: '+esc(o.brand):'')+(o.arabic?' · '+esc(o.arabic):'')+(o.compared&&o.compared.length?' · اتقارن بـ: '+o.compared.map(esc).join("، "):'')+(o.domain?' · '+esc(o.domain):'')+'</div>'
+      +(o.reason?'<div class="expl">'+esc(IMGX[o.reason]||o.reason)+'</div>':'');
+  }else if(o.cat==="barcode"){
+    title='باركود غير موجود';
+    body='<div class="mu" dir="ltr">'+esc(o.gtin)+'</div>';
+  }else{
+    title='مشكلة بيانات: '+esc(DATAX[o.code]||o.code);
+    body=o.detail?'<div class="mu" dir="auto">'+esc(o.detail)+'</div>':'';
+  }
+  return '<div class="op"><div>'+dot+org+'<b>'+title+'</b></div>'+body+'<div class="meta">'+when+'</div></div>';
 }
-$("obtn").onclick=loadOps;
+function drawErr(d){
+  EDATA=d;
+  const s=d.summary;
+  let h='<h2>آخر 24 ساعة</h2><div class="stats">'+stat(n0(s.api_total_24h),"أخطاء مزوّدين")+stat(n0(s.jobs_failed_24h),"مهام فاشلة")+stat(n0(s.not_found_24h),"بحث بلا نتيجة")+'</div>';
+  h+='<div class="sub">من '+n0(s.searches_24h)+' عملية بحث · مشاكل صور: '+n0(s.image_problems_24h)+' · باركود غير موجود: '+n0(s.barcode_miss_24h)+' · مشاكل بيانات مفتوحة: '+n0(s.integrity_open)+'</div>';
+  const a=s.api_24h||{},keys=Object.keys(a).sort((x,y)=>a[y]-a[x]);
+  if(keys.length){
+    h+='<h2 style="margin-top:14px">أكتر الأخطاء تكراراً</h2>';
+    keys.forEach(k=>{const p=k.split(":");h+='<div class="op"><b>'+esc(PROV[p[0]]||p[0])+' — خطأ '+esc(p[1])+'</b> <span class="mu">× '+n0(a[k])+'</span><div class="expl">'+apiExpl(Number(p[1]))+'</div></div>';});
+  }
+  const jo=s.job_outcomes_24h||{};
+  Object.keys(jo).forEach(k=>{h+='<div class="op"><b>'+esc(k)+'</b> <span class="mu">× '+n0(jo[k])+'</span><div class="expl">'+esc(JOBX[k]||"")+'</div></div>';});
+  $("esum").innerHTML=h;
+  drawErrList();
+  $("ewhen").textContent="آخر تحديث: "+clock(d.generated_at);
+}
+function drawErrList(){
+  if(!EDATA)return;
+  const all=EDATA.items||[],cnt={};
+  all.forEach(o=>{cnt[o.cat]=(cnt[o.cat]||0)+1});
+  const items=all.filter(o=>(EF==="all"||o.cat===EF)&&!(EHIDE&&o.sev==="info"));
+  let h='<div class="chips">'+CATS.map(c=>'<span class="chip'+(EF===c[0]?' on':'')+'" data-f="'+c[0]+'">'+c[1]+(c[0]!=="all"&&cnt[c[0]]?' ('+cnt[c[0]]+')':'')+'</span>').join("")+'<span class="chip'+(EHIDE?' on':'')+'" data-h="1">إخفاء الإرشادي</span></div>';
+  h+=items.length?items.slice(0,150).map(errItem).join(""):'<div class="mu">مفيش حاجة في الفلتر ده.</div>';
+  $("elist").innerHTML=h;
+}
+$("elist").addEventListener("click",e=>{
+  const t=e.target.closest(".chip");if(!t)return;
+  if(t.dataset.f)EF=t.dataset.f;else if(t.dataset.h)EHIDE=!EHIDE;
+  drawErrList();
+});
+let ebusy=false;
+async function loadErr(){
+  if(ebusy)return;ebusy=true;const b=$("ebtn");b.disabled=true;$("eerr").textContent="";
+  try{
+    const r=await fetch(ERR_API,{cache:"no-store"});
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();drawErr(d);
+    if(d.warnings&&d.warnings.length)$("eerr").textContent="تنبيه: "+d.warnings.join(" | ");
+  }catch(e){$("eerr").textContent="تعذر التحميل ("+e.message+")"}
+  ebusy=false;b.disabled=false;
+}
+function tab(){
+  const h=location.hash,pg=h==="#ops"?"ops":(h==="#errors"?"err":"keys");
+  $("pg-keys").hidden=pg!=="keys";$("pg-ops").hidden=pg!=="ops";$("pg-err").hidden=pg!=="err";
+  $("t-keys").className=pg==="keys"?"on":"";$("t-ops").className=pg==="ops"?"on":"";$("t-err").className=pg==="err"?"on":"";
+  if(pg==="ops")loadOps();else if(pg==="err")loadErr();
+}
+$("obtn").onclick=loadOps;$("ebtn").onclick=loadErr;
 window.addEventListener("hashchange",tab);
-setInterval(()=>{if(location.hash==="#ops"&&!document.hidden)loadOps()},15000);
+setInterval(()=>{if(document.hidden)return;if(location.hash==="#ops")loadOps();else if(location.hash==="#errors")loadErr()},15000);
 tab();
 </script>
 </body>
