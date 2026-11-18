@@ -264,6 +264,14 @@
     } else $("ab-s").textContent = "«" + lastQ + "»";
   });
 
+  // البحث بالصورة بيملا #out من غير submit للفورم، فبيطلب صفحة النتايج من هنا (نفس اللي بيحصل عند أي بحث)
+  window.showResultsPage = (label) => {
+    searched = true;
+    if (label) lastQ = label;
+    if (document.body.dataset.view !== "results") { navd = true; location.hash = "#/r"; }
+    else $("ab-s").textContent = "«" + lastQ + "»";
+  };
+
   $("back").addEventListener("click", goBack);
   window.addEventListener("hashchange", route);
   route();

@@ -91,6 +91,7 @@ async function handle(f) {
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
   busy(true); setStatus("جاري قراءة الصورة…"); showSkeleton();
+  if (window.showResultsPage) window.showResultsPage("بحث بالصورة"); // من غيرها النتيجة بتتملي في صفحة مخفية
   const ffPrev = window.__ff; window.__ff = ""; // فلتر الشكل الدوائي مش بيأثر على البحث بالصورة
   try {
     const b64 = await toJpegBase64(f);
