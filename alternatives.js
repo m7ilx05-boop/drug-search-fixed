@@ -23,12 +23,6 @@ function altItem(a) {
   if (a.match_level && a.match_level !== "strict") chips.append(el("span", "chip warn", "نفس المادة بس"));
   if (a.price_per_unit != null) chips.append(el("span", "chip", "سعر الوحدة: " + fmtEGP(a.price_per_unit)));
   info.append(chips);
-  if (a.source_url) {
-    try {
-      const x = new URL(a.source_url);
-      if (x.protocol === "https:") { const l = el("a", null, "المصدر"); l.href = x.href; l.target = "_blank"; l.rel = "noopener noreferrer"; info.append(l); }
-    } catch {}
-  }
 
   const price = el("div", "alt-price");
   if (a.current_price != null) price.append(el("b", null, fmtEGP(a.current_price)));
@@ -79,7 +73,7 @@ function altBlock(p) {
       return;
     }
     if (first) {
-      if (items[0].match_level === "strict") note.append(el("p", "sec-note", "بدائل بنفس المادة الفعّالة والتركيز والشكل الدوائي. المصدر: دليل دواء مصر (dwaprices.com)."));
+      if (items[0].match_level === "strict") note.append(el("p", "sec-note", "بدائل بنفس المادة الفعّالة والتركيز والشكل الدوائي."));
       else note.append(el("div", "dose-note", "نفس المادة الفعّالة بس. التركيز والشكل الدوائي ممكن يختلفوا، راجع كل منتج."));
     }
     items.forEach((a) => list.append(altItem(a)));

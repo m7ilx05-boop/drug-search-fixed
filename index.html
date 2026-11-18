@@ -32,7 +32,7 @@
   </g>
   <path d="M54 8l1.6 4.4L60 14l-4.4 1.6L54 20l-1.6-4.4L48 14l4.4-1.6z" fill="#fff" opacity=".9"/>
 </svg>
-<div><h1 id="ab-t">The Pharmacist</h1><p class="sub" id="ab-s">دليل الدواء المصري — ابحث بالاسم التجاري أو المادة الفعّالة</p></div>
+<div><h1 id="ab-t">The Pharmacist</h1><p class="sub" id="ab-s">ابحث بالاسم التجاري أو المادة الفعّالة</p></div>
 </div>
 <svg class="deco" viewBox="0 0 150 130" aria-hidden="true">
   <path d="M18 112c-8-22-2-42 16-50 2 20-2 38-16 50z" fill="#3FAE6A"/>
@@ -110,7 +110,7 @@
 <section id="v-product" class="view"><div id="pd" class="detail"></div></section>
 </main>
 
-<!-- الترتيب مهم: كل ملف بيعتمد على اللي قبله. barcode-live لازم يكون آخر واحد. -->
+<!-- الترتيب مهم: كل ملف بيعتمد على اللي قبله. barcode-live لازم يكون آخر واحد (source-scrub بعده بيراقب بس). -->
 <script src="core.js"></script>
 <script src="render.js"></script>
 <script src="alternatives.js"></script>
@@ -121,6 +121,7 @@
 <script src="dosage-filter.js"></script>
 <script src="ingredient-class.js"></script>
 <script src="barcode-live.js"></script>
+<script src="source-scrub.js"></script>
 <script>
 // بيلمّ أزرار (المسح الضوئي / الكاميرا / المعرض) اللي الملفات التانية بتضيفها في الفورم جوه صندوق "اقتراحات سريعة". شكل بس، مفيش منطق اتغيّر.
 (function () {

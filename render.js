@@ -20,7 +20,7 @@ function showDoses(box, r) {
     const left = el("span", null, d.ingredient + (d.conflict ? " ⚠ أرقام متعارضة" : ""));
     const right = el("span");
     right.append((Number(d.value) + " " + (d.unit || "") + " / " + (d.per || "tablet")) + " · ");
-    (d.sources || []).slice(0, 2).forEach((s, i) => {
+    (d.sources || []).filter((s) => !/dwaprices/i.test(String(s.host || s.url || ""))).slice(0, 2).forEach((s, i) => {
       if (i) right.append(" · ");
       const u = (() => { try { const x = new URL(s.url); return x.protocol === "https:" ? x.href : null; } catch { return null; } })();
       if (u) { const a = el("a", null, s.host); a.href = u; a.target = "_blank"; a.rel = "noopener noreferrer"; right.append(a); } else right.append(s.host || "");
@@ -132,7 +132,7 @@ function imageActions(p) {
   };
 
   if (imported) {
-    const src = p.image.source && p.image.source !== "imported" ? " من " + p.image.source : "";
+    const src = p.image.source && p.image.source !== "imported" && !/dwaprices/i.test(p.image.source) ? " من " + p.image.source : "";
     say("الصورة دي اتجلبت تلقائي" + src + " ومش من المصدر الرسمي.");
   }
 
@@ -171,7 +171,7 @@ function imageActions(p) {
         const r = await call("drug-image-import", { dwaprices_id: p.dwaprices_id });
         if (r.status === "accepted" && r.image_url) {
           swapPic(r.image_url);
-          say("لقينا صورة مطابقة" + (r.source_domain ? " من " + r.source_domain : "") + ". الصورة اتجلبت تلقائي ومش من المصدر الرسمي.");
+          say("لقينا صورة مطابقة" + (r.source_domain && !/dwaprices/i.test(r.source_domain) ? " من " + r.source_domain : "") + ". الصورة اتجلبت تلقائي ومش من المصدر الرسمي.");
           b.remove();
         } else {
           say("ملقيناش صورة مطابقة للمنتج." + (r.next_allowed_at ? " تقدر تجرّب تاني بعد " + dateAr(r.next_allowed_at) + "." : ""));

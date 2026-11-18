@@ -93,5 +93,5 @@ const AR_DIAC = /[\u064B-\u0670\u0640]/g;
 const normKey = (s) => String(s || "").toLowerCase().replace(AR_DIAC, "").replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/[^a-z0-9\u0621-\u064A]+/g, "");
 
 function srcLink(u) {
-  try { const x = new URL(u); if (x.protocol !== "https:") return null; return { href: x.href, host: x.hostname.replace(/^www[.]/, "") }; } catch { return null; }
+  try { const x = new URL(u); if (x.protocol !== "https:" || /dwaprices/i.test(x.hostname)) return null; return { href: x.href, host: x.hostname.replace(/^www[.]/, "") }; } catch { return null; }
 }

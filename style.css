@@ -1,4 +1,4 @@
-/* دليل الدواء — تنسيق واجهة التطبيق. كل الألوان متغيّرات، والـ IDs والـ classes اللي بيستخدمها الـ JS ما اتغيرتش. */
+/* The Pharmacist — تنسيق واجهة التطبيق. كل الألوان متغيّرات، والـ IDs والـ classes اللي بيستخدمها الـ JS ما اتغيرتش. */
 :root{
   --bg:#EAF5FD;--surface:#fff;--ink:#10264F;--muted:#5F7494;--line:#D6E6F4;
   --accent:#1068C9;--accent-ink:#fff;--fill:#BFE6FB;--fill-ink:#0B2E63;--soft:#E7F2FC;--soft-ink:#0E5CB5;
