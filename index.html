@@ -59,6 +59,7 @@
   <div class="row">
     <input id="q" type="search" required minlength="2" maxlength="100" placeholder="مثال: Panadol أو باراسيتامول" aria-label="اسم الدواء أو المادة الفعّالة" autocomplete="off">
     <button id="ffBtn" class="ff-btn" type="button" aria-label="فلتر الشكل الدوائي" aria-expanded="false" aria-controls="forms"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.4" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="8" cy="17" r="2.4" fill="none" stroke="currentColor" stroke-width="2.2"/></svg></button>
+    <div id="recent" class="recent" role="group" aria-label="آخر عمليات البحث"></div>
   </div>
   <div id="forms" class="forms" role="radiogroup" aria-label="الشكل الدوائي" hidden></div>
   <button id="go" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h17l-6.5 7.6V19l-4-2v-4.4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg><span>بحث</span></button>
@@ -68,7 +69,6 @@
     <label><input type="radio" name="t" value="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12.5V4h8.5L21 13.5 13.5 21z" fill="currentColor"/><circle cx="7.6" cy="8.6" r="1.5" fill="var(--tag-hole,#fff)"/></svg><span>منتج محدد</span></label>
     <label><input type="radio" name="t" value="ingredient"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="5.5" cy="5.5" r="2"/><circle cx="12" cy="5.5" r="2"/><circle cx="18.5" cy="5.5" r="2"/><circle cx="5.5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18.5" cy="12" r="2"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="12" cy="18.5" r="2"/><circle cx="18.5" cy="18.5" r="2"/></g></svg><span>مادة فعّالة</span></label>
   </div>
-  <div id="recent" class="recent" role="group" aria-label="آخر عمليات البحث"></div>
 </form>
 
 <div class="mascot" aria-hidden="true">
@@ -126,7 +126,7 @@
   var box = document.createElement("div"); box.className = "qs";
   var h = document.createElement("div"); h.className = "qs-h"; h.textContent = "اقتراحات سريعة";
   box.appendChild(h);
-  Array.prototype.forEach.call(bs, function (b) { box.appendChild(b); });
+  Array.prototype.forEach.call(bs, function (b) { var t = (b.textContent || "").trim(); b.setAttribute("aria-label", t); b.title = t; box.appendChild(b); }); // أيقونات بس: الاسم للقارئ والـ tooltip
   f.appendChild(box);
 })();
 </script>

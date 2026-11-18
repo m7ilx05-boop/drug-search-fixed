@@ -82,28 +82,39 @@ function recAdd(q, t) {
   recSet(a.slice(0, REC_MAX));
   recRender();
 }
+function recShow(on) { const b = $("recent"); b.classList.toggle("open", !!on && b.childElementCount > 0); }
+// السجل: قايمة بتنزل تحت خانة البحث لما تدوس عليها (وبتتفلتر وإنت بتكتب)
 function recRender() {
   const box = $("recent");
   box.replaceChildren();
-  const a = recGet();
-  if (!a.length) return;
+  const typed = normKey($("q").value);
+  const a = recGet().filter((x) => !typed || (normKey(x.q).includes(typed) && normKey(x.q) !== typed));
+  if (!a.length) { box.classList.remove("open"); return; }
   const head = el("div", "recent-h");
   head.append(el("span", null, "آخر عمليات البحث"));
   const clr = el("button", "rc-clear", "مسح"); clr.type = "button";
   clr.addEventListener("click", () => { recSet([]); recRender(); });
   head.append(clr);
-  const row = el("div", "chips");
+  const list = el("div", "rc-list");
   a.forEach((x) => {
     const b = el("button", "rc", x.q); b.type = "button"; b.dir = "auto";
     b.addEventListener("click", () => {
       $("q").value = x.q;
       const radio = document.querySelector('input[name=t][value="' + (REC_TYPES.includes(x.t) ? x.t : "auto") + '"]');
       if (radio) radio.checked = true;
+      recShow(false);
       $("f").requestSubmit();
     });
-    row.append(b);
+    list.append(b);
   });
-  box.append(head, row);
+  box.append(head, list);
+}
+{
+  const q = $("q"), openList = () => { recRender(); recShow(true); };
+  q.addEventListener("focus", openList); q.addEventListener("click", openList); q.addEventListener("input", openList);
+  q.addEventListener("keydown", (e) => { if (e.key === "Escape") recShow(false); });
+  document.addEventListener("pointerdown", (e) => { if (!e.target.closest(".row")) recShow(false); });
+  $("f").addEventListener("submit", () => recShow(false));
 }
 
 // ===== متابعة مهمة البحث على الإنترنت =====
