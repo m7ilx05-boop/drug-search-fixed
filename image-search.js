@@ -17,17 +17,34 @@ const mkInput = (capture) => { const i = el("input"); i.type = "file"; i.accept 
 const camIn = mkInput(true), galIn = mkInput(false);
 const imgBtn = el("button", "scan-btn img-pick", "بحث بصورة"); imgBtn.type = "button";
 imgBtn.setAttribute("aria-haspopup", "menu"); imgBtn.setAttribute("aria-expanded", "false");
-const menu = el("div", "img-menu"); menu.hidden = true; menu.setAttribute("role", "menu");
-const closeMenu = () => { menu.hidden = true; imgBtn.setAttribute("aria-expanded", "false"); };
+// القايمة: ورقة بتطلع من تحت، فيها قسم "صورة المنتج" (شغّال) وقسم "الروشتة" (قريباً)
+const sheet = el("div", "img-sheet"); sheet.hidden = true; sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true"); sheet.setAttribute("aria-label", "بحث بصورة");
+const closeMenu = () => { sheet.hidden = true; imgBtn.setAttribute("aria-expanded", "false"); };
 const opt = (cls, text, input) => {
-  const o = el("button", "img-opt " + cls, text); o.type = "button"; o.setAttribute("role", "menuitem");
+  const o = el("button", "img-opt " + cls, text); o.type = "button";
   o.addEventListener("click", () => { closeMenu(); input.click(); });
   return o;
 };
-menu.append(opt("cam", "تصوير بالكاميرا", camIn), opt("gal", "اختيار من المعرض", galIn));
-$("f").append(imgBtn, menu, camIn, galIn);
-imgBtn.addEventListener("click", () => { menu.hidden = !menu.hidden; imgBtn.setAttribute("aria-expanded", String(!menu.hidden)); });
-document.addEventListener("pointerdown", (e) => { if (!e.target.closest(".img-menu, .img-pick")) closeMenu(); });
+const soon = (cls, text) => { // الروشتة لسه مش شغّالة: الزر مقفول ومكتوب عليه "قريباً" بخط صغير
+  const o = el("button", "img-opt " + cls); o.type = "button"; o.disabled = true;
+  o.append(el("span", null, text), el("small", "img-soon", "قريباً"));
+  return o;
+};
+const panel = el("div", "img-panel");
+panel.append(
+  el("h3", "img-h", "بحث بصورة"),
+  el("div", "img-sec", "صورة المنتج"),
+  opt("cam", "تصوير المنتج بالكاميرا", camIn),
+  opt("gal", "استيراد صورة المنتج من المعرض", galIn),
+  el("div", "img-sec", "الروشتة"),
+  soon("cam", "تصوير الروشتة بالكاميرا"),
+  soon("gal", "استيراد صورة الروشتة من المعرض"),
+);
+sheet.append(panel);
+document.body.append(sheet);
+$("f").append(imgBtn, camIn, galIn);
+imgBtn.addEventListener("click", () => { sheet.hidden = !sheet.hidden; imgBtn.setAttribute("aria-expanded", String(!sheet.hidden)); });
+sheet.addEventListener("click", (e) => { if (e.target === sheet) closeMenu(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
 const busy = (v) => { imgBtn.disabled = v; };
 

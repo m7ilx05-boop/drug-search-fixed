@@ -421,3 +421,15 @@ ul.ing li .ing-detail .ing-bl li{display:list-item;padding:0;border:0;margin:0 0
 .ing-foot b:first-child{margin-top:0}
 .ing-page .ing-foot .ing-ul li{font-size:12.5px}
 .ing-foot .ltr{direction:ltr;unicode-bidi:isolate;display:inline;overflow-wrap:anywhere}
+
+/* ===== قايمة بحث بصورة: ورقة من تحت (منتج / روشتة) ===== */
+.img-sheet{position:fixed;inset:0;z-index:200;display:flex;align-items:flex-end;justify-content:center;background:rgba(6,20,34,.55)}
+.img-sheet[hidden]{display:none}
+.img-panel{width:min(100%,520px);max-height:90vh;overflow:auto;background:var(--surface);border-radius:26px 26px 0 0;padding:16px 14px calc(18px + var(--bot,0px));box-shadow:0 -10px 40px rgba(0,0,0,.35);animation:imgUp .22s ease-out}
+@keyframes imgUp{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+.img-h{margin:0 4px 6px;font-size:17px;font-weight:600}
+.img-sec{margin:12px 4px 4px;color:var(--muted);font-size:13px;font-weight:600}
+.img-opt span{flex:1}
+.img-opt[disabled]{opacity:.6;cursor:default}
+.img-opt[disabled]:hover,.img-opt[disabled]:active{background:none}
+.img-soon{flex:none;font-size:11px;font-weight:500;color:var(--muted);background:var(--soft);border-radius:999px;padding:2px 9px}
