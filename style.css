@@ -485,3 +485,6 @@ body[data-view=image] .appbar{padding-bottom:18px}
 @keyframes stIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @keyframes stSpin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.img-steps .st.run i{animation:none;border-top-color:var(--accent)}.img-steps .st.in{animation:none}.img-steps .st-b,.img-steps .st-c{transition:none}}
+
+/* خطوات البحث بالصورة بتظهر مع النتايج بس، مش على الرئيسية لما ترجع من النتايج */
+body[data-view=home] #imgbox{display:none}
