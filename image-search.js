@@ -26,8 +26,8 @@ const shotBtn = el("button", "ip-shot", "صوّر وابحث"); shotBtn.type = "
 const closeBtn = el("button", "ip-close", "إغلاق الكاميرا"); closeBtn.type = "button";
 const actions = el("div", "ip-actions"); actions.hidden = true; actions.append(shotBtn, closeBtn);
 const row = (cls, text, fn) => { const o = el("button", "img-opt " + cls, text); o.type = "button"; o.addEventListener("click", fn); return o; };
-const liveRow = row("cam", "فتح الكاميرا هنا", () => startCam());
-const nativeRow = row("cam", "تصوير بكاميرا التليفون", () => camIn.click());
+const liveRow = row("opt-cam", "فتح الكاميرا هنا", () => startCam());
+const nativeRow = row("opt-cam", "تصوير بكاميرا التليفون", () => camIn.click());
 const galRow = row("gal", "استيراد صورة من المعرض", () => galIn.click());
 const soon = (cls, text) => { // الروشتة لسه مش شغّالة: الزر مقفول ومكتوب عليه "قريباً" بخط صغير
   const o = el("button", "img-opt " + cls); o.type = "button"; o.disabled = true;
@@ -81,7 +81,7 @@ window.imagePage = () => {
     const c1 = el("div", "ip-card"), c2 = el("div", "ip-card");
     c1.append(el("h2", "ip-h", "صورة المنتج"), camBox, actions, ipMsg, liveRow, nativeRow, galRow,
       el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين."));
-    c2.append(el("h2", "ip-h", "الروشتة"), soon("cam", "تصوير الروشتة بالكاميرا"), soon("gal", "استيراد صورة الروشتة من المعرض"));
+    c2.append(el("h2", "ip-h", "الروشتة"), soon("opt-cam", "تصوير الروشتة بالكاميرا"), soon("gal", "استيراد صورة الروشتة من المعرض"));
     pg.append(c1, c2);
   }
   say("");
