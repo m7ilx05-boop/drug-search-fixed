@@ -12,70 +12,15 @@ const cache = new Map();      // اسم مُطبَّع -> العنصر الرا�
 const inflight = new Map();   // اسم مُطبَّع -> Promise
 const clean = (s) => String(s || "").replace(/\s*\[(EPC|MoA|PE|CS)\]\s*$/i, "").trim();
 
-// ---- تنظيم نص ملصق FDA (عناوين + نقط + جدول الجرعات) وزرار الترجمة ----
-const LBL_HEADS = ["Warnings", "Directions", "Uses", "Purpose", "Active ingredients?", "Inactive ingredients",
-  "Do not use", "Ask a doctor or pharmacist before use if you are", "Ask a doctor before use if you have",
-  "When using this product", "Stop use and ask a doctor if"];
-const LBL_BREAKS = ["If pregnant or breast-feeding", "Keep out of reach of children", "In case of overdose"];
-const LBL_ROWS = ["adults and children 12 years and over", "children 6 to under 12 years", "children under 6 years", "children 2 to under 6 years", "adults"];
-function labelStructure(raw) {
-  let t = String(raw || "").replace(/[\u25A0\u25AA\u25AB\u2022\u25CF]/g, "▪").replace(/\s+/g, " ").trim(); // openFDA بيستخدم ■ (U+25A0) كنقطة
-  LBL_HEADS.forEach((h) => { t = t.replace(new RegExp("(^|[\\s.:])(" + h + ")(?=\\s|:|$)", "g"), "$1\n##$2\n"); });
-  LBL_BREAKS.forEach((h) => { t = t.replace(new RegExp("(^|[\\s.])(" + h + ")(?=[\\s,.:]|$)", "g"), "$1\n$2"); });
-  if (/\bage\s+Dose\b/i.test(t)) {
-    t = t.replace(/\bage\s+Dose\b/i, "\n##age Dose\n");
-    LBL_ROWS.forEach((r) => { t = t.replace(new RegExp("(^|[\\s\\n])(" + r + ")(?=\\s+(?:\\d|do not))", "gi"), "$1\n▪ $2"); });
-  }
-  t = t.replace(/\s*▪\s*/g, "\n▪ ");
-  return t.split("\n").map((x) => x.trim()).filter(Boolean).join("\n");
-}
-function labelNodes(struct) {
-  const frag = document.createDocumentFragment(); let ul = null;
-  String(struct).split("\n").forEach((line) => {
-    if (line.startsWith("##")) { ul = null; frag.append(el("h5", "ing-h", line.slice(2).trim())); }
-    else if (line.startsWith("▪")) { if (!ul) { ul = el("ul", "ing-ul"); frag.append(ul); } ul.append(el("li", null, line.slice(1).trim())); }
-    else { ul = null; frag.append(el("p", "ing-p", line)); }
-  });
-  return frag;
-}
-function labelBlock(textEn, textAr) {
-  const wrap = el("div", "ing-lblwrap");
-  const struct = labelStructure(textEn);
-  const box = el("div", "ing-lbl"); box.dir = "ltr"; box.append(labelNodes(struct));
-  const btn = el("button", "ing-tr-btn", "🌐 ترجمة للعربي"); btn.type = "button";
-  const note = el("p", "meta ing-src", ""); note.hidden = true;
-  let ar = textAr ? labelStructure(textAr) : null, showAr = false;
-  const show = (isAr) => {
-    showAr = isAr; box.replaceChildren(labelNodes(isAr ? ar : struct)); box.dir = isAr ? "rtl" : "ltr";
-    btn.textContent = isAr ? "↩ النص الأصلي (English)" : "🌐 ترجمة للعربي";
-    note.hidden = !isAr; note.textContent = "ترجمة آلية للنص الأصلي، الأرقام والجرعات متطابقة معاه. الأصل بالإنجليزي هو المرجع.";
-  };
-  btn.addEventListener("click", async () => {
-    if (showAr) return show(false);
-    if (ar) return show(true);
-    btn.disabled = true; btn.textContent = "...جاري الترجمة";
-    try { const r = await call("translate-label", { text: struct, target: "ar" }); ar = String(r.text || ""); show(true); }
-    catch (e) {
-      btn.textContent = e && e.code === "rate_limited" ? "حاول بعد دقيقة" : e && (e.code === "numbers_mismatch" || e.code === "not_translated") ? "الترجمة مش دقيقة كفاية واترفضت، اقرأ الأصل" : "تعذّرت الترجمة، حاول تاني";
-      setTimeout(() => { if (!showAr) btn.textContent = "🌐 ترجمة للعربي"; }, 3500);
-    }
-    btn.disabled = false;
-  });
-  wrap.append(btn, box, note);
-  return wrap;
-}
-
-// ---- كارت RxClass: الاستخدامات والوقاية والموانع (MED-RT) ----
+// ---- RxClass: الاستخدامات والوقاية والموانع (MED-RT) ----
 // الأسماء إنجليزي (MeSH). لو name_ar متخزّن بيظهر، وغير كده زرار ترجمة بيترجم الأسماء كلها في طلب واحد (دالة translate-label).
 const RX_GROUPS = [["indications", "الاستخدامات"], ["prevention", "الوقاية"], ["contraindications", "موانع الاستعمال"]];
-function rxCard(rx) {
+function rxFlat(rx) {
   const groups = RX_GROUPS.map(([k, t]) => [k, t, (Array.isArray(rx[k]) ? rx[k] : []).filter((x) => x && x.name)]).filter((g) => g[2].length);
   if (!groups.length) return null;
-  const d = el("details", "ing-sec ing-rx"); d.append(el("summary", null, "الاستخدامات والموانع (RxClass)"));
   const body = el("div", "ing-rx-body");
   const btn = el("button", "ing-tr-btn", "🌐 ترجمة الأسماء للعربي"); btn.type = "button";
-  const note = el("p", "meta ing-src", ""); note.hidden = true;
-  const lis = []; // [{li, item}]
+  const lis = [];
   groups.forEach(([k, title, items]) => {
     body.append(el("h5", "ing-h" + (k === "contraindications" ? " ing-h-warn" : ""), title));
     const ul = el("ul", "ing-ul");
@@ -86,9 +31,8 @@ function rxCard(rx) {
   let ar = null, showAr = allAr;
   const apply = (isAr) => {
     showAr = isAr;
-    lis.forEach(({ li, x }, i) => { const t = isAr ? (x.name_ar || (ar && ar[i]) || x.name) : x.name; li.textContent = t; li.dir = isAr && (x.name_ar || (ar && ar[i])) ? "rtl" : "ltr"; });
+    lis.forEach(({ li, x }, i) => { const a = x.name_ar || (ar && ar[i]); li.textContent = isAr && a ? a : x.name; li.dir = isAr && a ? "rtl" : "ltr"; });
     btn.textContent = isAr ? "↩ الأسماء بالإنجليزي" : "🌐 ترجمة الأسماء للعربي";
-    note.hidden = !isAr || allAr; note.textContent = "ترجمة آلية لأسماء الأمراض، والأصل بالإنجليزي هو المرجع.";
   };
   if (!allAr) {
     btn.addEventListener("click", async () => {
@@ -108,13 +52,7 @@ function rxCard(rx) {
     });
     body.prepend(btn);
   }
-  body.append(note);
-  if (groups.some((g) => g[0] === "contraindications")) {
-    body.append(el("p", "meta ing-src ing-rx-warn", "⚠ الموانع دي على مستوى المادة الفعّالة من المصدر وما اتراجعتش بواسطة صيدلي. بعضها ممكن يخص منتجات مركّبة (مادة + مادة تانية)، فراجع نشرة المنتج قبل الاعتماد عليها."));
-  }
-  body.append(el("p", "meta ing-src", "المصدر: " + (rx.source || "RxClass (MED-RT)") + ". " + (rx.note_ar || "")));
-  d.append(body);
-  return d;
+  return body;
 }
 
 async function load(names) {
@@ -206,21 +144,36 @@ const TR_ERR = {
   section_not_found: "القسم ده مش موجود."
 };
 
-// قسم واحد: عنوان + نص مترتب + زرار ترجمة/النص الأصلي + المصدر
-function sectionBox(s, key) {
-  const d = el("details", "ing-sec"); d.append(el("summary", null, s.title_ar));
+// ---- صفحة المادة الفعّالة (#/i/الاسم): كل حاجة مترتبة، والمصادر والتنبيهات مرة واحدة في الآخر ----
+const SEC_ORDER = [["indications", "دواعي الاستعمال"], ["dosage", "الجرعة وطريقة الاستخدام"], ["contraindications", "موانع الاستعمال"],
+  ["warnings", "التحذيرات"], ["adverse", "الأعراض الجانبية"], ["interactions", "التداخلات الدوائية"]];
+const niceDate = (t) => { t = String(t || ""); return /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t; };
+const SRC_NAMES = {
+  rxclass: "RxClass (المكتبة الطبية الأمريكية NLM)",
+  openfda: "openFDA (ملصقات الأدوية الأمريكية)",
+  chembl: "ChEMBL (قاعدة EMBL-EBI المفتوحة): كود ATC وآلية العمل",
+  nutrient_rule: "قاعدة ثابتة في النظام (الفيتامينات والمعادن والأحماض الأمينية بتتصنف كمكمل غذائي، مش من مرجع طبي خارجي)",
+};
+const uniq = (a) => a.filter((x, i) => x && a.indexOf(x) === i);
+function addRow(box, k, v, ltr) {
+  if (!v || (Array.isArray(v) && !v.length)) return;
+  const d = el("div", "ing-row"); d.append(el("b", null, k));
+  (Array.isArray(v) ? v : [v]).forEach((x) => d.append(el("span", ltr ? "ltr" : null, x)));
+  box.append(d);
+}
+
+// قسم واحد من النشرة: نص مترتب + زرار ترجمة/النص الأصلي. من غير تحذير ولا مصدر هنا، دول في آخر الصفحة مرة واحدة.
+function sectionFlat(s, key) {
+  const wrap = el("div", "ing-secflat");
   const holder = el("div", "ing-view");
-  const note = el("p", "meta ing-src ing-warnbox"); note.hidden = true; // خارج صندوق التمرير عشان التحذير يفضل ظاهر
   const tools = el("div", "ing-tools");
   const tbtn = el("button", "ing-tr-btn", ""); tbtn.type = "button";
   const msg = el("p", "meta ing-trmsg"); msg.hidden = true;
   let mode = "en";
   const paint = () => {
-    holder.replaceChildren(); note.hidden = true;
+    holder.replaceChildren();
     if (mode === "ar" && s.text_ar) {
       holder.append(fdaBody(s.text_ar, false));
-      note.textContent = "ترجمة آلية اتعملت بالذكاء الاصطناعي واتراجعت آليًا بموديل تاني، ومفيش مراجعة بشرية، فممكن فيها أخطاء. المرجع هو النص الأصلي بالإنجليزي، ومش بديل لرأي الصيدلي أو الطبيب.";
-      note.hidden = false;
       tbtn.textContent = "عرض النص الأصلي (English)";
     } else {
       if (s.text_en) holder.append(fdaBody(s.text_en, true));
@@ -243,88 +196,126 @@ function sectionBox(s, key) {
       msg.hidden = false;
     } finally { tbtn.disabled = false; }
   });
-  tools.append(tbtn); d.append(tools, msg, holder, note);
+  tools.append(tbtn); wrap.append(tools, msg, holder);
   paint();
-  const src = el("p", "meta ing-src", "المصدر: openFDA label");
-  if (s.effective_time) { const t = String(s.effective_time), nice = /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t; src.append("، بتاريخ "); src.append(el("span", "ing-id", nice)); }
-  d.append(src);
-  if (s.set_id) d.append(el("p", "meta ing-src ing-setid", s.set_id));
-  return d;
+  return wrap;
 }
 
-function detailPanel(it, key) {
-  const box = el("div", "ing-detail");
-  if (!it || it.status !== "found" || !(tagOf(it) || it.fda_class || (it.fda_purpose && it.fda_purpose.length))) {
-    box.append(el("p", "meta", "لسه مفيش بيانات تصنيف مؤكدة لهذه المادة."));
-    return box;
+function ingredientBody(it, key) {
+  const frag = document.createDocumentFragment();
+  const secs = (it && Array.isArray(it.sections) ? it.sections : []).filter((s) => s && s.section_key && (s.text_en || s.text_ar));
+  const rx = it && it.rxclass ? it.rxclass : null;
+  const ref = it && it.reference && it.reference.review_status === "reviewed" ? it.reference : null;
+  const doses = ((it && it.reference && it.reference.doses) || []).filter((d) => d && d.review_status === "reviewed" && Number(d.max_daily_dose) > 0 && d.source_title);
+  const hasClass = !!(it && it.status === "found" && (tagOf(it) || it.fda_class || (it.fda_purpose && it.fda_purpose.length) || (it.atc && it.atc.length) || (it.moa && it.moa.length)));
+  if (!hasClass && !secs.length && !rx) { frag.append(el("p", "meta", "لسه مفيش بيانات تصنيف مؤكدة لهذه المادة.")); return frag; }
+
+  // 1) التصنيف
+  if (hasClass) {
+    frag.append(el("h3", "pd-h", "التصنيف"));
+    const box = el("div", "ing-box");
+    addRow(box, "التصنيف المختصر", uniq([it.purpose_ar, it.purpose_en]));
+    if (ref) addRow(box, "السب كلاس", uniq([ref.subclass_ar, ref.subclass_en]));
+    addRow(box, "كود ATC (WHO)", it.atc, true);
+    addRow(box, "تصنيف FDA الدوائي", lines(it.epc && it.epc.length ? it.epc : [it.fda_class]), true);
+    addRow(box, "آلية العمل (MoA)", lines(it.moa), true);
+    addRow(box, "الغرض حسب ملصق FDA", (Array.isArray(it.fda_purpose) ? it.fda_purpose : []).map((x) => String(x).slice(0, 160)), true);
+    frag.append(box);
   }
-  const row = (k, v, ltr) => {
-    if (!v || (Array.isArray(v) && !v.length)) return;
-    const d = el("div", "ing-row"); d.append(el("b", null, k));
-    (Array.isArray(v) ? v : [v]).forEach((x) => { const s = el("span", ltr ? "ltr" : null, x); d.append(s); });
-    box.append(d);
-  };
-  row("التصنيف المختصر", [it.purpose_ar, it.purpose_en].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i));
-  // السب كلاس والجرعة القصوى: بتظهر بس لو الصف متراجع (review_status = reviewed) وليه مصدر. أي حاجة تانية مبتظهرش.
-  const ref = it.reference && it.reference.review_status === "reviewed" ? it.reference : null;
-  if (ref) row("السب كلاس", [ref.subclass_ar, ref.subclass_en].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i));
-  const doses = ((it.reference && it.reference.doses) || []).filter((d) => d && d.review_status === "reviewed" && Number(d.max_daily_dose) > 0 && d.source_title);
+  // 2) أقسام النشرة بالترتيب
+  SEC_ORDER.forEach(([k, title]) => {
+    const s = secs.find((x) => x.section_key === k);
+    if (!s) return;
+    frag.append(el("h3", "pd-h", title));
+    if (s.source === "chembl") {
+      const ul = el("ul", "ing-ul");
+      String(s.text_en || "").split(";").map((x) => x.trim()).filter(Boolean).forEach((x) => { const li = el("li", null, x); li.dir = "ltr"; ul.append(li); });
+      frag.append(ul);
+    } else frag.append(sectionFlat(s, key));
+  });
+  // 3) الحد الأقصى اليومي (المتراجع فقط)
   if (doses.length) {
+    frag.append(el("h3", "pd-h", "الحد الأقصى اليومي (راجعه صيدلي)"));
     const AG = { adult: "بالغ", child: "أطفال", elderly: "كبار السن" };
-    const wrap = el("div", "ing-row"); wrap.append(el("b", null, "الحد الأقصى اليومي (راجعه صيدلي)"));
+    const ul = el("ul", "ing-ul");
     doses.forEach((d) => {
       const age = d.age_min_years != null || d.age_max_years != null ? " (" + (d.age_min_years ?? "") + "–" + (d.age_max_years ?? "") + " سنة)" : "";
-      wrap.append(el("span", null, (AG[d.age_group] || d.age_group) + age + ": " + d.max_daily_dose + " " + (d.unit || "mg") + " / يوم"));
-      wrap.append(el("span", "meta ing-src", "المصدر: " + d.source_title));
+      ul.append(el("li", null, (AG[d.age_group] || d.age_group) + age + ": " + d.max_daily_dose + " " + (d.unit || "mg") + " / يوم"));
     });
-    box.append(wrap);
+    frag.append(ul);
   }
-  const epc = lines(it.epc && it.epc.length ? it.epc : [it.fda_class]);
-  row("تصنيف FDA الدوائي", epc, true);
-  row("آلية العمل (MoA)", lines(it.moa), true);
-  row("الغرض حسب ملصق FDA", (Array.isArray(it.fda_purpose) ? it.fda_purpose : []).map((x) => String(x).slice(0, 160)), true);
-  // تفاصيل أكتر: أقسام ملصق FDA (نص أصلي مترتب + زرار ترجمة لو الترجمة مش متخزّنة). الزرار مبيظهرش لو مفيش أقسام متخزّنة.
-  const secs = (Array.isArray(it.sections) ? it.sections : []).filter((s) => s && s.title_ar && (s.text_en || s.text_ar));
-  if (secs.length) {
-    const more = el("div", "ing-more"); more.hidden = true;
-    secs.forEach((s) => more.append(sectionBox(s, key)));
-    const btn = el("button", "ing-more-btn", "تفاصيل أكتر"); btn.type = "button";
-    btn.addEventListener("click", () => { more.hidden = !more.hidden; btn.textContent = more.hidden ? "تفاصيل أكتر" : "إخفاء التفاصيل"; });
-    box.append(btn, more);
-  }
-  const srcs = String(it.source || "openfda").split("+").map((x) => x === "rxclass" ? "RxClass (المكتبة الطبية الأمريكية NLM)" : x === "openfda" ? "openFDA (ملصقات الأدوية الأمريكية)" : x === "nutrient_rule" ? "قاعدة ثابتة في النظام (الفيتامينات والمعادن والأحماض الأمينية بتتصنف كمكمل غذائي، مش من مرجع طبي خارجي)" : "").filter(Boolean);
-  box.append(el("p", "meta ing-src", "المصدر: " + srcs.join(" + ") + ". ده تصنيف عام للمادة الفعّالة مش لمنتج معيّن في السوق المصري، ومش بديل لرأي الصيدلي أو الطبيب."));
-  return box;
+  // 4) RxClass
+  const rxEl = rx ? rxFlat(rx) : null;
+  if (rxEl) { frag.append(el("h3", "pd-h", "الاستخدامات والموانع (RxClass)")); frag.append(rxEl); }
+
+  // 5) المصادر والتنبيهات: مرة واحدة في الآخر
+  const foot = el("div", "ing-foot");
+  foot.append(el("b", null, "المصادر"));
+  const sl = el("ul", "ing-ul");
+  const addSrc = (text, ltrPart) => { const li = el("li", null, text); if (ltrPart) { li.append(" "); li.append(el("span", "ltr", ltrPart)); } sl.append(li); };
+  uniq(String(it && it.source ? it.source : "").split("+").map((x) => SRC_NAMES[x] || "")).forEach((t) => addSrc("التصنيف: " + t));
+  const fdaSec = secs.find((s) => (s.source || "openfda") === "openfda");
+  if (fdaSec) addSrc("نصوص النشرة: openFDA label" + (fdaSec.effective_time ? "، بتاريخ " + niceDate(fdaSec.effective_time) : ""), fdaSec.set_id || "");
+  const chSec = secs.find((s) => s.source === "chembl");
+  if (chSec) addSrc("دواعي الاستعمال: ChEMBL،", chSec.source_ref || "");
+  if (rxEl) addSrc("الاستخدامات والموانع: RxClass (MED-RT)");
+  uniq([ref && ref.source_title, ...doses.map((d) => d.source_title)]).forEach((t) => addSrc("مرجع مراجَع: " + t));
+  foot.append(sl);
+  const notes = ["ده تصنيف ومعلومات عامة على مستوى المادة الفعّالة، مش لمنتج معيّن في السوق المصري، ومش بديل لرأي الصيدلي أو الطبيب. راجع نشرة المنتج قبل الاعتماد عليه."];
+  if (rx && Array.isArray(rx.contraindications) && rx.contraindications.length) notes.push("موانع RxClass على مستوى المادة وما اتراجعتش بواسطة صيدلي، وبعضها ممكن يخص منتجات مركّبة.");
+  if (chSec) notes.push("دواعي الاستعمال من ChEMBL محتفظ فيها بالمرحلة 3 فأعلى، وهي مش نص نشرة دواء ولا نص أصلي من FDA.");
+  if (secs.some((s) => (s.source || "openfda") === "openfda") || rxEl) notes.push("الترجمة العربية (لو اتعملت) اتعملت آليًا بالذكاء الاصطناعي واتراجعت آليًا بموديل تاني، ومفيش مراجعة بشرية، فممكن فيها أخطاء. المرجع هو النص الأصلي بالإنجليزي.");
+  foot.append(el("b", null, "تنبيهات"));
+  const nl = el("ul", "ing-ul");
+  notes.forEach((t) => nl.append(el("li", null, t)));
+  foot.append(nl);
+  frag.append(foot);
+  return frag;
 }
 
+// بتتنادى من pages.js لما الراوت يبقى #/i/الاسم. بترجّع [هيدر, ورقة] بتتحط في صفحة المنتج.
+window.ingredientPage = function (name, goBackFn) {
+  const hero = el("div", "hero ing-hero");
+  const bk = el("button", "back hero-back", "→"); bk.type = "button"; bk.setAttribute("aria-label", "رجوع");
+  if (goBackFn) bk.addEventListener("click", goBackFn);
+  const t = el("div", "ing-hero-t");
+  const h = el("h1", null, name); h.dir = "auto";
+  const tag = el("span", "ing-hero-tag", ""); tag.hidden = true;
+  t.append(h, tag); hero.append(bk, t);
+  const sheet = el("div", "sheet ing-page");
+  sheet.append(el("p", "meta", "...جاري التحميل"));
+  const key = norm(name);
+  const paint = () => {
+    if (!sheet.isConnected) { const a = refreshers.get(key) || []; const i = a.indexOf(paint); if (i >= 0) a.splice(i, 1); return; }
+    const it = cache.get(key);
+    tag.textContent = tagOf(it); tag.hidden = !tag.textContent;
+    sheet.replaceChildren(ingredientBody(it, key));
+  };
+  (refreshers.get(key) || refreshers.set(key, []).get(key)).push(paint);
+  load([name]).then(paint);
+  return [hero, sheet];
+};
+
+// القائمة: الشارة بتظهر في كل مكان، بس الاسم بيبقى رابط لصفحة المادة جوّه صفحة المنتج بس (مش في كروت النتايج)
 function decorate(li) {
   const nameEl = li.firstElementChild; if (!nameEl) return;
   const main = el("span", "ing-main");
   nameEl.classList.add("ing-name");
-  const valEl = nameEl.nextElementSibling; if (valEl) valEl.classList.add("ing-val"); // التركيز بيفضل جنب الصف حتى لو اتفتحت التفاصيل
+  const valEl = nameEl.nextElementSibling; if (valEl) valEl.classList.add("ing-val"); // التركيز بيفضل جنب الصف
   li.prepend(main); main.append(nameEl);
-  main.tabIndex = 0; main.setAttribute("role", "button"); main.setAttribute("aria-expanded", "false");
   const key = norm(li.dataset.ing);
+  if (li.closest("#pd")) {
+    main.classList.add("ing-link"); main.tabIndex = 0; main.setAttribute("role", "link");
+    const go = () => { if (typeof window.openIngredient === "function") window.openIngredient(li.dataset.ing); };
+    main.addEventListener("click", go);
+    main.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  }
   const fillTag = () => {
     const t = tagOf(cache.get(key));
     if (t && !main.querySelector(".ing-tag")) main.append(el("span", "ing-tag", t));
   };
-  let panel = null;
-  const refresh = () => {
-    fillTag();
-    if (panel && li.classList.contains("ing-open")) { const np = detailPanel(cache.get(key), key); panel.replaceWith(np); panel = np; }
-  };
-  (refreshers.get(key) || refreshers.set(key, []).get(key)).push(refresh);
+  (refreshers.get(key) || refreshers.set(key, []).get(key)).push(fillTag);
   load([li.dataset.ing]).then(fillTag);
-  const toggle = async () => {
-    if (panel) { panel.remove(); panel = null; main.setAttribute("aria-expanded", "false"); li.classList.remove("ing-open"); return; }
-    main.setAttribute("aria-expanded", "true"); li.classList.add("ing-open");
-    await load([li.dataset.ing]);
-    if (!li.classList.contains("ing-open")) return;
-    panel = detailPanel(cache.get(key), key); li.append(panel); fillTag();
-  };
-  main.addEventListener("click", toggle);
-  main.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
 }
 
 let queued = false;
