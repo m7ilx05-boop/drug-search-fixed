@@ -459,6 +459,9 @@ body[data-view=image] .appbar{padding-bottom:18px}
 /* خطوات البحث بالصورة: الخطوة بتظهر بحركة، وتخلص سطر مختصر، والضغط عليها يفتح تفاصيلها */
 .img-steps{margin:0 0 12px;padding:6px 10px;background:var(--surface);border:1px solid var(--line);border-radius:16px;font-size:14px}
 .img-steps .st[hidden]{display:none}
+.img-steps:not(.all) .st.gone{display:none}
+.img-steps .st-all{display:block;margin:2px auto 4px;padding:4px 12px;min-height:0;height:auto;border:0;background:none;color:var(--accent);font:inherit;font-size:12.5px;box-shadow:none}
+.img-steps .st-all[hidden]{display:none}
 .img-steps .st.in{animation:stIn .32s ease-out both}
 .img-steps .st-h{height:auto;border-radius:10px;display:flex;align-items:center;gap:10px;width:100%;min-height:40px;padding:6px 4px;border:0;background:none;color:var(--ink);font:inherit;text-align:start;cursor:default;box-shadow:none}
 .img-steps .st.has-d .st-h{cursor:pointer}

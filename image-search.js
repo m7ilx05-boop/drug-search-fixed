@@ -162,19 +162,25 @@ window.famBox = famBox; // search.js بيستخدمه بعد أي بحث عاد�
 function stepsUI() {
   const w = el("div", "img-steps"); w.setAttribute("role", "status"); w.setAttribute("aria-live", "polite");
   const items = {}; let cur = null;
+  // بيظهر بس الخطوة الشغّالة دلوقتي. الباقي متخبّي، وزر صغير «عرض كل الخطوات» بيفتحهم لو عايز تشوف التفاصيل.
+  const allBtn = el("button", "st-all", "عرض كل الخطوات"); allBtn.type = "button"; allBtn.hidden = true;
+  allBtn.addEventListener("click", () => { const on = w.classList.toggle("all"); allBtn.textContent = on ? "إخفاء الخطوات السابقة" : "عرض كل الخطوات"; });
+  w.append(allBtn);
   const add = (k) => {
     const li = el("div", "st pend"); li.hidden = true;
     const head = el("button", "st-h"); head.type = "button"; head.append(el("i"), el("span", "st-t"), el("b", "st-c"));
     const body = el("div", "st-b"); const inner = el("div", "st-bi"); body.append(inner);
     li.append(head, body);
     head.addEventListener("click", () => { if (li.classList.contains("has-d")) { const o = li.classList.toggle("open"); head.setAttribute("aria-expanded", o ? "true" : "false"); } });
-    w.append(li); items[k] = { li, head, inner };
+    w.insertBefore(li, allBtn); items[k] = { li, head, inner };
   };
   const set = (k, state, text) => {
     const it = items[k]; if (!it) return;
     const was = it.li.className;
-    it.li.className = "st " + state + (was.includes("has-d") ? " has-d" : "") + (was.includes(" open") ? " open" : "");
+    it.li.className = "st " + state + (was.includes("has-d") ? " has-d" : "") + (was.includes(" open") ? " open" : "") + (was.includes(" gone") ? " gone" : "");
     if (it.li.hidden) { it.li.hidden = false; it.li.classList.add("in"); }
+    if (state === "run") { Object.keys(items).forEach((x) => { if (x !== k) items[x].li.classList.add("gone"); }); it.li.classList.remove("gone"); }
+    if (Object.values(items).filter((x) => !x.li.hidden).length >= 2) allBtn.hidden = false;
     if (text != null) it.head.querySelector(".st-t").textContent = text;
     if (state === "run") cur = k; else if (cur === k) cur = null;
   };
