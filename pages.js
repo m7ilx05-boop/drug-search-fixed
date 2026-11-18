@@ -131,17 +131,22 @@
     location.hash = "#/i/" + encodeURIComponent(name);
   };
 
+  // زرار "بحث بصورة" في الرئيسية بيفتح صفحته (#/img)
+  window.openImagePage = () => { navd = true; location.hash = "#/img"; };
+
   function route() {
     const h = location.hash, m = h.match(/^#\/p\/(\d+)$/), im = h.match(/^#\/i\/(.+)$/);
-    let v = m || im ? "product" : h === "#/r" ? "results" : "home";
+    let v = m || im ? "product" : h === "#/r" ? "results" : h === "#/img" ? "image" : "home";
     const implied = v;
     if (m && !ITEMS[+m[1]]) v = searched ? "results" : "home";
     if (v === "results" && !searched) v = "home";
     if (v !== implied) history.replaceState(null, "", v === "results" ? "#/r" : "#/");
     const prev = document.body.dataset.view;
     document.body.dataset.view = v;
-    $("ab-t").textContent = v === "results" ? "نتائج البحث" : "The Pharmacist";
-    $("ab-s").textContent = v === "results" ? "«" + lastQ + "»" : HOME_SUB;
+    $("ab-t").textContent = v === "results" ? "نتائج البحث" : v === "image" ? "بحث بصورة" : "The Pharmacist";
+    $("ab-s").textContent = v === "results" ? "«" + lastQ + "»" : v === "image" ? "صوّر العلبة أو اختار صورة من المعرض" : HOME_SUB;
+    // صفحة البحث بصورة (image-search.js): بتتبني أول مرة، والكاميرا بتتقفل أول ما تسيب الصفحة
+    if (v === "image") { if (window.imagePage) window.imagePage(); } else if (window.imageLeave) window.imageLeave();
     let y = 0;
     if (v === "product" && im) {
       // صفحة المادة الفعّالة (بتتبني في ingredient-class.js)

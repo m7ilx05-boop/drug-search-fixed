@@ -16,36 +16,78 @@ $("out").after(fam); // بعد النتايج مباشرة، وفوق زر ال�
 const mkInput = (capture) => { const i = el("input"); i.type = "file"; i.accept = "image/*"; if (capture) i.setAttribute("capture", "environment"); i.hidden = true; return i; };
 const camIn = mkInput(true), galIn = mkInput(false);
 const imgBtn = el("button", "scan-btn img-pick", "بحث بصورة"); imgBtn.type = "button";
-imgBtn.setAttribute("aria-haspopup", "menu"); imgBtn.setAttribute("aria-expanded", "false");
-// القايمة: ورقة بتطلع من تحت، فيها قسم "صورة المنتج" (شغّال) وقسم "الروشتة" (قريباً)
-const sheet = el("div", "img-sheet"); sheet.hidden = true; sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true"); sheet.setAttribute("aria-label", "بحث بصورة");
-const closeMenu = () => { sheet.hidden = true; imgBtn.setAttribute("aria-expanded", "false"); };
-const opt = (cls, text, input) => {
-  const o = el("button", "img-opt " + cls, text); o.type = "button";
-  o.addEventListener("click", () => { closeMenu(); input.click(); });
-  return o;
-};
+// ===== صفحة البحث بالصورة (#/img): كاميرا حية جوه الصفحة، أو كاميرا التليفون العادية، أو المعرض. الروشتة قريباً. =====
+let built = false, stream = null, camGen = 0;
+const ipMsg = el("div", "ip-msg"); ipMsg.hidden = true;
+const say = (txt, bad) => { ipMsg.hidden = !txt; ipMsg.textContent = txt || ""; ipMsg.className = "ip-msg" + (bad ? " bad" : ""); };
+const video = Object.assign(el("video"), { muted: true, autoplay: true }); video.setAttribute("playsinline", "");
+const camBox = el("div", "ip-cam"); camBox.hidden = true; camBox.append(video, el("div", "ip-frame"));
+const shotBtn = el("button", "ip-shot", "صوّر وابحث"); shotBtn.type = "button";
+const closeBtn = el("button", "ip-close", "إغلاق الكاميرا"); closeBtn.type = "button";
+const actions = el("div", "ip-actions"); actions.hidden = true; actions.append(shotBtn, closeBtn);
+const row = (cls, text, fn) => { const o = el("button", "img-opt " + cls, text); o.type = "button"; o.addEventListener("click", fn); return o; };
+const liveRow = row("cam", "فتح الكاميرا هنا", () => startCam());
+const nativeRow = row("cam", "تصوير بكاميرا التليفون", () => camIn.click());
+const galRow = row("gal", "استيراد صورة من المعرض", () => galIn.click());
 const soon = (cls, text) => { // الروشتة لسه مش شغّالة: الزر مقفول ومكتوب عليه "قريباً" بخط صغير
   const o = el("button", "img-opt " + cls); o.type = "button"; o.disabled = true;
   o.append(el("span", null, text), el("small", "img-soon", "قريباً"));
   return o;
 };
-const panel = el("div", "img-panel");
-panel.append(
-  el("h3", "img-h", "بحث بصورة"),
-  el("div", "img-sec", "صورة المنتج"),
-  opt("cam", "تصوير المنتج بالكاميرا", camIn),
-  opt("gal", "استيراد صورة المنتج من المعرض", galIn),
-  el("div", "img-sec", "الروشتة"),
-  soon("cam", "تصوير الروشتة بالكاميرا"),
-  soon("gal", "استيراد صورة الروشتة من المعرض"),
-);
-sheet.append(panel);
-document.body.append(sheet);
+
+function stopCam() {
+  camGen++;
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  stream = null; video.srcObject = null;
+  camBox.hidden = true; actions.hidden = true; liveRow.hidden = false;
+}
+async function startCam() {
+  say("");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    say("الكاميرا جوه الصفحة مش متاحة في المتصفح ده (محتاجة HTTPS ومتصفح حديث). افتحنا لك كاميرا التليفون العادية.", true);
+    camIn.click(); return;
+  }
+  const gen = ++camGen;
+  let s;
+  try { s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
+  catch (e) {
+    say(e && e.name === "NotAllowedError" ? "مفيش إذن للكاميرا. فعّله من إعدادات المتصفح وجرّب تاني، أو استخدم «تصوير بكاميرا التليفون»." : "تعذّر فتح الكاميرا (" + ((e && e.name) || "unknown") + "). جرّب «تصوير بكاميرا التليفون».", true);
+    return;
+  }
+  if (gen !== camGen) { s.getTracks().forEach((t) => t.stop()); return; }
+  stream = s; video.srcObject = s;
+  try { await video.play(); } catch { /* هيشتغل أول ما الفريم يجهز */ }
+  camBox.hidden = false; actions.hidden = false; liveRow.hidden = true;
+}
+async function shoot() {
+  if (!stream || !video.videoWidth) { say("الكاميرا لسه بتجهز. استنى ثانية وجرّب تاني.", true); return; }
+  const cv = document.createElement("canvas"); cv.width = video.videoWidth; cv.height = video.videoHeight;
+  const ctx = cv.getContext("2d"); if (!ctx) { say("تعذّر التقاط الصورة.", true); return; }
+  ctx.drawImage(video, 0, 0, cv.width, cv.height);
+  const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.9));
+  stopCam();
+  if (!blob) { say("تعذّر التقاط الصورة.", true); return; }
+  handle(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+}
+shotBtn.addEventListener("click", shoot);
+closeBtn.addEventListener("click", stopCam);
+document.addEventListener("visibilitychange", () => { if (document.hidden) stopCam(); });
+
+window.imageLeave = stopCam;
+window.imagePage = () => {
+  const pg = $("imgpage");
+  if (!built) {
+    built = true;
+    const c1 = el("div", "ip-card"), c2 = el("div", "ip-card");
+    c1.append(el("h2", "ip-h", "صورة المنتج"), camBox, actions, ipMsg, liveRow, nativeRow, galRow,
+      el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين."));
+    c2.append(el("h2", "ip-h", "الروشتة"), soon("cam", "تصوير الروشتة بالكاميرا"), soon("gal", "استيراد صورة الروشتة من المعرض"));
+    pg.append(c1, c2);
+  }
+  say("");
+};
+imgBtn.addEventListener("click", () => { if (window.openImagePage) window.openImagePage(); else location.hash = "#/img"; });
 $("f").append(imgBtn, camIn, galIn);
-imgBtn.addEventListener("click", () => { sheet.hidden = !sheet.hidden; imgBtn.setAttribute("aria-expanded", String(!sheet.hidden)); });
-sheet.addEventListener("click", (e) => { if (e.target === sheet) closeMenu(); });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
 const busy = (v) => { imgBtn.disabled = v; };
 
 // أي بحث مش جاي من الصورة بيمسح صندوق العائلة
