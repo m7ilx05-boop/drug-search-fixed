@@ -179,6 +179,26 @@ function stepsUI() {
   return { w, add, set, lines, fail };
 }
 
+// ===== أقرب تركيز: لو مفيش مطابق تمامًا، بنرتّب باقي المنتجات بقرب تركيزها من المطلوب ونعرض الأقرب في الأول =====
+const MASS = { mg: 1, g: 1000, mcg: 0.001, "µg": 0.001, "μg": 0.001, ug: 0.001 };
+const normAmt = (v, u) => { u = String(u || "").toLowerCase().trim(); v = Number(v); return u in MASS ? { v: v * MASS[u], c: "mass" } : { v, c: u }; };
+const reqAmts = (m, x) => {
+  const src = (m && m.strength_checked && (m.required_strength || []).length) ? m.required_strength : String((x && x.strength) || "").split(/[+\/،,]| and /i);
+  return src.map((s) => { const mm = String(s).toLowerCase().replace(",", ".").match(/(\d+(?:\.\d+)?)\s*(mg|mcg|µg|μg|ug|g|iu|ml|%)?/); return mm ? normAmt(mm[1], mm[2]) : null; }).filter((a) => a && a.v > 0);
+};
+const prodAmts = (p) => (p.product_ingredients || []).filter((pi) => pi.strength_value != null && Number(pi.strength_value) > 0).map((pi) => normAmt(pi.strength_value, pi.strength_unit));
+function strengthGap(req, prod) {
+  if (!req.length || !prod.length) return Infinity;
+  const a = req.slice().sort((x, y) => x.v - y.v), b = prod.slice().sort((x, y) => x.v - y.v);
+  let s = 4 * Math.abs(a.length - b.length);
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    if (a[i].c && b[i].c && a[i].c !== b[i].c) s += 8; // وحدتين مختلفتين (مثلًا % و mg)
+    s += Math.abs(Math.log(Math.max(a[i].v, b[i].v) / Math.min(a[i].v, b[i].v)));
+  }
+  return s;
+}
+const strengthText = (p) => (p.product_ingredients || []).filter((pi) => pi.strength_value != null).map((pi) => fmtStrength(pi)).join(" + ");
+
 const quiet = () => { $("status").className = ""; };                    // من غير شريط حالة: الخطوات هي اللي بتعرض التقدّم
 const imgErr = (txt) => { hideSkeleton(); quiet(); toast("error", txt); }; // الخطأ بيظهر في الخطوة + تنبيه واحد
 async function handle(f) {
@@ -246,6 +266,7 @@ async function handle(f) {
       return;
     }
     const ex = new Set(m.exact_ids), un = new Set(m.unverified_ids || []);
+    let closest = [];
     const exact = list.filter((p) => ex.has(p.dwaprices_id));
     const unv = list.filter((p) => un.has(p.dwaprices_id));
     if (exact.length) {
@@ -254,14 +275,23 @@ async function handle(f) {
       exact.forEach((p) => out.append(card(p, 1)));
     } else {
       out.append(el("div", "scan-msg warn", "ما لقيناش في السجل نفس المنتج بنفس التركيز والشكل."));
+      // أقرب تركيز في الأول
+      const req = reqAmts(m, x);
+      closest = list.filter((p) => !ex.has(p.dwaprices_id) && !un.has(p.dwaprices_id))
+        .map((p) => ({ p, g: strengthGap(req, prodAmts(p)) })).filter((o) => isFinite(o.g)).sort((a, b) => a.g - b.g).slice(0, 3);
+      if (closest.length) {
+        out.append(el("h3", "sec", "أقرب تركيز لقيناه (" + closest.length + ")"));
+        out.append(el("p", "sec-note", "التركيز المطلوب: " + ((m.required_strength && m.required_strength.length ? m.required_strength.join(" + ") : x.strength) || "؟") + ". ده أقرب تركيز متاح في السجل، لكنه مش نفس التركيز. قارنه بالعلبة."));
+        closest.forEach((o) => out.append(card(o.p, 3)));
+      }
     }
     if (unv.length) {
       out.append(el("h3", "sec", "نفس الاسم لكن التركيز مش مكتوب في السجل (" + unv.length + ")"));
       out.append(el("p", "sec-note", "مش قادرين نأكد إنه نفس التركيز. قارنه بالعلبة."));
       unv.forEach((p) => out.append(card(p, 3)));
     }
-    st.set("match", "done", exact.length ? "لقينا " + exact.length + " مطابق بنفس الاسم والتركيز والشكل" : "ما لقيناش مطابق بنفس التركيز والشكل");
-    st.lines("match", [["التركيز المطلوب", m.strength_checked ? (m.required_strength || []).join(" + ") : "مش متحقق منه"], ["مطابق تمامًا", exact.length], ["نفس الاسم والتركيز مش مسجّل", unv.length], ["اتخفّى لاختلاف التركيز أو الشكل أو النوع", m.hidden_count || 0]]);
+    st.set("match", "done", exact.length ? "لقينا " + exact.length + " مطابق بنفس الاسم والتركيز والشكل" : closest.length ? "مفيش مطابق، أقرب تركيز: " + (strengthText(closest[0].p) || "—") : "ما لقيناش مطابق بنفس التركيز والشكل");
+    st.lines("match", [["التركيز المطلوب", m.strength_checked ? (m.required_strength || []).join(" + ") : "مش متحقق منه"], ["مطابق تمامًا", exact.length], ["أقرب تركيز (لو مفيش مطابق)", closest.length ? closest.map((o) => (o.p.product_name || "") + " — " + strengthText(o.p)).join(" | ") : ""], ["نفس الاسم والتركيز مش مسجّل", unv.length], ["اتخفّى لاختلاف التركيز أو الشكل أو النوع", m.hidden_count || 0]]);
     if (m.hidden_count > 0) out.append(el("p", "sec-note", "اتخفّى " + m.hidden_count + " منتج بنفس العائلة بتركيز أو شكل أو نوع مختلف. تقدر تشوفهم من البحث بالعائلة تحت."));
     quiet();
   } catch (err) {
