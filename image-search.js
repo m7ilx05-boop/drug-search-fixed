@@ -114,24 +114,6 @@ async function toJpegBase64(f) {
   return String(url).split(",")[1];
 }
 
-function readCard(r) {
-  const x = r.extracted || {};
-  const c = el("div", "read-box");
-  c.append(el("h3", null, "اللي اتقرا من الصورة"));
-  const dl = el("dl");
-  const row = (k, v) => { if (!v) return; dl.append(el("dt", null, k), el("dd", null, v)); };
-  row("الاسم", x.brand_name);
-  row("الاسم بالعربي", x.arabic_name);
-  row("المادة الفعّالة", (x.active_ingredients || []).join("، "));
-  row("التركيز", x.strength);
-  row("الشكل الدوائي", x.dosage_form);
-  row("الشركة", x.manufacturer);
-  if (r.barcode_read) row("باركود", (r.gtins || []).length ? r.gtins[0] + " (رقم المراجعة صحيح)" : "اتقرا بس رقم المراجعة مش مطابق، فمش هيتستخدم");
-  c.append(dl);
-  c.append(el("div", "dose-note", "ده قراءة آلية للصورة وممكن تغلط في حرف أو رقم. قارن الاسم والتركيز بالعلبة نفسها قبل ما تعتمد على أي نتيجة."));
-  return c;
-}
-
 // صندوق "باقي منتجات نفس العائلة": الاسم متعبّي من الصورة وتقدر تغيّره (بنادول، سنترم...)
 function famBox(family) {
   fam.replaceChildren();
@@ -197,12 +179,14 @@ function stepsUI() {
   return { w, add, set, lines, fail };
 }
 
+const quiet = () => { $("status").className = ""; };                    // من غير شريط حالة: الخطوات هي اللي بتعرض التقدّم
+const imgErr = (txt) => { hideSkeleton(); quiet(); toast("error", txt); }; // الخطأ بيظهر في الخطوة + تنبيه واحد
 async function handle(f) {
   if (!f) return;
-  if (!/^image\//.test(f.type)) { setStatus("الملف ده مش صورة.", { error: true }); return; }
+  if (!/^image\//.test(f.type)) { imgErr("الملف ده مش صورة."); return; }
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
-  busy(true); setStatus("جاري قراءة الصورة…"); showSkeleton();
+  busy(true); showSkeleton();
   const st = stepsUI(); st.add("prep"); st.add("read"); st.set("prep", "run", "جاري تجهيز الصورة…"); box.append(st.w);
   if (window.showResultsPage) window.showResultsPage("بحث بالصورة"); // من غيرها النتيجة بتتملي في صفحة مخفية
   const ffPrev = window.__ff; window.__ff = ""; // فلتر الشكل الدوائي مش بيأثر على البحث بالصورة
@@ -214,13 +198,12 @@ async function handle(f) {
     st.set("read", "run", "جاري قراءة نص الصورة…");
     const r = await call("drug-image-search", { image: b64, mime: "image/jpeg" });
     if (token !== polling) return;
-    box.append(readCard(r));
     const x = r.extracted || {};
     const nm = x.brand_name || x.arabic_name || (x.active_ingredients || [])[0];
     st.set("read", "done", nm ? "اتقرا: " + nm + (x.strength ? " " + x.strength : "") : "اتقرا النص");
-    st.lines("read", [["الاسم التجاري", x.brand_name], ["الاسم بالعربي", x.arabic_name], ["المادة الفعّالة", (x.active_ingredients || []).join("، ")], ["التركيز", x.strength || "مش مكتوب في الصورة"], ["الشكل الدوائي", x.dosage_form], ["الشركة", x.manufacturer], ["الباركود", r.barcode_read ? ((r.gtins || []).length ? r.gtins[0] + " (رقم المراجعة صحيح)" : "اتقرا بس رقم المراجعة مش مطابق") : "ما اتقراش"], ["علبة دواء؟", x.is_medicine_pack ? "أيوه" : "لأ"]]);
-    if (!x.is_medicine_pack) { st.set("read", "bad", "مش باين في الصورة علبة دواء"); st.lines("read", [["اللي حصل", "القراءة خلصت بس مفيش علبة دواء واضحة في الصورة. صوّر العلبة من قدّام وبإضاءة كويسة."]]); setStatus("مش باين في الصورة علبة دواء. صوّر العلبة من قدّام وبإضاءة كويسة.", { error: true }); return; }
-    if (!(r.gtins || []).length && !r.search) { st.set("read", "bad", "ما قدرناش نقرا اسم ولا باركود واضح"); st.lines("read", [["اللي حصل", "القراءة خلصت بس مفيش اسم ولا باركود واضح. جرّب صورة أقرب وأوضح."]]); setStatus("ما قدرناش نقرا اسم ولا باركود واضح من الصورة. جرّب صورة أقرب وأوضح.", { error: true }); return; }
+    st.lines("read", [["الاسم التجاري", x.brand_name], ["الاسم بالعربي", x.arabic_name], ["المادة الفعّالة", (x.active_ingredients || []).join("، ")], ["التركيز", x.strength || "مش مكتوب في الصورة"], ["الشكل الدوائي", x.dosage_form], ["الشركة", x.manufacturer], ["الباركود", r.barcode_read ? ((r.gtins || []).length ? r.gtins[0] + " (رقم المراجعة صحيح)" : "اتقرا بس رقم المراجعة مش مطابق") : "ما اتقراش"], ["علبة دواء؟", x.is_medicine_pack ? "أيوه" : "لأ"], ["تنبيه", "قراءة آلية للصورة وممكن تغلط في حرف أو رقم. قارن الاسم والتركيز بالعلبة نفسها قبل ما تعتمد على أي نتيجة."]]);
+    if (!x.is_medicine_pack) { st.set("read", "bad", "مش باين في الصورة علبة دواء"); st.lines("read", [["اللي حصل", "القراءة خلصت بس مفيش علبة دواء واضحة في الصورة. صوّر العلبة من قدّام وبإضاءة كويسة."]]); imgErr("مش باين في الصورة علبة دواء. صوّر العلبة من قدّام وبإضاءة كويسة."); return; }
+    if (!(r.gtins || []).length && !r.search) { st.set("read", "bad", "ما قدرناش نقرا اسم ولا باركود واضح"); st.lines("read", [["اللي حصل", "القراءة خلصت بس مفيش اسم ولا باركود واضح. جرّب صورة أقرب وأوضح."]]); imgErr("ما قدرناش نقرا اسم ولا باركود واضح من الصورة. جرّب صورة أقرب وأوضح."); return; }
     if (r.family) famBox(r.family);
     else if (r.search && r.search.type !== "ingredient") famBox({ text: r.search.text });
 
@@ -236,8 +219,7 @@ async function handle(f) {
           out.replaceChildren(el("h3", "sec", "نفس المنتج اللي في الصورة (" + d.found + ")"));
           if (d.ambiguous) out.append(el("div", "scan-msg warn", "الباركود ده مسجّل لأكتر من منتج في المصدر. راجع الاسم والحجم على العبوة."));
           (d.results || []).forEach((p) => out.append(card(p, 1)));
-          setStatus("اتعرف على المنتج من الباركود المطبوع في الصورة.");
-          toast("success", "اتعرف على المنتج من الباركود.");
+          quiet();
           return;
         }
         st.set("bc", "done", "الباركود مش موجود في القاعدة"); st.lines("bc", [["الباركود", (r.gtins || []).join("، ")], ["النتيجة", "مش مسجّل في قاعدة البيانات، فكمّلنا بالبحث بالاسم."]]);
@@ -245,8 +227,8 @@ async function handle(f) {
     }
 
     // 2) الاسم + التركيز + الشكل: الباك اند حدّد مين هو نفس المنتج، ومخفي أي تركيز أو شكل مختلف
-    if (!r.search) { st.add("nm"); st.set("nm", "bad", "مفيش اسم واضح نبحث بيه"); st.lines("nm", [["اللي حصل", "الباركود مش موجود في القاعدة ومفيش اسم واضح في الصورة."]]); setStatus("الباركود المقروء مش موجود في قاعدة البيانات، ومفيش اسم واضح في الصورة نبحث بيه.", { error: true }); return; }
-    st.add("srch"); st.add("match"); st.set("srch", "run", "جاري البحث عن «" + r.search.text + "»…"); setStatus("جاري البحث عن المنتج في قاعدة البيانات…");
+    if (!r.search) { st.add("nm"); st.set("nm", "bad", "مفيش اسم واضح نبحث بيه"); st.lines("nm", [["اللي حصل", "الباركود مش موجود في القاعدة ومفيش اسم واضح في الصورة."]]); imgErr("الباركود المقروء مش موجود في قاعدة البيانات، ومفيش اسم واضح في الصورة نبحث بيه."); return; }
+    st.add("srch"); st.add("match"); st.set("srch", "run", "جاري البحث عن «" + r.search.text + "»…");
     const d = await call("drug-search", { query: r.search.text, search_type: r.search.type === "ingredient" ? "ingredient" : "brand" });
     if (token !== polling) return;
     st.set("srch", "done", "البحث عن «" + r.search.text + "» خلص");
@@ -260,7 +242,7 @@ async function handle(f) {
       st.set("match", "bad", "ما قدرناش نتحقق من التركيز والشكل"); st.lines("match", [["اللي حصل", "التحقق من التركيز والشكل ماتمّش، فالنتايج ممكن تكون لمنتجات مشابهة. قارنها بالعلبة."]]);
       out.append(el("div", "scan-msg warn", "ما قدرناش نتحقق من التركيز والشكل، فالنتايج دي ممكن تكون لمنتجات مشابهة. قارنها بالعلبة."));
       list.forEach((p) => out.append(card(p, 1)));
-      setStatus("");
+      quiet();
       return;
     }
     const ex = new Set(m.exact_ids), un = new Set(m.unverified_ids || []);
@@ -270,9 +252,7 @@ async function handle(f) {
       out.append(el("h3", "sec", "نفس المنتج اللي في الصورة (" + exact.length + ")"));
       out.append(el("p", "sec-note", "نفس الاسم" + (m.strength_checked ? " والتركيز (" + (m.required_strength || []).join(" + ") + ")" : "") + " والشكل الدوائي."));
       exact.forEach((p) => out.append(card(p, 1)));
-      toast("success", "لقينا نفس المنتج اللي في الصورة.");
     } else {
-      toast("warn", "ما لقيناش نفس المنتج بنفس التركيز والشكل.");
       out.append(el("div", "scan-msg warn", "ما لقيناش في السجل نفس المنتج بنفس التركيز والشكل."));
     }
     if (unv.length) {
@@ -283,12 +263,12 @@ async function handle(f) {
     st.set("match", "done", exact.length ? "لقينا " + exact.length + " مطابق بنفس الاسم والتركيز والشكل" : "ما لقيناش مطابق بنفس التركيز والشكل");
     st.lines("match", [["التركيز المطلوب", m.strength_checked ? (m.required_strength || []).join(" + ") : "مش متحقق منه"], ["مطابق تمامًا", exact.length], ["نفس الاسم والتركيز مش مسجّل", unv.length], ["اتخفّى لاختلاف التركيز أو الشكل أو النوع", m.hidden_count || 0]]);
     if (m.hidden_count > 0) out.append(el("p", "sec-note", "اتخفّى " + m.hidden_count + " منتج بنفس العائلة بتركيز أو شكل أو نوع مختلف. تقدر تشوفهم من البحث بالعائلة تحت."));
-    setStatus("");
+    quiet();
   } catch (err) {
     st.fail("حصلت مشكلة في الخطوة دي", [["كود الخطأ", (err && (err.code || err.message)) || "unknown"]]);
     const gw = err && err.data && err.data.gateway_error;
     const known = ERR[err && err.code];
-    setStatus(known || "حصلت مشكلة في قراءة الصورة (" + ((err && (err.code || err.message)) || "unknown") + (gw ? " / " + gw : "") + ").", { error: true });
+    imgErr(known || "حصلت مشكلة في قراءة الصورة (" + ((err && (err.code || err.message)) || "unknown") + (gw ? " / " + gw : "") + ").");
   } finally { window.__ff = ffPrev; busy(false); }
 }
 
