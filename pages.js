@@ -124,11 +124,18 @@
     root.replaceChildren(...it.dom);
   }
 
+  // دوس على مادة فعّالة في صفحة المنتج = صفحتها لوحدها (#/i/الاسم). الرجوع بيرجّعك لصفحة المنتج في نفس مكان السكرول.
+  window.openIngredient = (name) => {
+    if (curIdx >= 0 && ITEMS[curIdx]) ITEMS[curIdx].y = window.scrollY;
+    navd = true;
+    location.hash = "#/i/" + encodeURIComponent(name);
+  };
+
   function route() {
-    const h = location.hash, m = h.match(/^#\/p\/(\d+)$/);
-    let v = m ? "product" : h === "#/r" ? "results" : "home";
+    const h = location.hash, m = h.match(/^#\/p\/(\d+)$/), im = h.match(/^#\/i\/(.+)$/);
+    let v = m || im ? "product" : h === "#/r" ? "results" : "home";
     const implied = v;
-    if (v === "product" && !ITEMS[+m[1]]) v = searched ? "results" : "home";
+    if (m && !ITEMS[+m[1]]) v = searched ? "results" : "home";
     if (v === "results" && !searched) v = "home";
     if (v !== implied) history.replaceState(null, "", v === "results" ? "#/r" : "#/");
     const prev = document.body.dataset.view;
@@ -136,7 +143,12 @@
     $("ab-t").textContent = v === "results" ? "نتائج البحث" : "The Pharmacist";
     $("ab-s").textContent = v === "results" ? "«" + lastQ + "»" : HOME_SUB;
     let y = 0;
-    if (v === "product") {
+    if (v === "product" && im) {
+      // صفحة المادة الفعّالة (بتتبني في ingredient-class.js)
+      curIdx = -1;
+      let nm = im[1]; try { nm = decodeURIComponent(nm); } catch (e) { /* الاسم زي ما هو */ }
+      $("pd").replaceChildren(...(window.ingredientPage ? window.ingredientPage(nm, goBack) : [el("p", "meta", "تعذّر تحميل صفحة المادة")]));
+    } else if (v === "product") {
       curIdx = +m[1];
       detail(curIdx);
       y = ITEMS[curIdx].y || 0; ITEMS[curIdx].y = 0;
