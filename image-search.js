@@ -16,48 +16,51 @@ $("out").after(fam); // بعد النتايج مباشرة، وفوق زر ال�
 const mkInput = (capture) => { const i = el("input"); i.type = "file"; i.accept = "image/*"; if (capture) i.setAttribute("capture", "environment"); i.hidden = true; return i; };
 const camIn = mkInput(true), galIn = mkInput(false);
 const imgBtn = el("button", "scan-btn img-pick", "بحث بصورة"); imgBtn.type = "button";
-// ===== صفحة البحث بالصورة (#/img): كاميرا حية جوه الصفحة، أو كاميرا التليفون العادية، أو المعرض. الروشتة قريباً. =====
+// ===== صفحة البحث بالصورة (#/img): الكاميرا الحية بتفتح أول ما تدخل الصفحة (حوالي ¾ الشاشة)، والمعرض تحتها.
+// فوق الكاميرا زرين صغيرين عايمين: منتج (شغّال) / روشتة (قريباً). =====
 let built = false, stream = null, camGen = 0;
 const ipMsg = el("div", "ip-msg"); ipMsg.hidden = true;
 const say = (txt, bad) => { ipMsg.hidden = !txt; ipMsg.textContent = txt || ""; ipMsg.className = "ip-msg" + (bad ? " bad" : ""); };
 const video = Object.assign(el("video"), { muted: true, autoplay: true }); video.setAttribute("playsinline", "");
-const camBox = el("div", "ip-cam"); camBox.hidden = true; camBox.append(video, el("div", "ip-frame"));
-const shotBtn = el("button", "ip-shot", "صوّر وابحث"); shotBtn.type = "button";
-const closeBtn = el("button", "ip-close", "إغلاق الكاميرا"); closeBtn.type = "button";
-const actions = el("div", "ip-actions"); actions.hidden = true; actions.append(shotBtn, closeBtn);
-const row = (cls, text, fn) => { const o = el("button", "img-opt " + cls, text); o.type = "button"; o.addEventListener("click", fn); return o; };
-const liveRow = row("opt-cam", "فتح الكاميرا هنا", () => startCam());
-const nativeRow = row("opt-cam", "تصوير بكاميرا التليفون", () => camIn.click());
-const galRow = row("gal", "استيراد صورة من المعرض", () => galIn.click());
-const soon = (cls, text) => { // الروشتة لسه مش شغّالة: الزر مقفول ومكتوب عليه "قريباً" بخط صغير
-  const o = el("button", "img-opt " + cls); o.type = "button"; o.disabled = true;
-  o.append(el("span", null, text), el("small", "img-soon", "قريباً"));
-  return o;
-};
+const camBox = el("div", "ip-cam off");
+const modes = el("div", "ip-modes");
+const prodMode = el("button", "ip-mode on", "منتج"); prodMode.type = "button"; prodMode.setAttribute("aria-pressed", "true");
+const rxMode = el("button", "ip-mode", "روشتة"); rxMode.type = "button"; rxMode.disabled = true; rxMode.title = "قريباً";
+rxMode.append(el("small", null, "قريباً"));
+modes.append(prodMode, rxMode);
+const shotBtn = el("button", "ip-shot"); shotBtn.type = "button"; shotBtn.setAttribute("aria-label", "صوّر وابحث"); shotBtn.disabled = true;
+const retryBtn = el("button", "ip-retry", "تشغيل الكاميرا"); retryBtn.type = "button";
+camBox.append(video, el("div", "ip-frame"), modes, retryBtn, shotBtn);
+const galRow = el("button", "img-opt gal", "استيراد صورة من المعرض"); galRow.type = "button";
+galRow.addEventListener("click", () => galIn.click());
 
 function stopCam() {
   camGen++;
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; video.srcObject = null;
-  camBox.hidden = true; actions.hidden = true; liveRow.hidden = false;
+  camBox.classList.add("off"); shotBtn.disabled = true;
 }
 async function startCam() {
+  if (stream) return;
   say("");
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    say("الكاميرا جوه الصفحة مش متاحة في المتصفح ده (محتاجة HTTPS ومتصفح حديث). افتحنا لك كاميرا التليفون العادية.", true);
-    camIn.click(); return;
+    say("الكاميرا مش متاحة في المتصفح ده (محتاجة HTTPS ومتصفح حديث). استخدم «استيراد صورة من المعرض».", true);
+    return;
   }
   const gen = ++camGen;
+  retryBtn.disabled = true;
   let s;
   try { s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
   catch (e) {
-    say(e && e.name === "NotAllowedError" ? "مفيش إذن للكاميرا. فعّله من إعدادات المتصفح وجرّب تاني، أو استخدم «تصوير بكاميرا التليفون»." : "تعذّر فتح الكاميرا (" + ((e && e.name) || "unknown") + "). جرّب «تصوير بكاميرا التليفون».", true);
+    retryBtn.disabled = false;
+    say(e && e.name === "NotAllowedError" ? "مفيش إذن للكاميرا. فعّله من إعدادات المتصفح واضغط «تشغيل الكاميرا»، أو استخدم المعرض." : "تعذّر فتح الكاميرا (" + ((e && e.name) || "unknown") + "). جرّب تاني أو استخدم المعرض.", true);
     return;
   }
+  retryBtn.disabled = false;
   if (gen !== camGen) { s.getTracks().forEach((t) => t.stop()); return; }
   stream = s; video.srcObject = s;
   try { await video.play(); } catch { /* هيشتغل أول ما الفريم يجهز */ }
-  camBox.hidden = false; actions.hidden = false; liveRow.hidden = true;
+  camBox.classList.remove("off"); shotBtn.disabled = false;
 }
 async function shoot() {
   if (!stream || !video.videoWidth) { say("الكاميرا لسه بتجهز. استنى ثانية وجرّب تاني.", true); return; }
@@ -70,7 +73,7 @@ async function shoot() {
   handle(new File([blob], "photo.jpg", { type: "image/jpeg" }));
 }
 shotBtn.addEventListener("click", shoot);
-closeBtn.addEventListener("click", stopCam);
+retryBtn.addEventListener("click", startCam);
 document.addEventListener("visibilitychange", () => { if (document.hidden) stopCam(); });
 
 window.imageLeave = stopCam;
@@ -78,13 +81,12 @@ window.imagePage = () => {
   const pg = $("imgpage");
   if (!built) {
     built = true;
-    const c1 = el("div", "ip-card"), c2 = el("div", "ip-card");
-    c1.append(el("h2", "ip-h", "صورة المنتج"), camBox, actions, ipMsg, liveRow, nativeRow, galRow,
-      el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين."));
-    c2.append(el("h2", "ip-h", "الروشتة"), soon("opt-cam", "تصوير الروشتة بالكاميرا"), soon("gal", "استيراد صورة الروشتة من المعرض"));
-    pg.append(c1, c2);
+    const c = el("div", "ip-card");
+    c.append(galRow, el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين."));
+    pg.append(camBox, ipMsg, c);
   }
   say("");
+  startCam();
 };
 imgBtn.addEventListener("click", () => { if (window.openImagePage) window.openImagePage(); else location.hash = "#/img"; });
 $("f").append(imgBtn, camIn, galIn);
