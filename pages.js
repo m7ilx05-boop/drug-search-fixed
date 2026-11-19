@@ -125,7 +125,9 @@
   }
 
   // دوس على مادة فعّالة في صفحة المنتج = صفحتها لوحدها (#/i/الاسم). الرجوع بيرجّعك لصفحة المنتج في نفس مكان السكرول.
-  window.openIngredient = (name) => {
+  let ingCtx = null; // أسماء مواد الدواء اللي فتحنا منه صفحة المادة (للتنقل بينهم)
+  window.openIngredient = (name, siblings) => {
+    ingCtx = siblings || null;
     if (curIdx >= 0 && ITEMS[curIdx]) ITEMS[curIdx].y = window.scrollY;
     navd = true;
     location.hash = "#/i/" + encodeURIComponent(name);
@@ -152,7 +154,7 @@
       // صفحة المادة الفعّالة (بتتبني في ingredient-class.js)
       curIdx = -1;
       let nm = im[1]; try { nm = decodeURIComponent(nm); } catch (e) { /* الاسم زي ما هو */ }
-      $("pd").replaceChildren(...(window.ingredientPage ? window.ingredientPage(nm, goBack) : [el("p", "meta", "تعذّر تحميل صفحة المادة")]));
+      $("pd").replaceChildren(...(window.ingredientPage ? window.ingredientPage(nm, goBack, ingCtx) : [el("p", "meta", "تعذّر تحميل صفحة المادة")]));
     } else if (v === "product") {
       curIdx = +m[1];
       detail(curIdx);

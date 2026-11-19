@@ -274,14 +274,30 @@ function ingredientBody(it, key) {
 }
 
 // بتتنادى من pages.js لما الراوت يبقى #/i/الاسم. بترجّع [هيدر, ورقة] بتتحط في صفحة المنتج.
-window.ingredientPage = function (name, goBackFn) {
+window.ingredientPage = function (name, goBackFn, siblings) {
   const hero = el("div", "hero ing-hero");
-  const bk = el("button", "back hero-back", "→"); bk.type = "button"; bk.setAttribute("aria-label", "رجوع");
+  // شريط ثابت فوق: زرار الرجوع + اسم المادة (ولو الدواء فيه أكتر من مادة: تابات للتنقل بينهم)
+  const bar = el("div", "ing-bar");
+  const bk = el("button", "back", "→"); bk.type = "button"; bk.setAttribute("aria-label", "رجوع");
   if (goBackFn) bk.addEventListener("click", goBackFn);
+  const tabs = el("div", "ing-tabs");
+  const names = Array.isArray(siblings) && siblings.length > 1 && siblings.includes(name) ? siblings : [name];
+  names.forEach((n) => {
+    const b = el("button", "ing-tab" + (n === name ? " on" : ""), n); b.type = "button"; b.dir = "auto";
+    if (n === name) b.setAttribute("aria-current", "true");
+    else b.addEventListener("click", () => {
+      history.replaceState(null, "", "#/i/" + encodeURIComponent(n));
+      document.getElementById("pd").replaceChildren(...window.ingredientPage(n, goBackFn, names));
+      window.scrollTo(0, 0);
+    });
+    tabs.append(b);
+  });
+  bar.append(bk, tabs);
+  requestAnimationFrame(() => { const on = tabs.querySelector(".on"); if (on && tabs.scrollWidth > tabs.clientWidth) tabs.scrollLeft += (on.getBoundingClientRect().left + on.offsetWidth / 2) - (tabs.getBoundingClientRect().left + tabs.clientWidth / 2); });
   const t = el("div", "ing-hero-t");
   const h = el("h1", null, name); h.dir = "auto";
   const tag = el("span", "ing-hero-tag", ""); tag.hidden = true;
-  t.append(h, tag); hero.append(bk, t);
+  t.append(h, tag); hero.append(t);
   const sheet = el("div", "sheet ing-page");
   sheet.append(el("p", "meta", "...جاري التحميل"));
   const key = norm(name);
@@ -293,7 +309,7 @@ window.ingredientPage = function (name, goBackFn) {
   };
   (refreshers.get(key) || refreshers.set(key, []).get(key)).push(paint);
   load([name]).then(paint);
-  return [hero, sheet];
+  return [bar, hero, sheet];
 };
 
 // القائمة: الشارة بتظهر في كل مكان، بس الاسم بيبقى رابط لصفحة المادة جوّه صفحة المنتج بس (مش في كروت النتايج)
@@ -306,7 +322,10 @@ function decorate(li) {
   const key = norm(li.dataset.ing);
   if (li.closest("#pd")) {
     main.classList.add("ing-link"); main.tabIndex = 0; main.setAttribute("role", "link");
-    const go = () => { if (typeof window.openIngredient === "function") window.openIngredient(li.dataset.ing); };
+    const go = () => {
+      const sib = [...li.closest("ul.ing").querySelectorAll("li[data-ing]")].map((x) => x.dataset.ing);
+      if (typeof window.openIngredient === "function") window.openIngredient(li.dataset.ing, sib);
+    };
     main.addEventListener("click", go);
     main.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
   }
