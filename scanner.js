@@ -86,13 +86,16 @@ css.textContent = `.scan-btn{display:block;width:100%;margin-top:12px;background
 .scan-top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .scan-state{font-weight:600;padding:3px 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok)}
 .scan-state.lost{background:var(--warn-bg);color:var(--warn)}
-.cam-state{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:3;display:inline-flex;align-items:center;gap:8px;padding:5px 14px;font-size:13px;white-space:nowrap;background:rgba(0,0,0,.6);color:#fff;pointer-events:none}
+.cam-state{position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:3;display:inline-flex;align-items:center;gap:8px;padding:5px 14px;font-size:13px;white-space:nowrap;background:rgba(0,0,0,.6);color:#fff;pointer-events:none}
 .cam-state::before{content:"";flex:none;width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px 2px rgba(34,197,94,.8);animation:scanDot 1.2s ease-in-out infinite}
 .cam-state.lost{background:rgba(0,0,0,.6);color:#fde68a}.cam-state.lost::before{background:#fbbf24;box-shadow:0 0 8px 2px rgba(251,191,36,.8)}
 @keyframes scanDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.15;transform:scale(.7)}}
 @media (prefers-reduced-motion:reduce){.cam-state::before{animation:none}}
 #scanIn{width:100%;margin-top:10px;direction:ltr;text-align:center;font:inherit;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .cam-ctl{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--accent);border-radius:14px;background:rgba(127,127,127,.08)}
+.torch-btn{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;padding:0;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,transform .15s}
+.torch-btn svg{fill:none;transition:fill .2s}.torch-btn:active{transform:scale(.9)}
+.torch-btn.on{background:#fbbf24;border-color:#fbbf24;color:#111;box-shadow:0 0 0 4px rgba(251,191,36,.28),0 0 18px 4px rgba(251,191,36,.7)}.torch-btn.on svg{fill:currentColor}
 .cam-ctl input[type=range]{flex:1 1 auto;min-width:0}.cam-ctl button{flex:none;white-space:nowrap}
 .scan-opt{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
 .scan-msg{padding:12px 14px;border-radius:10px;margin-top:12px;font-weight:500}
@@ -148,7 +151,10 @@ const MIN_ZOOM = 4; // أقل زوم مفروض على الكاميرا: بيج�
 
 phoneBtn.textContent = "🖼️ صورة بدقة عالية"; // بيفتح تطبيق الكاميرا الأصلي لصورة واحدة (للباركود الصغير جداً)
 const tools = el("div", "cam-tools"); tools.hidden = true;
-const torchBtn = el("button", null, "🔦 فلاش"); torchBtn.type = "button"; torchBtn.hidden = true;
+const torchBtn = el("button", "torch-btn"); torchBtn.type = "button"; torchBtn.hidden = true; // زر فلاش تفاعلي (أيقونة بدل الكلام)
+torchBtn.setAttribute("aria-label", "الفلاش"); torchBtn.setAttribute("aria-pressed", "false");
+torchBtn.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+const setTorchUi = (on) => { torchBtn.classList.toggle("on", on); torchBtn.setAttribute("aria-pressed", on ? "true" : "false"); };
 const zoomIn = el("input"); zoomIn.type = "range"; zoomIn.hidden = true; zoomIn.setAttribute("aria-label", "زوم الكاميرا");
 const zoomLbl = el("span", "meta", "");
 const camInfo = el("div", "meta cam-info"); camInfo.hidden = true; camInfo.dir = "ltr"; // الأرقام الحقيقية اللي الكاميرا شغّالة بيها
@@ -157,10 +163,11 @@ const autoHiL = el("label", "scan-opt"), autoHiChk = el("input"); autoHiChk.type
 autoHiL.append(autoHiChk, "تصوير تلقائي بدقة كاملة أول ما الكاميرا تلمح الباركود");
 const ctl = el("div", "cam-ctl"); ctl.hidden = true; // إطار واحد للفلاش + الزوم
 ctl.append(torchBtn, zoomIn, zoomLbl);
-tools.append(ctl, autoHiL); // زر «التقاط بدقة كاملة» اتشال: الالتقاط بيحصل تلقائياً
+tools.append(ctl); // خيار «تصوير تلقائي بدقة كاملة» مخفي: الوضع تلقائي دائماً (autoHiChk.checked = true) // زر «التقاط بدقة كاملة» اتشال: الالتقاط بيحصل تلقائياً
 camMsg.after(tools); tools.after(camInfo);
 // بيعرض الدقة والتركيز والزوم الفعليين (من الجهاز نفسه) بدل التخمين
 async function showCamInfo() {
+  camInfo.hidden = true; return; // تفاصيل الكاميرا (الدقة/التركيز/الزوم) مخفية
   if (!track) { camInfo.hidden = true; return; }
   const s = track.getSettings ? track.getSettings() : {};
   const bits = [(video.videoWidth || s.width || "?") + "×" + (video.videoHeight || s.height || "?") + (s.frameRate ? " @" + Math.round(s.frameRate) + "fps" : "")];
@@ -296,8 +303,8 @@ function camStop() {
   camGen++; camOn = false; stopScanAnim(); clearInterval(afTimer); afTimer = 0;
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; track = null; torchOn = false; video.srcObject = null;
-  tools.hidden = true; ctl.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; camInfo.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
-  cam.classList.remove("on", "ok", "seen", "snap"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
+  tools.hidden = true; ctl.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; camInfo.hidden = true; zoomIn.hidden = true; setTorchUi(false);
+  cam.classList.remove("on", "ok", "seen", "snap"); camBtn.disabled = false; camBtn.hidden = false; camBtn.textContent = "📷 افتح الكاميرا";
 }
 
 zoomIn.addEventListener("input", () => {
@@ -325,8 +332,8 @@ function startAutoFocus(caps) {
 torchBtn.addEventListener("click", async () => {
   if (!track) return;
   torchOn = !torchOn;
-  try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); torchBtn.textContent = torchOn ? "🔦 إطفاء الفلاش" : "🔦 فلاش"; }
-  catch { torchOn = false; }
+  try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); setTorchUi(torchOn); }
+  catch { torchOn = false; setTorchUi(false); }
 });
 
 async function camStart() {
@@ -367,7 +374,7 @@ async function camStart() {
   try { det = await makeDetector(); }
   catch (e) { camStop(); camMsg.textContent = "تعذّر تحميل قارئ الباركود (" + e.message + "). تأكد من الإنترنت وجرّب تاني، أو استخدم السكانر أو ابحث بصورة المنتج."; return; }
   if (gen !== camGen) return;
-  camOn = true; camBtn.disabled = false; camBtn.textContent = "إيقاف الكاميرا";
+  camOn = true; camBtn.disabled = false; camBtn.hidden = true; // مفيش زر إيقاف الكاميرا (بتقفل بـ«إيقاف وضع المسح» أو بعد التقاط الباركود)
   if (window.ImageCapture && track) { tools.hidden = false; } // الزرار بيظهر بس لو المتصفح بيدعم التقاط صورة ثابتة
   camMsg.textContent = "ابعد العلبة لحد ما الباركود يبقى كله جوه الإطار وهيتلقط لوحده. لو الإضاءة ضعيفة استخدم الفلاش.";
 
