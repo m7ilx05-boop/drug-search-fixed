@@ -189,6 +189,17 @@ function imageActions(p) {
 }
 
 // tier: 1 = معتمد من المصنع، 2 = من الصيدليات، 3 = غير مؤكد، undefined = من غير تصنيف
+// "25mg" -> one ingredient; "5/12.5mg" -> paired in order (shared trailing unit); anything else -> null (shown as a general line).
+function pairStrengths(n, str) {
+  const s = String(str || "").trim();
+  if (!s || !n) return null;
+  if (n === 1) return [s];
+  const parts = s.split("/").map((x) => x.trim());
+  if (parts.length !== n || parts.some((x) => !x)) return null;
+  const unit = (parts[parts.length - 1].match(/[^\d.\s].*$/) || [""])[0];
+  return parts.map((x) => (/[^\d.\s]/.test(x) ? x : x + unit));
+}
+
 function card(p, tier) {
   const c = el("article", "card" + (tier === 1 ? " official" : tier === 2 ? " pharm" : ""));
   c.append(picBlock(p));
@@ -210,12 +221,16 @@ function card(p, tier) {
     c.append(ul);
   } else if (p.scientific_name) {
     const ul = el("ul", "ing");
-    String(p.scientific_name).split("+").map((s) => s.trim()).filter(Boolean).forEach((n) => {
+    const names = String(p.scientific_name).split("+").map((s) => s.trim()).filter(Boolean);
+    const per = pairStrengths(names.length, p.strength);
+    names.forEach((n, i) => {
       const li = el("li"); li.dir = "auto"; li.dataset.ing = n;
       li.append(el("span", null, n));
+      if (per && per[i]) li.append(el("span", null, per[i]));
       ul.append(li);
     });
     c.append(ul);
+    if (!per && p.strength) c.append(el("div", "meta", "التركيز: " + p.strength));
   } else c.append(el("div", "meta", "المواد الفعّالة غير مسجّلة بعد."));
 
   const chips = el("div", "chips");
