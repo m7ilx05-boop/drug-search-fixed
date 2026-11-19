@@ -134,7 +134,7 @@ const refocus = () => { if (active && document.activeElement !== inp) inp.focus(
 // كل قراءة بتتراجع (رقم المراجعة) وبتتكرر قبل ما تتقبل. "صورة بدقة عالية" بتفتح تطبيق كاميرا الجوال لصورة واحدة.
 const WANT = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "itf", "qr_code", "data_matrix"];
 const ZX_URLS = ["vendor/zxing-0.21.3.min.js", "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"]; // نسخة على موقعنا الأول، وبعدها CDN
-let zxPromise = null, stream = null, track = null, camOn = false, camGen = 0, torchOn = false;
+let zxPromise = null, stream = null, track = null, camOn = false, camGen = 0, torchOn = false, afTimer = 0, lotAnim = null, lotPromise = null;
 let hiBusy = false, hiAt = 0, finishedGen = -1;
 const MIN_ZOOM = 4; // أقل زوم مفروض على الكاميرا: بيجبر المستخدم يبعد العلبة عشان الكاميرا تعرف تركّز وتصوّر الباركود. غيّر الرقم من هنا بس
 
@@ -143,12 +143,11 @@ const tools = el("div", "cam-tools"); tools.hidden = true;
 const torchBtn = el("button", null, "🔦 فلاش"); torchBtn.type = "button"; torchBtn.hidden = true;
 const zoomIn = el("input"); zoomIn.type = "range"; zoomIn.hidden = true; zoomIn.setAttribute("aria-label", "زوم الكاميرا");
 const zoomLbl = el("span", "meta", "");
-const focusBtn = el("button", null, "🎯 ركّز"); focusBtn.type = "button"; focusBtn.hidden = true; // بيعيد ضبط التركيز لو الصورة مش واضحة
 const camInfo = el("div", "meta cam-info"); camInfo.hidden = true; camInfo.dir = "ltr"; // الأرقام الحقيقية اللي الكاميرا شغّالة بيها
 const shotBtn = el("button", null, "📸 التقاط بدقة كاملة"); shotBtn.type = "button"; shotBtn.hidden = true; // صورة ثابتة بدقة الكاميرا (ImageCapture) والباركود بيتقرا منها
 const autoHiL = el("label", "scan-opt"), autoHiChk = el("input"); autoHiChk.type = "checkbox"; autoHiChk.checked = true; autoHiL.hidden = !window.ImageCapture;
 autoHiL.append(autoHiChk, "تصوير تلقائي بدقة كاملة أول ما الكاميرا تلمح الباركود");
-tools.append(shotBtn, torchBtn, focusBtn, zoomIn, zoomLbl, autoHiL);
+tools.append(shotBtn, torchBtn, zoomIn, zoomLbl, autoHiL);
 camMsg.after(tools); tools.after(camInfo);
 // بيعرض الدقة والتركيز والزوم الفعليين (من الجهاز نفسه) بدل التخمين
 async function showCamInfo() {
@@ -238,31 +237,81 @@ function visibleROI() {
   return [(1 - fw) / 2 + fw * m, (1 - fh) / 2 + fh * m, fw * (1 - 2 * m), fh * (1 - 2 * m)];
 }
 
+// ===== أنيميشن المسح (Lottie) =====
+// شبكة نقط وخطوط بيعدّي عليها شعاع أزرق ومعاه ذيل متدرّج. المكتبة بتتحمّل من CDN أول مرة، ولو فشلت الشعاع القديم بيفضل شغال.
+const LOT_URLS = ["https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_light.min.js", "https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie_light.min.js"];
+const lotBox = el("div", "lot"); cam.querySelector(".frame").append(lotBox);
+const loadLottie = () => lotPromise || (lotPromise = new Promise((res, rej) => {
+  const get = () => window.lottie || window.bodymovin;
+  if (get()) return res(get());
+  const tryLoad = (i) => {
+    if (i >= LOT_URLS.length) { lotPromise = null; return rej(new Error("lottie_load_failed")); }
+    const s = document.createElement("script");
+    s.src = LOT_URLS[i];
+    s.onload = () => (get() ? res(get()) : tryLoad(i + 1));
+    s.onerror = () => { s.remove(); tryLoad(i + 1); };
+    document.head.append(s);
+  };
+  tryLoad(0);
+}));
+function scanAnimData() {
+  const N = (k) => ({ a: 0, k });
+  const tr = (p, s) => ({ ty: "tr", p: N(p), a: N([0, 0]), s: N(s || [100, 100]), r: N(0), o: N(100), sk: N(0), sa: N(0) });
+  const lay = (ind, p, r, shapes, x) => Object.assign({ ddd: 0, ind, ty: 4, sr: 1, ks: { o: N(100), r: N(r), p, a: N([0, 0, 0]), s: N([100, 100, 100]) }, ao: 0, shapes, ip: 0, op: 60, st: 0, bm: 0 }, x || {});
+  const DOTS = [[3.97,62.27,-8.44],[1.32,37.08,-2.18],[3.89,-59.76,-20.98],[2.63,-48.64,6.81],[1.11,-5.83,23.48],[4.26,117.73,79.99],[2.42,115.3,61.64],[5.14,87.11,65.27],[1.53,40.98,73.7],[1.24,-25.47,76.2],[2.37,-74.92,76.01],[2.56,-97.17,54.13],[2.69,-61.12,53.44],[2.43,-22.6,56.72],[3.12,12.22,52.9],[3.08,64.48,42.27],[3.15,116.43,26.39],[1.39,98.11,24.37],[4.02,75.18,14.32],[2.2,45.86,28.19],[3.26,-33.18,23.79],[2.33,-79.48,15.37],[3.31,-104.76,4.88],[1.18,-75.13,-14.38],[3.32,-2.46,-28.84],[1.7,-37.74,-12.6],[2.3,28.1,-13.81],[2.1,98.85,-17.32],[3.43,49.88,-28.79],[3.88,-86.67,-49.4],[3.25,-34.7,-42.89],[4.12,68.79,-50.04],[2.48,120.64,-60.33],[2.14,67.8,-82.09],[2.66,24.11,-73.5],[2.56,-41.86,-73.93],[3.15,-79.45,-76.66],[3.06,-119.28,-70.26]];
+  const dots = DOTS.map((d) => ({ ty: "gr", it: [{ ty: "el", d: 1, s: N([d[0], d[0]]), p: N([0, 0]) }, { ty: "fl", c: N([0.377, 0.377, 0.923, 1]), o: N(100), r: 1 }, tr([d[1], d[2]])] }));
+  const line = (c) => [{ ty: "gr", it: [{ ind: 0, ty: "sh", ks: N({ i: [[0, 0], [0, 0]], o: [[0, 0], [0, 0]], v: [[-163.5, -68], [164.5, -68]], c: false }) }, { ty: "st", c: N([0.84, 0.84, 0.84, 1]), o: N(100), w: N(0.1), lc: 1, lj: 1, ml: 4 }, tr([0, 0])] }, { ty: "rp", c: N(c), o: N(0), m: 1, tr: { ty: "tr", p: N([0, 6]), a: N([0, 0]), s: N([100, 100]), r: N(0), so: N(100), eo: N(100) } }];
+  const X3 = [0.667, 0.667, 0.667], O3 = [0.333, 0.333, 0.333];
+  const kf = (t, s, iy, oy) => ({ i: { x: X3, y: iy || [1, 1, 1] }, o: { x: O3, y: oy || [0, 0, 0] }, t, s });
+  const sc = [kf(0, [-100, 0, 100], [1, 1.062, 1]), kf(10, [-100, -150, 100], null, [0, 9.259, 0]), kf(20, [-100, -150, 100]), kf(30, [-100, 0, 100], [1, 0.938, 1]), kf(40, [-100, 150, 100], null, [0, 9.259, 0]), kf(50, [-100, 150, 100]), { t: 60, s: [-100, 0, 100] }];
+  const bp = [{ i: { x: 0.333, y: 1 }, o: { x: 0.333, y: 0 }, t: 0, s: [164, 0, 0], to: [0, 34.667, 0], ti: [0, 0, 0] }, { i: { x: 0.333, y: 1 }, o: { x: 0.333, y: 0 }, t: 30, s: [164, 208, 0], to: [0, 0, 0], ti: [0, 34.667, 0] }, { t: 60, s: [164, 0, 0] }];
+  const comp = [lay(1, N([164, 104, 0]), 0, dots), lay(2, N([163.258, 63.649, 0]), 0, line(39)), lay(3, N([267.826, 71.985, 0]), 90, line(88))];
+  const bar = lay(1, { a: 1, k: bp }, 0, [{ ty: "gr", it: [{ ty: "rc", d: 1, s: N([328, 2]), p: N([0, 0]), r: N(0) }, { ty: "fl", c: N([0.4, 0.4, 1, 1]), o: N(100), r: 1 }, tr([-0.059, -10.747], [100, 111.34])] }]);
+  bar.ks.a = N([-0.059, -10.747, 0]);
+  const pre = { ddd: 0, ind: 2, ty: 0, td: 1, refId: "comp_0", sr: 1, ks: { o: N(100), r: N(0), p: N([164, 104, 0]), a: N([164, 104, 0]), s: N([100, 100, 100]) }, ao: 0, w: 328, h: 208, ip: 0, op: 60, st: 0, bm: 0 };
+  const trail = lay(3, N([-0.059, -10.747, 0]), 0, [{ ty: "gr", it: [{ ty: "rc", d: 1, s: N([328, 60]), p: N([0, 0]), r: N(0) }, { ty: "gf", o: N(100), r: 1, bm: 0, g: { p: 3, k: N([0, 0.1408, 0.1408, 0.8992, 0.504, 0.1408, 0.1408, 0.8992, 1, 0.1408, 0.1408, 0.8992, 0, 1, 0.5, 0.5, 1, 0]) }, s: N([0, -30]), e: N([0, 30]), t: 1 }, tr([-0.059, -10.747], [100, 111.34])] }], { parent: 1, tt: 1 });
+  trail.ks.a = N([0, -43.747, 0]); trail.ks.s = { a: 1, k: sc };
+  return { v: "5.5.7", fr: 29.97, ip: 0, op: 60, w: 328, h: 208, ddd: 0, assets: [{ id: "comp_0", layers: comp }], layers: [bar, pre, trail] };
+}
+function startScanAnim() {
+  const go = (L) => {
+    if (!lotAnim) lotAnim = L.loadAnimation({ container: lotBox, renderer: "svg", loop: true, autoplay: false, animationData: scanAnimData(), rendererSettings: { preserveAspectRatio: "none" } });
+    lotAnim.play(); cam.classList.add("lot-on");
+  };
+  loadLottie().then(go).catch(() => { /* المكتبة ما اتحمّلتش: الشعاع القديم يكمّل */ });
+}
+function stopScanAnim() { if (lotAnim) lotAnim.pause(); cam.classList.remove("lot-on"); }
+
 function camStop() {
-  camGen++; camOn = false;
+  camGen++; camOn = false; stopScanAnim(); clearInterval(afTimer); afTimer = 0;
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; track = null; torchOn = false; video.srcObject = null;
-  tools.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; focusBtn.hidden = true; camInfo.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
+  tools.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; camInfo.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
   cam.classList.remove("on", "ok", "seen", "snap"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
 }
 
 zoomIn.addEventListener("input", () => {
   if (!track) return;
   const z = Math.max(Number(zoomIn.value), Number(zoomIn.min)); zoomLbl.textContent = "×" + z.toFixed(1);
-  track.applyConstraints({ advanced: [{ zoom: z }] }).then(showCamInfo).catch(() => {});
+  track.applyConstraints({ advanced: [{ zoom: z }] }).then(() => { showCamInfo(); autoFocus(); }).catch(() => {});
 });
-focusBtn.addEventListener("click", async () => {
-  if (!track) return;
-  const caps = track.getCapabilities ? track.getCapabilities() : {}, modes = caps.focusMode || [];
+// تركيز تلقائي: مفيش زرار. التركيز المستمر بيتفعّل أول ما الكاميرا تشتغل وبيتعاد بعد أي تغيير في الزوم.
+// لو الجهاز مش بيدعم التركيز المستمر بنعمل تركيز لقطة واحدة كل ثانيتين تلقائياً.
+async function autoFocus() {
+  if (!track || !track.getCapabilities) return;
+  const modes = track.getCapabilities().focusMode || [];
   try {
-    if (modes.includes("single-shot")) await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
-    else if (modes.includes("manual")) await track.applyConstraints({ advanced: [{ focusMode: "manual" }] });
-    await new Promise((r) => setTimeout(r, 400));
     if (modes.includes("continuous")) await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
-    camMsg.textContent = "اتعاد ضبط التركيز. ثبّت الجوال ثانية.";
-  } catch { camMsg.textContent = "الجهاز مش بيسمح بالتحكم في التركيز من المتصفح."; }
-  showCamInfo();
-});
+    else if (modes.includes("single-shot")) await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
+  } catch { /* الجهاز مش بيسمح بالتحكم في التركيز من المتصفح */ }
+}
+function startAutoFocus(caps) {
+  clearInterval(afTimer); afTimer = 0;
+  const modes = (caps && caps.focusMode) || [];
+  if (!modes.length) return;
+  autoFocus();
+  if (!modes.includes("continuous") && modes.includes("single-shot")) afTimer = setInterval(() => { if (camOn) autoFocus(); }, 2000);
+}
 torchBtn.addEventListener("click", async () => {
   if (!track) return;
   torchOn = !torchOn;
@@ -285,7 +334,7 @@ async function camStart() {
   }
   if (gen !== camGen) { stream.getTracks().forEach((t) => t.stop()); stream = null; return; }
   video.srcObject = stream;
-  cam.classList.add("on"); cam.classList.remove("ok"); camMsg.textContent = "الكاميرا اشتغلت. جاري تجهيز قارئ الباركود…";
+  cam.classList.add("on"); cam.classList.remove("ok"); startScanAnim(); camMsg.textContent = "الكاميرا اشتغلت. جاري تجهيز قارئ الباركود…";
   try { await video.play(); } catch { /* autoplay هيشتغل أول ما الفريم يجهز */ }
 
   // تركيز مستمر + زوم + فلاش (لو الجهاز بيدعمهم)
@@ -301,7 +350,7 @@ async function camStart() {
     try { await track.applyConstraints({ advanced: [{ zoom: z0 }] }); zoomLbl.textContent = "×" + z0.toFixed(1); zoomIn.hidden = false; tools.hidden = false; } catch { /* مش مدعوم */ }
   }
   if (caps.torch) { torchBtn.hidden = false; tools.hidden = false; }
-  if (caps.focusMode && caps.focusMode.length) { focusBtn.hidden = false; tools.hidden = false; }
+  startAutoFocus(caps);
   setTimeout(showCamInfo, 600); // بعد ما الفيديو يستقر
 
   let det;
