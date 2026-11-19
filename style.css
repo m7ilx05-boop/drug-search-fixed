@@ -56,12 +56,12 @@ button:disabled{opacity:.55;cursor:wait}
 .recent .rc-clear::before{content:"";width:17px;height:17px;background:var(--accent);-webkit-mask:var(--ic-trash) center/contain no-repeat;mask:var(--ic-trash) center/contain no-repeat}
 
 /* اقتراحات سريعة: زرّين مستطيلين جنب بعض (الباركود | بحث بصورة). الأزرار بيضيفها JS جوه .qs */
-.qs{position:relative;display:flex;gap:10px;margin-top:16px;padding:0;background:none;border:0;border-radius:0}
-.qs-h{display:none}
-form .qs .scan-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;flex:1 1 0;min-width:0;width:auto;height:68px;min-height:68px;margin:0;padding:0 8px;font-size:13.5px;font-weight:500;line-height:1.2;text-align:center;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 8px rgba(20,90,160,.08)}
-form .qs .scan-btn::before{content:"";flex:none;width:26px;height:26px;background:var(--accent);-webkit-mask:var(--ic-barcode) center/contain no-repeat;mask:var(--ic-barcode) center/contain no-repeat}
-form .qs .scan-btn.img-pick::before{-webkit-mask-image:var(--ic-camera);mask-image:var(--ic-camera)}
-form .qs .scan-btn::after{display:none}
+.qs{position:relative;display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;padding:14px;background:var(--surface);border-radius:26px;box-shadow:var(--shadow)}
+.qs-h{flex:0 0 100%;margin:0 2px 2px;color:var(--muted);font-size:13.5px;font-weight:600}
+.qs .scan-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;flex:1 1 0;min-width:0;width:auto;height:68px;min-height:68px;margin:0;padding:0 8px;font-size:13.5px;font-weight:500;line-height:1.2;text-align:center;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 8px rgba(20,90,160,.08)}
+.qs .scan-btn::before{content:"";flex:none;width:26px;height:26px;background:var(--accent);-webkit-mask:var(--ic-barcode) center/contain no-repeat;mask:var(--ic-barcode) center/contain no-repeat}
+.qs .scan-btn.img-pick::before{-webkit-mask-image:var(--ic-camera);mask-image:var(--ic-camera)}
+.qs .scan-btn::after{display:none}
 .img-menu{position:absolute;z-index:30;inset-inline:0;top:calc(100% + 8px);padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
 .img-menu[hidden]{display:none}
 .img-opt{display:flex;width:100%;align-items:center;justify-content:flex-start;gap:12px;background:none;color:var(--ink);border:0;border-radius:12px;padding:0 12px;min-height:48px;font-size:15.5px;font-weight:500;text-align:start}
