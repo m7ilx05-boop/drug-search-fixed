@@ -130,11 +130,11 @@
   var f = document.getElementById("f"), bs = f && f.querySelectorAll(".scan-btn");
   if (!bs || !bs.length) return;
   var box = document.createElement("div"); box.className = "qs";
-  var h = document.createElement("div"); h.className = "qs-h"; h.textContent = "اقتراحات سريعة";
+  var h = document.createElement("div"); h.className = "qs-h"; h.textContent = "المسح الضوئي والبحث بصورة";
   box.appendChild(h);
   Array.prototype.forEach.call(bs, function (b) { var t = (b.textContent || "").trim(); b.setAttribute("aria-label", t); b.title = t; box.appendChild(b); }); // أيقونات بس: الاسم للقارئ والـ tooltip
   var m = f.querySelector(".img-menu"); if (m) box.appendChild(m);
-  f.appendChild(box);
+  f.parentNode.insertBefore(box, f.nextSibling); // صندوق منفصل تحت مربع البحث
 })();
 </script>
 <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});</script>
