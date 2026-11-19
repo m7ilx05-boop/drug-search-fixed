@@ -129,17 +129,20 @@ const hideIds = ["f", "out", "more", "status", "imgbox", "fam"];
 const setState = () => { const ok = document.activeElement === inp; state.textContent = ok ? "جاهز للمسح" : "التركيز مفقود — اضغط في أي مكان"; state.className = "scan-state" + (ok ? "" : " lost"); };
 const refocus = () => { if (active && document.activeElement !== inp) inp.focus({ preventScroll: true }); setState(); };
 
-// ===== مسح بالكاميرا (باركود خطي + QR + DataMatrix) =====
+// ===== مسح بالكاميرا جوه البرنامج (باركود خطي + QR + DataMatrix) =====
+// الكاميرا بتفتح جوه الصفحة نفسها، ومربع بيتتبع الباركود وبيقفل عليه (أصفر = بيقرا، أخضر = اتلقط، أحمر = رقم غلط).
 // القراءة جوه المتصفح: BarcodeDetector لو بيدعم الأنواع المطلوبة، وإلا مكتبة ZXing (نسخة على موقعنا). الفيديو ما بيتبعتش لأي سيرفر.
-// v2: دقة أعلى (1080p) + تركيز مستمر + زوم وفلاش، وكل قراءة بتتراجع (رقم المراجعة) وبتتكرر مرتين ورا بعض قبل ما تتقبل،
-//     فالرقم الغلط ما بيعدّيش. قراءة الصور الثابتة بتجرّب أكتر من مقياس وقصّ للمنتصف.
+// دقة 1080p + تركيز مستمر + زوم وفلاش. وكل قراءة بتتراجع (رقم المراجعة) وبتتكرر مرتين ورا بعض قبل ما تتقبل، فالرقم الغلط ما بيعدّيش.
+// بنقرا بس الجزء اللي ظاهر قدامك على الشاشة، بدقته الكاملة.
 const WANT = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "itf", "qr_code", "data_matrix"];
 const ZX_URLS = ["vendor/zxing-0.21.3.min.js", "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"]; // نسخة على موقعنا الأول، وبعدها CDN
-const LIVE_ROI = [0.05, 0.15, 0.9, 0.7]; // الجزء اللي بنقراه من الفريم (نسب: x, y, عرض, ارتفاع) بدقته الكاملة
 let zxPromise = null, stream = null, track = null, camOn = false, camGen = 0, torchOn = false;
 
+camBtn.textContent = "📷 افتح الكاميرا"; phoneBtn.textContent = "🖼️ صورة بدقة عالية"; // الزر التاني بيفتح تطبيق الكاميرا الأصلي لصورة واحدة (للباركود الصغير جداً)
 const css2 = document.createElement("style");
-css2.textContent = ".cam-tools{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}.cam-tools input[type=range]{flex:1;min-width:120px}";
+css2.textContent = ".cam-tools{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}.cam-tools input[type=range]{flex:1;min-width:120px}"
+  + ".cam canvas.trk{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.cam.live .frame{display:none}"
+  + "@media (pointer:coarse){.cam{aspect-ratio:3/4}}";
 document.head.append(css2);
 const tools = el("div", "cam-tools"); tools.hidden = true;
 const torchBtn = el("button", null, "🔦 فلاش"); torchBtn.type = "button"; torchBtn.hidden = true;
@@ -161,25 +164,53 @@ const loadZx = () => zxPromise || (zxPromise = new Promise((res, rej) => {
   tryLoad(0);
 }));
 
-// بنرسم الجزء المطلوب من الفريم (أو الصورة) على canvas بدقته الكاملة (من غير تصغير زيادة) قبل القراءة: التصغير هو اللي بيضيّع الباركود الصغير
+// بنرسم الجزء المطلوب من الفريم (أو الصورة) على canvas بدقته الكاملة قبل القراءة: التصغير هو اللي بيضيّع الباركود الصغير
 const cvs = document.createElement("canvas"), cctx = cvs.getContext("2d", { willReadFrequently: true });
+let lastROI = { x: 0, y: 0, k: 1 };
 function drawROI(src, roi, maxW) {
   const sw = src.videoWidth || src.width, sh = src.videoHeight || src.height, r = roi || [0, 0, 1, 1];
   const x = Math.round(sw * r[0]), y = Math.round(sh * r[1]), w = Math.max(1, Math.round(sw * r[2])), h = Math.max(1, Math.round(sh * r[3]));
   const k = Math.min(1, maxW / w);
   cvs.width = Math.max(1, Math.round(w * k)); cvs.height = Math.max(1, Math.round(h * k));
   cctx.drawImage(src, x, y, w, h, 0, 0, cvs.width, cvs.height);
+  lastROI = { x, y, k }; // عشان نرجّع إحداثيات الكود لمكانه في الفريم الأصلي
   return cvs;
 }
+// أربع نقط للمربع من نقط القراءة (الباركود الخطي بيرجّع نقطتين بس: بنرسم حواليهم مستطيل)
+function quadFrom(pts) {
+  if (!pts || pts.length < 2) return null;
+  if (pts.length >= 3) {
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const px = (x1 - x0) * 0.12 + 6, py = (y1 - y0) * 0.12 + 6;
+    return [[x0 - px, y0 - py], [x1 + px, y0 - py], [x1 + px, y1 + py], [x0 - px, y1 + py]];
+  }
+  const a = pts[0], b = pts[1], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len, h = len * 0.18 + 6;
+  return [[a[0] + nx * h, a[1] + ny * h], [b[0] + nx * h, b[1] + ny * h], [b[0] - nx * h, b[1] - ny * h], [a[0] - nx * h, a[1] - ny * h]];
+}
 
-// read(src, { roi, maxW }) بترجّع مصفوفة نصوص (ممكن أكتر من كود في الفريم، زي EAN و DataMatrix على نفس العلبة)
+// read(src, { roi, maxW }) بترجّع [{ text, pts }] (ممكن أكتر من كود في الفريم، زي EAN و DataMatrix على نفس العلبة)
 async function makeDetector() {
   if ("BarcodeDetector" in window) {
     try {
       const sup = await window.BarcodeDetector.getSupportedFormats();
       if (["ean_13", "qr_code", "data_matrix"].every((f) => sup.includes(f))) {
         const d = new window.BarcodeDetector({ formats: WANT.filter((f) => sup.includes(f)) });
-        return { native: true, read: async (src, o = {}) => { const s = (o.roi || o.maxW) ? drawROI(src, o.roi, o.maxW || 2400) : src; const a = await d.detect(s); return a.map((r) => r.rawValue).filter(Boolean); } };
+        return {
+          native: true,
+          read: async (src, o = {}) => {
+            const used = !!(o.roi || o.maxW), s = used ? drawROI(src, o.roi, o.maxW || 2400) : src;
+            const t = used ? lastROI : { x: 0, y: 0, k: 1 };
+            const a = await d.detect(s);
+            return a.filter((r) => r.rawValue).map((r) => {
+              const bb = r.boundingBox;
+              const cp = r.cornerPoints && r.cornerPoints.length === 4 ? r.cornerPoints.map((p) => [p.x, p.y])
+                : bb ? [[bb.x, bb.y], [bb.x + bb.width, bb.y], [bb.x + bb.width, bb.y + bb.height], [bb.x, bb.y + bb.height]] : [];
+              return { text: r.rawValue, pts: cp.map((p) => [t.x + p[0] / t.k, t.y + p[1] / t.k]) };
+            });
+          },
+        };
       }
     } catch { /* نكمّل بـ ZXing */ }
   }
@@ -191,19 +222,56 @@ async function makeDetector() {
   return {
     native: false,
     read: async (src, o = {}) => {
-      const c = drawROI(src, o.roi, o.maxW || 1400);
-      try { return [mfr.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(c)))).getText()]; }
-      catch { return []; } // مفيش كود في الفريم ده
+      const c = drawROI(src, o.roi, o.maxW || 1400), t = lastROI;
+      try {
+        const res = mfr.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(c))));
+        const rp = res.getResultPoints ? res.getResultPoints() : [];
+        return [{ text: res.getText(), pts: rp.map((p) => [t.x + p.getX() / t.k, t.y + p.getY() / t.k]) }];
+      } catch { return []; } // مفيش كود في الفريم ده
     },
   };
 }
 
+// ===== المربع اللي بيتتبع الباركود =====
+const trk = document.createElement("canvas"); trk.className = "trk"; cam.append(trk);
+const tctx = trk.getContext("2d");
+const COL = { ok: "#22c55e", warn: "#facc15", bad: "#ef4444" };
+let tgt = null, cur = null, tcol = "warn", tgtAt = 0, raf = 0;
+const setTarget = (pts, c) => { const q = quadFrom(pts); if (!q) return; tgt = q; tcol = c; tgtAt = performance.now(); };
+function mapPt(p) { // من إحداثيات الفيديو لإحداثيات الشاشة (الفيديو object-fit: cover)
+  const vw = video.videoWidth || 1, vh = video.videoHeight || 1, cw = trk.clientWidth, ch = trk.clientHeight;
+  const s = Math.max(cw / vw, ch / vh);
+  return [(cw - vw * s) / 2 + p[0] * s, (ch - vh * s) / 2 + p[1] * s];
+}
+function paint() {
+  raf = requestAnimationFrame(paint);
+  const dpr = window.devicePixelRatio || 1, cw = trk.clientWidth, ch = trk.clientHeight;
+  if (trk.width !== Math.round(cw * dpr) || trk.height !== Math.round(ch * dpr)) { trk.width = Math.round(cw * dpr); trk.height = Math.round(ch * dpr); }
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0); tctx.clearRect(0, 0, cw, ch);
+  if (!tgt || performance.now() - tgtAt > 500) { cur = null; return; } // الكود اختفى: المربع يختفي
+  const goal = tgt.map(mapPt);
+  cur = cur ? cur.map((p, i) => [p[0] + (goal[i][0] - p[0]) * 0.4, p[1] + (goal[i][1] - p[1]) * 0.4]) : goal; // حركة ناعمة ورا الكود
+  const col = COL[tcol] || COL.warn;
+  tctx.beginPath(); cur.forEach((p, i) => (i ? tctx.lineTo(p[0], p[1]) : tctx.moveTo(p[0], p[1]))); tctx.closePath();
+  tctx.fillStyle = col + "33"; tctx.fill();
+  tctx.lineWidth = 4; tctx.lineJoin = "round"; tctx.strokeStyle = col; tctx.stroke();
+  if (tcol === "ok") { tctx.font = "bold 20px sans-serif"; tctx.fillStyle = col; tctx.fillText("✓", Math.min(...cur.map((p) => p[0])) + 4, Math.min(...cur.map((p) => p[1])) - 6); }
+}
+// الجزء اللي ظاهر فعلاً على الشاشة من الفريم (نسب)، عشان نقرا اللي بتشوفه بس
+function visibleROI() {
+  const vw = video.videoWidth, vh = video.videoHeight, cw = cam.clientWidth, ch = cam.clientHeight;
+  if (!vw || !vh || !cw || !ch) return [0.05, 0.1, 0.9, 0.8];
+  const s = Math.max(cw / vw, ch / vh), fw = Math.min(1, cw / (vw * s)), fh = Math.min(1, ch / (vh * s)), m = 0.03;
+  return [(1 - fw) / 2 + fw * m, (1 - fh) / 2 + fh * m, fw * (1 - 2 * m), fh * (1 - 2 * m)];
+}
+
 function camStop() {
   camGen++; camOn = false;
+  cancelAnimationFrame(raf); tgt = null; cur = null; tctx.clearRect(0, 0, trk.width, trk.height);
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; track = null; torchOn = false; video.srcObject = null;
   tools.hidden = true; torchBtn.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
-  cam.classList.remove("on"); camBtn.disabled = false; camBtn.textContent = "تشغيل الكاميرا";
+  cam.classList.remove("on", "live"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
 }
 
 zoomIn.addEventListener("input", () => {
@@ -233,7 +301,7 @@ async function camStart() {
   }
   if (gen !== camGen) { stream.getTracks().forEach((t) => t.stop()); stream = null; return; }
   video.srcObject = stream;
-  cam.classList.add("on"); camMsg.textContent = "الكاميرا اشتغلت. جاري تجهيز قارئ الباركود…";
+  cam.classList.add("on", "live"); camMsg.textContent = "الكاميرا اشتغلت. جاري تجهيز قارئ الباركود…";
   try { await video.play(); } catch { /* autoplay هيشتغل أول ما الفريم يجهز */ }
 
   // تركيز مستمر + زوم + فلاش (لو الجهاز بيدعمهم)
@@ -255,36 +323,39 @@ async function camStart() {
   catch (e) { camStop(); camMsg.textContent = "تعذّر تحميل قارئ الباركود (" + e.message + "). تأكد من الإنترنت وجرّب تاني، أو استخدم السكانر أو ابحث بصورة المنتج."; return; }
   if (gen !== camGen) return;
   camOn = true; camBtn.disabled = false; camBtn.textContent = "إيقاف الكاميرا";
-  const hint = "وجّه الباركود ناحية الإطار على بعد 15–25 سم وثبّت الموبايل. لو الباركود صغير استخدم الزوم والفلاش.";
-  camMsg.textContent = hint;
+  camMsg.textContent = "وجّه الكاميرا ناحية الباركود وهيتلقط لوحده، والمربع بيتتبعه. لو صغير استخدم الزوم والفلاش.";
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(paint);
 
-  let votes = null, bad = 0;
-  const schedule = () => { if (gen !== camGen) return; if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => tick()); else setTimeout(tick, 120); };
+  let votes = null, bad = 0, done = false;
+  const schedule = () => { if (gen !== camGen || done) return; if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => tick()); else setTimeout(tick, 100); };
   const tick = async () => {
-    if (gen !== camGen) return;
+    if (gen !== camGen || done) return;
     if (video.readyState >= 2 && video.videoWidth) {
-      let texts = [];
-      try { texts = await det.read(video, { roi: LIVE_ROI, maxW: det.native ? 2400 : 1400 }); } catch { /* نكمّل */ }
-      if (gen !== camGen) return;
+      let dets = [];
+      try { dets = await det.read(video, { roi: visibleROI(), maxW: det.native ? 2400 : 1400 }); } catch { /* نكمّل */ }
+      if (gen !== camGen || done) return;
       // أول كود منتج صالح (رقم المراجعة سليم) هو المرشح. الأرقام الغلط بتتجاهل والكاميرا بتفضل شغالة
-      let cand = null;
-      for (const raw of texts) {
-        const p = parseScan(raw);
+      let cand = null, seen = null;
+      for (const d of dets) {
+        const p = parseScan(d.text);
         if (p.kind === "empty") continue;
-        if (p.gtins) { cand = { raw, need: 2 }; break; }
-        if ((p.kind === "gtin" || p.kind === "gs1") && p.error) { bad++; continue; }
-        if (!cand) cand = { raw, need: 3 }; // QR/نص مش رقم منتج: بنطلب تكرار أكتر قبل ما نوقف
+        if (p.gtins) { cand = { raw: d.text, need: 2, d }; break; }
+        if ((p.kind === "gtin" || p.kind === "gs1") && p.error) { bad++; if (!seen) seen = d; continue; }
+        if (!cand) cand = { raw: d.text, need: 3, d }; // QR/نص مش رقم منتج: بنطلب تكرار أكتر قبل ما نوقف
       }
       if (cand) {
         const key = AR(String(cand.raw)).trim(), now = Date.now();
         const n = votes && votes.key === key && now - votes.t < 1800 ? votes.n + 1 : 1;
         votes = { key, n, t: now };
         if (n >= cand.need) {
+          done = true; setTarget(cand.d.pts, "ok"); // المربع يبقى أخضر لحظة قبل ما نقفل
           try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ }
-          camStop(); camMsg.textContent = "تم التقاط الباركود وقفلنا الكاميرا. اضغط «تشغيل الكاميرا» لمسح تاني.";
-          submit(cand.raw); return;
+          camMsg.textContent = "تم التقاط الباركود ✓";
+          setTimeout(() => { if (gen !== camGen) return; camStop(); camMsg.textContent = "تم التقاط الباركود وقفلنا الكاميرا. اضغط «📷 افتح الكاميرا» لمسح تاني."; submit(cand.raw); }, 450);
+          return;
         }
-      }
+        setTarget(cand.d.pts, "warn");
+      } else if (seen) setTarget(seen.pts, "bad"); // اتقرا رقم غلط: مربع أحمر والكاميرا مكمّلة
       if (bad >= 4) { camMsg.textContent = "بنقرا أرقام غير صحيحة ونتجاهلها. قرّب شوية، ثبّت الموبايل أو شغّل الفلاش."; bad = 0; }
     }
     schedule();
@@ -298,18 +369,18 @@ async function readStill(bmp, det) {
   const tries = [{ maxW: 1800 }, { maxW: 3000 }, { roi: [0.1, 0.2, 0.8, 0.6], maxW: 3000 }, { roi: [0, 0.3, 1, 0.4], maxW: 3000 }];
   let weak = null, invalid = false;
   for (const o of tries) {
-    let texts = [];
-    try { texts = await det.read(bmp, o); } catch { /* نجرّب اللي بعده */ }
-    for (const raw of texts) {
-      const p = parseScan(raw);
-      if (p.gtins) return { raw };
+    let dets = [];
+    try { dets = await det.read(bmp, o); } catch { /* نجرّب اللي بعده */ }
+    for (const d of dets) {
+      const p = parseScan(d.text);
+      if (p.gtins) return { raw: d.text };
       if ((p.kind === "gtin" || p.kind === "gs1") && p.error) { invalid = true; continue; }
-      if (!weak && p.kind !== "empty") weak = raw;
+      if (!weak && p.kind !== "empty") weak = d.text;
     }
   }
   return weak ? { raw: weak } : { raw: null, invalid };
 }
-// كاميرا الجوال: بيفتح تطبيق الكاميرا الأصلي (دقة أعلى بكتير من الكاميرا المباشرة)، وبعد التصوير بنقرا الباركود من الصورة جوه المتصفح (الصورة مبتتبعتش لأي سيرفر)
+// صورة بدقة عالية: بيفتح تطبيق الكاميرا الأصلي (للباركود الصغير جداً)، وبعد التصوير بنقرا الباركود من الصورة جوه المتصفح (الصورة مبتتبعتش لأي سيرفر)
 phoneBtn.addEventListener("click", () => { phoneIn.value = ""; phoneIn.click(); });
 phoneIn.addEventListener("change", async () => {
   const f = phoneIn.files && phoneIn.files[0]; if (!f) return;
@@ -334,7 +405,7 @@ function start() {
   active = true;
   try { polling++; clearMore(); } catch {}
   hideIds.forEach((id) => { const n = $(id); if (n) n.style.display = "none"; });
-  panel.hidden = false; refocus();
+  panel.hidden = false; refocus(); if (window.matchMedia && window.matchMedia("(pointer:coarse)").matches) camStart();
 }
 function end() {
   active = false; camStop(); camMsg.textContent = ""; panel.hidden = true; inp.value = "";
