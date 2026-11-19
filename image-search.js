@@ -3,7 +3,8 @@
    بيعتمد على: core.js, render.js (card), search.js (polling, clearMore), وكلاس .scan-btn من scanner.js. */
 (() => {
 "use strict";
-const MAX_SIDE = 1280;
+const MAX_SIDE = 2048; // أكبر ضلع للصورة قبل الإرسال (كان 1280): الخط الصغير على العلبة (التركيز) بيفضل مقروء
+const OCR_B64_MAX = 1300000; // OCR.space المجاني بيقبل لحد حوالي 1 ميجا: فوق كده بيتخطّى والقراءة بتتم بـ Gemini بس، فبنضغط الصورة لتحت الحد ده
 let lastShot = { w: 0, h: 0 };
 ERR.vision_unavailable = "قراءة الصورة مش متاحة دلوقتي. جرّب تاني بعد شوية.";
 ERR.vision_bad_output = "ما قدرناش نقرا الصورة. جرّب صورة أوضح.";
@@ -19,7 +20,7 @@ const camIn = mkInput(true), galIn = mkInput(false);
 const imgBtn = el("button", "scan-btn img-pick", "بحث بصورة"); imgBtn.type = "button";
 // ===== صفحة البحث بالصورة (#/img): الكاميرا الحية بتفتح أول ما تدخل الصفحة (حوالي ¾ الشاشة)، والمعرض تحتها.
 // فوق الكاميرا زرين صغيرين عايمين: منتج (شغّال) / روشتة (قريباً). =====
-let built = false, stream = null, camGen = 0;
+let built = false, stream = null, track = null, camGen = 0, shooting = false;
 const ipMsg = el("div", "ip-msg"); ipMsg.hidden = true;
 const say = (txt, bad) => { ipMsg.hidden = !txt; ipMsg.textContent = txt || ""; ipMsg.className = "ip-msg" + (bad ? " bad" : ""); };
 const video = Object.assign(el("video"), { muted: true, autoplay: true }); video.setAttribute("playsinline", "");
@@ -32,13 +33,15 @@ modes.append(prodMode, rxMode);
 const shotBtn = el("button", "ip-shot"); shotBtn.type = "button"; shotBtn.setAttribute("aria-label", "صوّر وابحث"); shotBtn.disabled = true;
 const retryBtn = el("button", "ip-retry", "تشغيل الكاميرا"); retryBtn.type = "button";
 camBox.append(video, el("div", "ip-frame"), modes, retryBtn, shotBtn);
+const camRow = el("button", "img-opt photo", "تصوير بكاميرا التليفون (أعلى دقة)"); camRow.type = "button";
+camRow.addEventListener("click", () => { camIn.value = ""; camIn.click(); });
 const galRow = el("button", "img-opt gal", "استيراد صورة من المعرض"); galRow.type = "button";
 galRow.addEventListener("click", () => galIn.click());
 
 function stopCam() {
   camGen++;
   if (stream) stream.getTracks().forEach((t) => t.stop());
-  stream = null; video.srcObject = null;
+  stream = null; track = null; video.srcObject = null;
   camBox.classList.add("off"); shotBtn.disabled = true;
 }
 async function startCam() {
@@ -51,7 +54,7 @@ async function startCam() {
   const gen = ++camGen;
   retryBtn.disabled = true;
   let s;
-  try { s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
+  try { s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 } }, audio: false }); }
   catch (e) {
     retryBtn.disabled = false;
     say(e && e.name === "NotAllowedError" ? "مفيش إذن للكاميرا. فعّله من إعدادات المتصفح واضغط «تشغيل الكاميرا»، أو استخدم المعرض." : "تعذّر فتح الكاميرا (" + ((e && e.name) || "unknown") + "). جرّب تاني أو استخدم المعرض.", true);
@@ -60,18 +63,50 @@ async function startCam() {
   retryBtn.disabled = false;
   if (gen !== camGen) { s.getTracks().forEach((t) => t.stop()); return; }
   stream = s; video.srcObject = s;
+  track = s.getVideoTracks()[0] || null;
+  try { // تركيز وتعريض مستمرين لو الجهاز بيدعمهم
+    const caps = track && track.getCapabilities ? track.getCapabilities() : {}, adv = [];
+    if (caps.focusMode && caps.focusMode.includes("continuous")) adv.push({ focusMode: "continuous" });
+    if (caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({ exposureMode: "continuous" });
+    if (adv.length) await track.applyConstraints({ advanced: adv });
+  } catch { /* مش مدعوم */ }
   try { await video.play(); } catch { /* هيشتغل أول ما الفريم يجهز */ }
   camBox.classList.remove("off"); shotBtn.disabled = false;
 }
+// لقطة بدقة الحساس كاملة من نفس الكاميرا (ImageCapture: كروم/سامسونج على أندرويد). غير كده (آيفون) بناخد لقطة من الفيديو.
+async function stillPhoto() {
+  if (!window.ImageCapture || !track) return null;
+  try {
+    const ic = new window.ImageCapture(track);
+    let opts = null;
+    try { // أعلى دقة بيدعمها الجهاز، بسقف 4096 على أطول ضلع عشان الموبايلات الضعيفة (50/108 ميجا) ماتهنجش
+      const pc = await ic.getPhotoCapabilities();
+      if (pc && pc.imageWidth && pc.imageHeight) {
+        const w = pc.imageWidth.max, h = pc.imageHeight.max, k = Math.min(1, 4096 / Math.max(w, h));
+        opts = { imageWidth: Math.round(w * k), imageHeight: Math.round(h * k) };
+      }
+    } catch { /* نلتقط بالإعدادات الافتراضية */ }
+    try { return await ic.takePhoto(opts || undefined); }
+    catch { return await ic.takePhoto(); }
+  } catch { return null; }
+}
 async function shoot() {
+  if (shooting) return;
   if (!stream || !video.videoWidth) { say("الكاميرا لسه بتجهز. استنى ثانية وجرّب تاني.", true); return; }
-  const cv = document.createElement("canvas"); cv.width = video.videoWidth; cv.height = video.videoHeight;
-  const ctx = cv.getContext("2d"); if (!ctx) { say("تعذّر التقاط الصورة.", true); return; }
-  ctx.drawImage(video, 0, 0, cv.width, cv.height);
-  const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.9));
-  stopCam();
-  if (!blob) { say("تعذّر التقاط الصورة.", true); return; }
-  handle(new File([blob], "photo.jpg", { type: "image/jpeg" }));
+  shooting = true; shotBtn.disabled = true;
+  try {
+    if (window.ImageCapture) say("بنصوّر بدقة كاملة… ثبّت الموبايل");
+    let blob = await stillPhoto();
+    if (!blob) {
+      const cv = document.createElement("canvas"); cv.width = video.videoWidth; cv.height = video.videoHeight;
+      const ctx = cv.getContext("2d"); if (!ctx) { say("تعذّر التقاط الصورة.", true); return; }
+      ctx.drawImage(video, 0, 0, cv.width, cv.height);
+      blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.92));
+    }
+    if (!blob) { say("تعذّر التقاط الصورة.", true); return; }
+    stopCam(); say("");
+    handle(new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" }));
+  } finally { shooting = false; if (stream) shotBtn.disabled = false; }
 }
 shotBtn.addEventListener("click", shoot);
 retryBtn.addEventListener("click", startCam);
@@ -83,7 +118,7 @@ window.imagePage = () => {
   if (!built) {
     built = true;
     const c = el("div", "ip-card");
-    c.append(galRow, el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين."));
+    c.append(camRow, galRow, el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين. «كاميرا التليفون» بتفتح تطبيق الكاميرا الأصلي بأعلى دقة."));
     pg.append(camBox, ipMsg, c);
   }
   say("");
@@ -104,14 +139,21 @@ async function toJpegBase64(f) {
     w0 = src.naturalWidth; h0 = src.naturalHeight;
   }
   if (!w0 || !h0) throw new Error("image_decode_failed");
-  const k = Math.min(1, MAX_SIDE / Math.max(w0, h0));
-  const cv = document.createElement("canvas"); cv.width = Math.round(w0 * k); cv.height = Math.round(h0 * k);
-  lastShot = { w: cv.width, h: cv.height };
-  cv.getContext("2d").drawImage(src, 0, 0, cv.width, cv.height);
-  const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.85));
-  if (!blob) throw new Error("image_encode_failed");
-  const url = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(new Error("image_read_failed")); fr.readAsDataURL(blob); });
-  return String(url).split(",")[1];
+  // بنبدأ بأعلى دقة، ولو حجم الصورة عدّى حد OCR بنقلّل الجودة ثم الأبعاد لحد ما تدخل تحت الحد
+  const toB64 = (blob) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(new Error("image_read_failed")); fr.readAsDataURL(blob); });
+  const cv = document.createElement("canvas"), g = cv.getContext("2d");
+  let out = null;
+  for (const [side, q] of [[MAX_SIDE, 0.88], [MAX_SIDE, 0.78], [1700, 0.8], [1400, 0.78], [1280, 0.72]]) {
+    const k = Math.min(1, side / Math.max(w0, h0));
+    cv.width = Math.round(w0 * k); cv.height = Math.round(h0 * k);
+    lastShot = { w: cv.width, h: cv.height };
+    g.drawImage(src, 0, 0, cv.width, cv.height);
+    const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", q));
+    if (!blob) throw new Error("image_encode_failed");
+    out = await toB64(blob);
+    if (out.length <= OCR_B64_MAX) break;
+  }
+  return out;
 }
 
 // صندوق "باقي منتجات نفس العائلة": الاسم متعبّي من الصورة وتقدر تغيّره (بنادول، سنترم...)
