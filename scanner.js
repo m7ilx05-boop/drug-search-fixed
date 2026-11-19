@@ -136,6 +136,7 @@ const WANT = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "itf", "qr_code",
 const ZX_URLS = ["vendor/zxing-0.21.3.min.js", "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"]; // نسخة على موقعنا الأول، وبعدها CDN
 let zxPromise = null, stream = null, track = null, camOn = false, camGen = 0, torchOn = false;
 let hiBusy = false, hiAt = 0, finishedGen = -1;
+const MIN_ZOOM = 4; // أقل زوم مفروض على الكاميرا: بيجبر المستخدم يبعد العلبة عشان الكاميرا تعرف تركّز وتصوّر الباركود. غيّر الرقم من هنا بس
 
 phoneBtn.textContent = "🖼️ صورة بدقة عالية"; // بيفتح تطبيق الكاميرا الأصلي لصورة واحدة (للباركود الصغير جداً)
 const tools = el("div", "cam-tools"); tools.hidden = true;
@@ -247,7 +248,7 @@ function camStop() {
 
 zoomIn.addEventListener("input", () => {
   if (!track) return;
-  const z = Number(zoomIn.value); zoomLbl.textContent = "×" + z.toFixed(1);
+  const z = Math.max(Number(zoomIn.value), Number(zoomIn.min)); zoomLbl.textContent = "×" + z.toFixed(1);
   track.applyConstraints({ advanced: [{ zoom: z }] }).then(showCamInfo).catch(() => {});
 });
 focusBtn.addEventListener("click", async () => {
@@ -295,8 +296,8 @@ async function camStart() {
   if (caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({ exposureMode: "continuous" });
   if (adv.length) { try { await track.applyConstraints({ advanced: adv }); } catch { /* مش مدعوم */ } }
   if (caps.zoom && caps.zoom.max > caps.zoom.min) {
-    const z0 = caps.zoom.min; // كان ×2 تلقائي: الزوم الرقمي بيقصّ الصورة ويقلّل التفاصيل. ابدأ من ×1 وكبّر بإيدك
-    zoomIn.min = caps.zoom.min; zoomIn.max = caps.zoom.max; zoomIn.step = caps.zoom.step || 0.1; zoomIn.value = z0;
+    const z0 = Math.min(Math.max(MIN_ZOOM, caps.zoom.min), caps.zoom.max); // يبدأ من MIN_ZOOM (أو أقصى زوم للجهاز لو أقل)
+    zoomIn.min = z0; zoomIn.max = caps.zoom.max; zoomIn.step = caps.zoom.step || 0.1; zoomIn.value = z0;
     try { await track.applyConstraints({ advanced: [{ zoom: z0 }] }); zoomLbl.textContent = "×" + z0.toFixed(1); zoomIn.hidden = false; tools.hidden = false; } catch { /* مش مدعوم */ }
   }
   if (caps.torch) { torchBtn.hidden = false; tools.hidden = false; }
@@ -309,7 +310,7 @@ async function camStart() {
   if (gen !== camGen) return;
   camOn = true; camBtn.disabled = false; camBtn.textContent = "إيقاف الكاميرا";
   if (window.ImageCapture && track) { shotBtn.hidden = false; tools.hidden = false; } // الزرار بيظهر بس لو المتصفح بيدعم التقاط صورة ثابتة
-  camMsg.textContent = "وجّه الكاميرا ناحية الباركود جوه الإطار وهيتلقط لوحده. لو صغير استخدم الزوم والفلاش.";
+  camMsg.textContent = "ابعد العلبة لحد ما الباركود يبقى كله جوه الإطار وهيتلقط لوحده. لو الإضاءة ضعيفة استخدم الفلاش.";
 
   let votes = null, bad = 0, done = false;
   const schedule = () => { if (gen !== camGen || done) return; if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => tick()); else setTimeout(tick, 100); };
