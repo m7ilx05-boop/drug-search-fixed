@@ -141,7 +141,8 @@ const tools = el("div", "cam-tools"); tools.hidden = true;
 const torchBtn = el("button", null, "🔦 فلاش"); torchBtn.type = "button"; torchBtn.hidden = true;
 const zoomIn = el("input"); zoomIn.type = "range"; zoomIn.hidden = true; zoomIn.setAttribute("aria-label", "زوم الكاميرا");
 const zoomLbl = el("span", "meta", "");
-tools.append(torchBtn, zoomIn, zoomLbl);
+const shotBtn = el("button", null, "📸 التقاط بدقة كاملة"); shotBtn.type = "button"; shotBtn.hidden = true; // صورة ثابتة بدقة الكاميرا (ImageCapture) والباركود بيتقرا منها
+tools.append(shotBtn, torchBtn, zoomIn, zoomLbl);
 camMsg.before(tools);
 
 const loadZx = () => zxPromise || (zxPromise = new Promise((res, rej) => {
@@ -223,7 +224,7 @@ function camStop() {
   camGen++; camOn = false;
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; track = null; torchOn = false; video.srcObject = null;
-  tools.hidden = true; torchBtn.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
+  tools.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
   cam.classList.remove("on", "ok"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
 }
 
@@ -276,6 +277,7 @@ async function camStart() {
   catch (e) { camStop(); camMsg.textContent = "تعذّر تحميل قارئ الباركود (" + e.message + "). تأكد من الإنترنت وجرّب تاني، أو استخدم السكانر أو ابحث بصورة المنتج."; return; }
   if (gen !== camGen) return;
   camOn = true; camBtn.disabled = false; camBtn.textContent = "إيقاف الكاميرا";
+  if (window.ImageCapture && track) { shotBtn.hidden = false; tools.hidden = false; } // الزرار بيظهر بس لو المتصفح بيدعم التقاط صورة ثابتة
   camMsg.textContent = "وجّه الكاميرا ناحية الباركود جوه الإطار وهيتلقط لوحده. لو صغير استخدم الزوم والفلاش.";
 
   let votes = null, bad = 0, done = false;
@@ -314,6 +316,34 @@ async function camStart() {
   tick();
 }
 camBtn.addEventListener("click", () => (camOn ? camStop() : camStart()));
+
+// التقاط بدقة كاملة: بنطلب من الكاميرا صورة ثابتة بأعلى دقة (مش لقطة من الفيديو) وبنقرا الباركود منها
+let shotBusy = false;
+shotBtn.addEventListener("click", async () => {
+  if (!camOn || !track || shotBusy) return;
+  shotBusy = true; shotBtn.disabled = true; camMsg.textContent = "بنلتقط صورة بدقة كاملة…";
+  try {
+    const ic = new window.ImageCapture(track);
+    let opts = {};
+    try { const pc = await ic.getPhotoCapabilities(); if (pc && pc.imageWidth && pc.imageHeight) opts = { imageWidth: pc.imageWidth.max, imageHeight: pc.imageHeight.max }; } catch { /* نلتقط بالإعدادات الافتراضية */ }
+    const blob = await ic.takePhoto(opts);
+    const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+    const det = await makeDetector();
+    const r = await readStill(bmp, det);
+    if (bmp.close) bmp.close();
+    if (r.raw) {
+      cam.classList.add("ok");
+      try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ }
+      camMsg.textContent = "تم التقاط الباركود ✓";
+      const raw = r.raw;
+      setTimeout(() => { camStop(); camMsg.textContent = "تم التقاط الباركود وقفلنا الكاميرا. اضغط «📷 افتح الكاميرا» لمسح تاني."; submit(raw); }, 450);
+    } else camMsg.textContent = r.invalid ? "اتقرا رقم بس رقم المراجعة بتاعه غلط، فاتجاهلناه. قرّب الباركود وثبّت الموبايل وجرّب تاني."
+      : "ما لقيناش باركود واضح في الصورة. خلّي الباركود جوه الإطار وقرّب شوية وجرّب تاني.";
+  } catch (e) {
+    camMsg.textContent = "تعذّر التقاط الصورة (" + ((e && e.name) || "خطأ") + "). جرّب تاني أو استخدم «🖼️ صورة بدقة عالية».";
+  }
+  shotBusy = false; shotBtn.disabled = false;
+});
 
 // صورة ثابتة: بنجرّب أكتر من مقياس وقصّ للمنتصف، وبنقبل بس الكود اللي رقم مراجعته سليم
 async function readStill(bmp, det) {
