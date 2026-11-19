@@ -96,6 +96,9 @@ css.textContent = `.scan-btn{display:block;width:100%;margin-top:12px;background
 .torch-btn{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;padding:0;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,transform .15s}
 .torch-btn svg{fill:none;transition:fill .2s}.torch-btn:active{transform:scale(.9)}
 .torch-btn.on{background:#fbbf24;border-color:#fbbf24;color:#111;box-shadow:0 0 0 4px rgba(251,191,36,.28),0 0 18px 4px rgba(251,191,36,.7)}.torch-btn.on svg{fill:currentColor}
+.cam-ctl[hidden],.cam-tools[hidden],.torch-btn[hidden],.scan-fail[hidden]{display:none}
+.scan-fail{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:12px;padding:12px;border:1.5px solid var(--warn);border-radius:14px;background:var(--warn-bg)}
+.scan-fail-msg{font-weight:700;color:var(--warn)}.scan-fail button{width:100%}
 .cam-ctl input[type=range]{flex:1 1 auto;min-width:0}.cam-ctl button{flex:none;white-space:nowrap}
 .scan-opt{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
 .scan-msg{padding:12px 14px;border-radius:10px;margin-top:12px;font-weight:500}
@@ -115,7 +118,11 @@ const camBtn = el("button", null, "📷 افتح الكاميرا"); camBtn.type
 const phoneBtn = el("button", null, "📷 كاميرا الجوال"); phoneBtn.type = "button"; // بيفتح تطبيق كاميرا الجوال نفسه ويقرا الباركود من الصورة
 const phoneIn = el("input"); phoneIn.type = "file"; phoneIn.accept = "image/*"; phoneIn.setAttribute("capture", "environment"); phoneIn.hidden = true;
 const stop = el("button", null, "إيقاف وضع المسح"); stop.type = "button";
-top.append(state, camBtn, phoneBtn, stop);
+top.append(camBtn); // أزرار «جاهز للمسح» و«إيقاف وضع المسح» اتشالت من هنا
+const failBox = el("div", "scan-fail"); failBox.hidden = true; // بيظهر بس لما المسح يفشل
+failBox.append(el("div", "scan-fail-msg", "فشل قراءة الباركود"), phoneBtn);
+let failTimer = 0;
+const showFail = () => { if (camOn) failBox.hidden = false; };
 const cam = el("div", "cam"); cam.append(Object.assign(el("video"), { muted: true, autoplay: true }), el("div", "frame"), el("div", "scanline"));
 const video = cam.firstChild; video.setAttribute("playsinline", "");
 const camState = el("span", "scan-state cam-state", "جاهز للمسح"); cam.append(camState); // نفس حالة «جاهز للمسح» فوق الكاميرا بنقطة خضراء بتنوّر وتطفي
@@ -126,7 +133,7 @@ inp.setAttribute("aria-label", "حقل استقبال السكانر"); inp.plac
 const optL = el("label", "scan-opt"); const noEnter = el("input"); noEnter.type = "checkbox";
 optL.append(noEnter, "السكانر لا يرسل Enter بعد المسح (الاكتشاف التلقائي بالسرعة)");
 const note = el("div", "meta");
-box.append(cam, camMsg, top, inp, optL, note, phoneIn); // الكاميرا فوق، وكل الأزرار تحتها
+box.append(cam, camMsg, failBox, top, inp, optL, note, phoneIn); // الكاميرا فوق، وكل الأزرار تحتها
 const outBox = el("div"); outBox.setAttribute("aria-live", "polite");
 const logTitle = el("h3", "sec", "آخر عمليات المسح"); const logList = el("div", "scan-log");
 panel.append(box, outBox, logTitle, logList);
@@ -149,7 +156,7 @@ let zxPromise = null, stream = null, track = null, camOn = false, camGen = 0, to
 let hiBusy = false, hiAt = 0, finishedGen = -1;
 const MIN_ZOOM = 4; // أقل زوم مفروض على الكاميرا: بيجبر المستخدم يبعد العلبة عشان الكاميرا تعرف تركّز وتصوّر الباركود. غيّر الرقم من هنا بس
 
-phoneBtn.textContent = "🖼️ صورة بدقة عالية"; // بيفتح تطبيق الكاميرا الأصلي لصورة واحدة (للباركود الصغير جداً)
+phoneBtn.textContent = "📷 افتح كاميرا الهاتف والتقط صورة عالية الدقة"; // بيفتح تطبيق الكاميرا الأصلي لصورة واحدة (للباركود الصغير جداً)
 const tools = el("div", "cam-tools"); tools.hidden = true;
 const torchBtn = el("button", "torch-btn"); torchBtn.type = "button"; torchBtn.hidden = true; // زر فلاش تفاعلي (أيقونة بدل الكلام)
 torchBtn.setAttribute("aria-label", "الفلاش"); torchBtn.setAttribute("aria-pressed", "false");
@@ -300,6 +307,7 @@ function startScanAnim() {
 function stopScanAnim() { if (lotAnim) lotAnim.pause(); cam.classList.remove("lot-on"); }
 
 function camStop() {
+  clearTimeout(failTimer);
   camGen++; camOn = false; stopScanAnim(); clearInterval(afTimer); afTimer = 0;
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; track = null; torchOn = false; video.srcObject = null;
@@ -374,7 +382,7 @@ async function camStart() {
   try { det = await makeDetector(); }
   catch (e) { camStop(); camMsg.textContent = "تعذّر تحميل قارئ الباركود (" + e.message + "). تأكد من الإنترنت وجرّب تاني، أو استخدم السكانر أو ابحث بصورة المنتج."; return; }
   if (gen !== camGen) return;
-  camOn = true; camBtn.disabled = false; camBtn.hidden = true; // مفيش زر إيقاف الكاميرا (بتقفل بـ«إيقاف وضع المسح» أو بعد التقاط الباركود)
+  camOn = true; failBox.hidden = true; clearTimeout(failTimer); failTimer = setTimeout(showFail, 15000); camBtn.disabled = false; camBtn.hidden = true; // مفيش زر إيقاف الكاميرا (بتقفل بـ«إيقاف وضع المسح» أو بعد التقاط الباركود)
   if (window.ImageCapture && track) { tools.hidden = false; } // الزرار بيظهر بس لو المتصفح بيدعم التقاط صورة ثابتة
   camMsg.textContent = "ابعد العلبة لحد ما الباركود يبقى كله جوه الإطار وهيتلقط لوحده. لو الإضاءة ضعيفة استخدم الفلاش.";
 
@@ -403,7 +411,7 @@ async function camStart() {
         votes = { key, n, t: now };
         if (n >= cand.need) { done = true; finishScan(cand.raw, gen); return; }
       }
-      if (bad >= 4) { camMsg.textContent = "بنقرا أرقام غير صحيحة ونتجاهلها. قرّب شوية، ثبّت الموبايل أو شغّل الفلاش."; bad = 0; }
+      if (bad >= 4) { showFail(); camMsg.textContent = "بنقرا أرقام غير صحيحة ونتجاهلها. قرّب شوية، ثبّت الموبايل أو شغّل الفلاش."; bad = 0; }
     }
     schedule();
   };
@@ -415,7 +423,7 @@ camBtn.addEventListener("click", () => (camOn ? camStop() : camStart()));
 // بيشتغل بالزرار، وتلقائي أول ما المسح المباشر يلمح أي باركود (لو الخيار مفعّل). لو فشل بنكمّل بالمسح المباشر.
 function finishScan(raw, gen) {
   if (gen !== camGen || finishedGen === gen) return; // مرة واحدة بس لكل جلسة كاميرا
-  finishedGen = gen;
+  finishedGen = gen; clearTimeout(failTimer); failBox.hidden = true;
   cam.classList.add("ok");
   try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ }
   camMsg.textContent = "تم التقاط الباركود ✓";
@@ -439,9 +447,9 @@ async function hiCapture(gen, manual) {
     if (r.raw) finishScan(r.raw, gen);
     else if (manual) camMsg.textContent = r.invalid ? "اتقرا رقم بس رقم المراجعة بتاعه غلط، فاتجاهلناه. قرّب الباركود وثبّت الموبايل وجرّب تاني."
       : "ما لقيناش باركود واضح في الصورة. خلّي الباركود جوه الإطار وقرّب شوية وجرّب تاني.";
-    else camMsg.textContent = "الصورة الكاملة ما اتقرتش، بنكمّل مسح مباشر…";
+    else { camMsg.textContent = "الصورة الكاملة ما اتقرتش، بنكمّل مسح مباشر…"; showFail(); }
   } catch (e) {
-    camMsg.textContent = manual ? "تعذّر التقاط الصورة (" + ((e && e.name) || "خطأ") + "). جرّب تاني أو استخدم «🖼️ صورة بدقة عالية»." : "تعذّر التصوير بدقة كاملة، بنكمّل مسح مباشر.";
+    camMsg.textContent = manual ? "تعذّر التقاط الصورة (" + ((e && e.name) || "خطأ") + "). جرّب تاني." : "تعذّر التصوير بدقة كاملة، بنكمّل مسح مباشر."; showFail();
   } finally { hiBusy = false; hiAt = Date.now(); shotBtn.disabled = false; }
 }
 shotBtn.addEventListener("click", () => hiCapture(camGen, true));
@@ -467,18 +475,19 @@ phoneBtn.addEventListener("click", () => { phoneIn.value = ""; phoneIn.click(); 
 phoneIn.addEventListener("change", async () => {
   const f = phoneIn.files && phoneIn.files[0]; if (!f) return;
   if (camOn) camStop();
-  phoneBtn.disabled = true; camMsg.textContent = "جاري قراءة الباركود من الصورة…";
+  let r_ok = false; phoneBtn.disabled = true; camMsg.textContent = "جاري قراءة الباركود من الصورة…";
   try {
     const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
     const det = await makeDetector();
     const r = await readStill(bmp, det);
     if (bmp.close) bmp.close();
-    if (r.raw) { try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ } camMsg.textContent = "تم قراءة الباركود من الصورة."; submit(r.raw); }
+    if (r.raw) { try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ } camMsg.textContent = "تم قراءة الباركود من الصورة."; failBox.hidden = true; r_ok = true; submit(r.raw); }
     else camMsg.textContent = r.invalid ? "اتقرا رقم بس رقم المراجعة بتاعه غلط، فاتجاهلناه. صوّر الباركود لوحده أقرب وأوضح وبإضاءة كويسة وجرّب تاني."
       : "ما لقيناش باركود واضح في الصورة. قرّب وصوّر الباركود لوحده بإضاءة كويسة وجرّب تاني.";
   } catch (e) {
     camMsg.textContent = "تعذّر قراءة الصورة (" + (e && e.message ? e.message : "خطأ") + "). جرّب تاني.";
   }
+  if (!r_ok) failBox.hidden = false;
   phoneBtn.disabled = false; phoneIn.value = "";
 });
 
