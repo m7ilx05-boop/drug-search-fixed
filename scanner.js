@@ -391,7 +391,8 @@ function start() {
   active = true;
   try { polling++; clearMore(); } catch {}
   hideIds.forEach((id) => { const n = $(id); if (n) n.style.display = "none"; });
-  panel.hidden = false; refocus(); 
+  panel.hidden = false; refocus();
+  if (window.matchMedia && window.matchMedia("(pointer:coarse)").matches) camStart(); // على الموبايل: الكاميرا بتفتح أول ما تدخل المسح (على الكمبيوتر بالزرار) 
 }
 function end() {
   active = false; camStop(); camMsg.textContent = ""; panel.hidden = true; inp.value = "";
