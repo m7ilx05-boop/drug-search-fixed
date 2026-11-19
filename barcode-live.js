@@ -12,7 +12,7 @@ const LIVE_ERR = {
   providers_unavailable: "مصدر البيانات مش بيرد دلوقتي. جرّب بعد شوية.",
   rate_limited: "عدد محاولات البحث على الإنترنت كبير. انتظر دقيقة وجرّب تاني.",
 };
-const warn = (m) => setTimeout(() => { const pn = document.getElementById("scanPanel"), ob = pn && pn.children[1]; if (ob) ob.append(el("div", "scan-msg bad", m)); }, 0);
+const warn = (m) => setTimeout(() => { const pn = document.getElementById("scanPanel"), ob = document.getElementById("scanOut"); if (ob) ob.append(el("div", "scan-msg bad", m)); }, 0);
 
 window.call = async function (name, body) {
   const d = await baseCall(name, body);

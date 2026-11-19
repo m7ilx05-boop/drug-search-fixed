@@ -83,6 +83,8 @@ function parseScan(raw0) {
 const css = document.createElement("style");
 css.textContent = `.scan-btn{display:block;width:100%;margin-top:12px;background:var(--surface);color:var(--accent);border:2px solid var(--accent)}
 #scanPanel{margin-top:14px}.scan-box{background:var(--surface);border:2px solid var(--accent);border-radius:12px;padding:14px}
+.scan-back{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;min-height:40px;margin:0 0 10px;padding:0;border-radius:50%;background:var(--surface);color:var(--accent);border:1px solid var(--line);font-size:20px;line-height:1;box-shadow:0 2px 8px rgba(20,90,160,.18);cursor:pointer}
+.scan-inbox{margin-top:12px;background:var(--surface);border:2px solid var(--accent);border-radius:12px;padding:14px}
 .scan-top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .scan-state{font-weight:600;padding:3px 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok)}
 .scan-state.lost{background:var(--warn-bg);color:var(--warn)}
@@ -91,7 +93,7 @@ css.textContent = `.scan-btn{display:block;width:100%;margin-top:12px;background
 .cam-state.lost{background:rgba(0,0,0,.6);color:#fde68a}.cam-state.lost::before{background:#fbbf24;box-shadow:0 0 8px 2px rgba(251,191,36,.8)}
 @keyframes scanDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.15;transform:scale(.7)}}
 @media (prefers-reduced-motion:reduce){.cam-state::before{animation:none}}
-#scanIn{width:100%;margin-top:10px;direction:ltr;text-align:center;font:inherit;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+#scanIn{width:100%;margin-top:0;direction:ltr;text-align:center;font:inherit;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .cam-ctl{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--accent);border-radius:14px;background:rgba(127,127,127,.08)}
 .torch-btn{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;padding:0;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,transform .15s}
 .torch-btn svg{fill:none;transition:fill .2s}.torch-btn:active{transform:scale(.9)}
@@ -133,10 +135,12 @@ inp.setAttribute("aria-label", "حقل استقبال السكانر"); inp.plac
 const optL = el("label", "scan-opt"); const noEnter = el("input"); noEnter.type = "checkbox";
 optL.append(noEnter, "السكانر لا يرسل Enter بعد المسح (الاكتشاف التلقائي بالسرعة)");
 const note = el("div", "meta");
-box.append(cam, camMsg, failBox, top, inp, optL, note, phoneIn); // الكاميرا فوق، وكل الأزرار تحتها
-const outBox = el("div"); outBox.setAttribute("aria-live", "polite");
+box.append(cam, camMsg, failBox, top, note, phoneIn);
+const inBox = el("div", "scan-inbox"); inBox.append(inp, optL); // خانة الباركود في مربع منفصل
+const backBtn = el("button", "scan-back", "→"); backBtn.type = "button"; backBtn.setAttribute("aria-label", "رجوع"); // سهم من غير كلام: يخرج من وضع المسح للصفحة السابقة // الكاميرا فوق، وكل الأزرار تحتها
+const outBox = el("div"); outBox.id = "scanOut"; outBox.setAttribute("aria-live", "polite");
 const logTitle = el("h3", "sec", "آخر عمليات المسح"); const logList = el("div", "scan-log");
-panel.append(box, outBox, logTitle, logList);
+panel.append(backBtn, box, inBox, outBox, logTitle, logList);
 $("f").after(panel);
 
 let active = false, seq = 0, lastKey = "", lastAt = 0, times = [], timer = 0;
@@ -507,6 +511,7 @@ function end() {
 }
 btn.addEventListener("click", start);
 stop.addEventListener("click", end);
+backBtn.addEventListener("click", end);
 
 inp.addEventListener("blur", () => setTimeout(() => { const a = document.activeElement; if (active && (!a || a === document.body)) refocus(); else setState(); }, 0));
 inp.addEventListener("focus", setState);
