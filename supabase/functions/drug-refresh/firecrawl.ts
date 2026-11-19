@@ -11,6 +11,17 @@ function slots(): string[] {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
+// Round-robin start position. Every call begins at a different key, so the load is spread over all usable keys
+// instead of always hitting the first ones (Firecrawl_16, _17, _18 ...). The counter starts at a random value so
+// separate function instances do not all begin at the same key. The cursor moves synchronously, so parallel
+// page workers inside one job get different start keys.
+let rrCursor = Math.floor(Math.random() * 1_000_000);
+function rotate<T>(list: T[]): T[] {
+  if (list.length < 2) return list;
+  const start = rrCursor++ % list.length;
+  return [...list.slice(start), ...list.slice(0, start)];
+}
+
 function firstOfNextMonthUTC(): string {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString();
@@ -46,7 +57,7 @@ async function scrapeRaw(db: SupabaseClient, url: string, formats: unknown[], ex
   const blocked = new Set((states ?? [])
     .filter((s) => s.exhausted_until && new Date(s.exhausted_until).getTime() > Date.now())
     .map((s) => s.slot));
-  const candidates = all.filter((s) => !blocked.has(s));
+  const candidates = rotate(all.filter((s) => !blocked.has(s)));
   if (!candidates.length) throw new FirecrawlUnavailable("all Firecrawl keys are cooling down");
 
   // for key_usage_log: JSON extraction costs more credits than a plain markdown scrape
