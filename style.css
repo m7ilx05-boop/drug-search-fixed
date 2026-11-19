@@ -544,3 +544,5 @@ body[data-view=home] #imgbox{display:none}
 .forms .types label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:1px}
 @media (max-width:400px){.forms .types label{flex-direction:column;gap:3px;padding:8px 2px;font-size:12px}}
 .forms .set-done{position:sticky;bottom:0;margin-top:4px;min-height:44px;justify-content:center;background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:600;box-shadow:0 -6px 12px var(--surface)}
+
+.forms .set-sub{font-weight:400;font-size:12px;opacity:.8}

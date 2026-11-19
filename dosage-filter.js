@@ -15,13 +15,17 @@ const FORMS = [
   { id: "sachet", label: "أكياس", re: /sachet|powder|أكياس|ساشيه|بودرة/i },
   { id: "spray", label: "سبراي", re: /spray|سبراي|بخاخ/i },
 ];
-window.__ff = ""; // الفلتر الشغال دلوقتي (id الشكل الدوائي)، فاضي = تلقائي
+window.__ff = ""; // الفلتر الشغال دلوقتي: id أو أكتر من id للأشكال الدوائية مفصولين بفاصلة (مثلاً "solid,injection")، فاضي = تلقائي
+const selIds = () => String(window.__ff || "").split(",").filter(Boolean);
+const selForms = () => selIds().map((id) => FORMS.find((x) => x.id === id)).filter((f) => f && f.re);
 
 // ===== الواجهة =====
 const btn = $("ffBtn"), strip = $("forms"), note = $("ffnote");
 // القائمة: فوق "نوع البحث" (الراديوهات اتنقلت هنا من الفورم)، وتحتها "الشكل الدوائي"، وزرار "تم" في الآخر
-strip.append(el("div", "set-h", "الشكل الدوائي"));
-const formsBox = el("div", "set-forms"); formsBox.setAttribute("role", "radiogroup"); formsBox.setAttribute("aria-label", "الشكل الدوائي");
+const formsH = el("div", "set-h", "الشكل الدوائي");
+formsH.append(el("span", "set-sub", " · اختار واحد أو أكتر"));
+strip.append(formsH);
+const formsBox = el("div", "set-forms"); formsBox.setAttribute("role", "group"); formsBox.setAttribute("aria-label", "الشكل الدوائي");
 // صف واحد بيتحرّك يمين وشمال. تحته شريط صغير بيبيّن مكانك من باقي الاختيارات، وبيبهت الطرف اللي فيه اختيارات مخبية
 const formsWrap = el("div", "set-formswrap");
 const track = el("div", "set-track"); track.setAttribute("aria-hidden", "true");
@@ -47,19 +51,26 @@ formsBox.addEventListener("scroll", syncScroll, { passive: true });
 if (window.ResizeObserver) new ResizeObserver(syncScroll).observe(formsBox); else window.addEventListener("resize", syncScroll);
 FORMS.forEach((f, i) => {
   const b = el("button", null, f.label); b.type = "button"; b.dataset.id = f.id;
-  b.setAttribute("role", "radio"); b.setAttribute("aria-checked", i === 0 ? "true" : "false");
+  b.setAttribute("role", "checkbox"); b.setAttribute("aria-checked", i === 0 ? "true" : "false");
   formsBox.append(b);
 });
+function paintForms() {
+  const cur = selIds();
+  formsBox.querySelectorAll("button").forEach((x) => {
+    const on = x.dataset.id === "" ? cur.length === 0 : cur.includes(x.dataset.id);
+    x.setAttribute("aria-checked", on ? "true" : "false");
+  });
+}
 const done = el("button", "set-done", "تم"); done.type = "button";
 strip.append(done);
 const typeChecked = () => { const r = document.querySelector("input[name=t]:checked"); return r ? r.value : "auto"; };
 // النقطة الصفرا على زرار الإعدادات: بتظهر لو في فلتر شكل دوائي أو نوع بحث غير "تلقائي"
 function syncDot() {
-  const t = typeChecked(), f = FORMS.find((x) => x.id === window.__ff);
-  btn.classList.toggle("on", !!window.__ff || t !== "auto");
+  const t = typeChecked(), fs = selForms();
+  btn.classList.toggle("on", fs.length > 0 || t !== "auto");
   const parts = [];
   if (t !== "auto") { const r = document.querySelector("input[name=t]:checked"); const s = r && r.parentElement && r.parentElement.querySelector("span"); if (s) parts.push("نوع البحث: " + s.textContent); }
-  if (window.__ff && f) parts.push("الشكل الدوائي: " + f.label);
+  if (fs.length) parts.push("الشكل الدوائي: " + fs.map((f) => f.label).join(" + "));
   btn.title = parts.join(" · ");
 }
 function setOpen(open) {
@@ -71,8 +82,11 @@ done.addEventListener("click", () => setOpen(false));
 strip.addEventListener("change", syncDot); // تغيير نوع البحث
 strip.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-id]"); if (!b) return;
-  window.__ff = b.dataset.id;
-  formsBox.querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", x === b ? "true" : "false"));
+  // «تلقائي» بيمسح كل الاختيارات. أي شكل تاني بيتضاف/بيتشال، ولو مفضلش ولا واحد نرجع «تلقائي»
+  const id = b.dataset.id, cur = selIds();
+  const next = id === "" ? [] : cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+  window.__ff = next.join(",");
+  paintForms();
   b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
   syncDot();
   clearNote();
@@ -93,7 +107,7 @@ function setNote(label, n) {
 // ===== الفلترة =====
 const isProd = (o) => o && typeof o === "object" && !Array.isArray(o) && "product_name" in o;
 const keyOf = (p) => String(p.id || p.dwaprices_id || p.product_name);
-function filterDeep(node, f, hidden) {
+function filterDeep(node, f, hidden) { // f.re.test(...) = أي واحد من الأشكال المختارة
   if (Array.isArray(node)) {
     if (node.some(isProd)) return node.filter((p) => {
       if (!isProd(p)) return true;
@@ -109,8 +123,9 @@ function filterDeep(node, f, hidden) {
 const baseCall = window.call, jobs = new Set();
 window.call = async function (name, body) {
   const d = await baseCall(name, body);
-  const id = window.__ff, f = FORMS.find((x) => x.id === id);
-  if (!id || !f || !f.re || !d) return d;
+  const fs = selForms();
+  if (!fs.length || !d) return d;
+  const f = { label: fs.map((x) => x.label).join(" + "), re: { test: (v) => fs.some((x) => x.re.test(v)) } };
   if (name === "drug-search") {
     if (d.job_id) jobs.add(d.job_id);
     if (d.secondary && d.secondary.job_id) jobs.add(d.secondary.job_id);
