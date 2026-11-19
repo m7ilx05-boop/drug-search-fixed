@@ -228,7 +228,7 @@ function camStop() {
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; track = null; torchOn = false; video.srcObject = null;
   tools.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
-  cam.classList.remove("on", "ok"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
+  cam.classList.remove("on", "ok", "seen", "snap"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
 }
 
 zoomIn.addEventListener("input", () => {
@@ -291,6 +291,7 @@ async function camStart() {
       let dets = [];
       try { dets = await det.read(video, { roi: visibleROI(), maxW: det.native ? 2400 : 1400 }); } catch { /* نكمّل */ }
       if (gen !== camGen || done) return;
+      cam.classList.toggle("seen", dets.length > 0 && !cam.classList.contains("ok")); // الإطار بيضيق ويبقى كهرماني لما يلمح باركود
       if (dets.length && autoHiChk.checked && !hiBusy && Date.now() - hiAt > 4000) hiCapture(gen, false); // لمحنا باركود: صوّر بدقة كاملة
       // أول كود منتج صالح (رقم المراجعة سليم) هو المرشح. الأرقام الغلط بتتجاهل والكاميرا بتفضل شغالة
       let cand = null, seen = null;
@@ -328,6 +329,7 @@ function finishScan(raw, gen) {
 async function hiCapture(gen, manual) {
   if (!camOn || !track || hiBusy || gen !== camGen || finishedGen === gen || !window.ImageCapture) return;
   hiBusy = true; shotBtn.disabled = true;
+  cam.classList.remove("snap"); void cam.offsetWidth; cam.classList.add("snap"); // وميض التصوير
   camMsg.textContent = manual ? "بنلتقط صورة بدقة كاملة…" : "لمحنا باركود، بنصوّر بدقة كاملة… ثبّت الموبايل";
   try {
     const ic = new window.ImageCapture(track);

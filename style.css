@@ -477,14 +477,41 @@ body[data-view=home] #imgbox{display:none}
 .ip-card .img-opt{min-height:68px;margin:0 0 10px;padding:0 16px;font-size:17px;font-weight:600;background:var(--soft);border:1px solid var(--line);border-radius:16px}
 .ip-card .img-opt::before{width:28px;height:28px}
 
-/* كاميرا المسح جوه الصفحة: إطار + خط أخضر سريع بيطلع وينزل (أنيميشن مسح) */
+/* كاميرا المسح جوه الصفحة: مستطيل عريض + إطار بزوايا + شعاع مسح بيطلع وينزل + حالات (لمح / صوّر / اتلقط) */
 .cam-tools{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}.cam-tools input[type=range]{flex:1;min-width:120px}
-.cam{aspect-ratio:2/1} /* مستطيل عريض زي شكل الباركود */
-.cam .frame{inset:14% 6%}
+.cam{aspect-ratio:2/1;isolation:isolate}
 .scan-top{margin-top:12px}
-.cam .scanline{position:absolute;left:6%;right:6%;top:14%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,#22c55e 20%,#86efac 50%,#22c55e 80%,transparent);box-shadow:0 0 14px 3px rgba(34,197,94,.65);pointer-events:none;animation:scanmove .95s ease-in-out infinite alternate}
-@keyframes scanmove{from{top:14%}to{top:calc(86% - 3px)}}
-.cam .frame{transition:border-color .15s}
-.cam.ok .frame{border-color:#22c55e}
+.cam .frame{--c:#34d399;--t:4px;--l:28px;position:absolute;inset:14% 6%;border:0;border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.42);pointer-events:none;transition:inset .28s cubic-bezier(.2,.8,.2,1)}
+.cam .frame::before{content:"";position:absolute;inset:0;border-radius:14px;pointer-events:none;filter:drop-shadow(0 0 5px var(--c));animation:breathe 1.8s ease-in-out infinite;
+  background:
+   linear-gradient(var(--c),var(--c)) left top/var(--l) var(--t) no-repeat,linear-gradient(var(--c),var(--c)) left top/var(--t) var(--l) no-repeat,
+   linear-gradient(var(--c),var(--c)) right top/var(--l) var(--t) no-repeat,linear-gradient(var(--c),var(--c)) right top/var(--t) var(--l) no-repeat,
+   linear-gradient(var(--c),var(--c)) left bottom/var(--l) var(--t) no-repeat,linear-gradient(var(--c),var(--c)) left bottom/var(--t) var(--l) no-repeat,
+   linear-gradient(var(--c),var(--c)) right bottom/var(--l) var(--t) no-repeat,linear-gradient(var(--c),var(--c)) right bottom/var(--t) var(--l) no-repeat}
+.cam .scanline{position:absolute;left:6%;right:6%;top:14%;height:2px;border-radius:2px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,#a7f3d0 14%,#fff 50%,#a7f3d0 86%,transparent);
+  box-shadow:0 0 10px 2px rgba(52,211,153,.85),0 0 30px 8px rgba(52,211,153,.35);
+  animation:scanmove .95s cubic-bezier(.45,0,.55,1) infinite alternate}
+.cam .scanline::before,.cam .scanline::after{content:"";position:absolute;left:0;right:0;height:46px;pointer-events:none;animation-duration:1.9s;animation-iteration-count:infinite;animation-timing-function:linear}
+.cam .scanline::before{bottom:100%;background:linear-gradient(to top,rgba(52,211,153,.34),transparent);animation-name:trailDown}
+.cam .scanline::after{top:100%;background:linear-gradient(to bottom,rgba(52,211,153,.34),transparent);animation-name:trailUp}
+@keyframes scanmove{from{top:14%}to{top:calc(86% - 2px)}}
+@keyframes trailDown{0%,49.9%{opacity:1}50%,100%{opacity:0}}
+@keyframes trailUp{0%,49.9%{opacity:0}50%,100%{opacity:1}}
+@keyframes breathe{0%,100%{opacity:.8}50%{opacity:1}}
+.cam::after{content:"";position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:2}
+.cam.snap::after{animation:snapflash .38s ease-out}
+@keyframes snapflash{0%{opacity:.75}100%{opacity:0}}
+/* لمح باركود: الإطار بيضيق ويبقى كهرماني */
+.cam.seen .frame{--c:#fbbf24;inset:17% 9%}
+.cam.seen .scanline{box-shadow:0 0 10px 2px rgba(251,191,36,.85),0 0 30px 8px rgba(251,191,36,.35);background:linear-gradient(90deg,transparent,#fde68a 14%,#fff 50%,#fde68a 86%,transparent)}
+.cam.seen .scanline::before{background:linear-gradient(to top,rgba(251,191,36,.34),transparent)}
+.cam.seen .scanline::after{background:linear-gradient(to bottom,rgba(251,191,36,.34),transparent)}
+/* اتلقط: أخضر + علامة صح + وميض */
+.cam.ok .frame{--c:#22c55e;inset:16% 8%}
+.cam.ok .frame::after{content:"\2713";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:58px;font-weight:700;color:#22c55e;text-shadow:0 0 20px rgba(34,197,94,.9);animation:okpop .4s cubic-bezier(.2,1.5,.4,1)}
 .cam.ok .scanline{animation:none;opacity:0}
-@media (prefers-reduced-motion:reduce){.cam .scanline{animation-duration:2.4s}}
+.cam.ok::after{background:#22c55e;animation:okflash .6s ease-out}
+@keyframes okpop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes okflash{0%{opacity:.42}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.cam .scanline{animation-duration:2.4s}.cam .scanline::before,.cam .scanline::after{animation-duration:4.8s}.cam .frame::before{animation:none}}
