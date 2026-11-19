@@ -142,11 +142,25 @@ const tools = el("div", "cam-tools"); tools.hidden = true;
 const torchBtn = el("button", null, "🔦 فلاش"); torchBtn.type = "button"; torchBtn.hidden = true;
 const zoomIn = el("input"); zoomIn.type = "range"; zoomIn.hidden = true; zoomIn.setAttribute("aria-label", "زوم الكاميرا");
 const zoomLbl = el("span", "meta", "");
+const focusBtn = el("button", null, "🎯 ركّز"); focusBtn.type = "button"; focusBtn.hidden = true; // بيعيد ضبط التركيز لو الصورة مش واضحة
+const camInfo = el("div", "meta cam-info"); camInfo.hidden = true; camInfo.dir = "ltr"; // الأرقام الحقيقية اللي الكاميرا شغّالة بيها
 const shotBtn = el("button", null, "📸 التقاط بدقة كاملة"); shotBtn.type = "button"; shotBtn.hidden = true; // صورة ثابتة بدقة الكاميرا (ImageCapture) والباركود بيتقرا منها
 const autoHiL = el("label", "scan-opt"), autoHiChk = el("input"); autoHiChk.type = "checkbox"; autoHiChk.checked = true; autoHiL.hidden = !window.ImageCapture;
 autoHiL.append(autoHiChk, "تصوير تلقائي بدقة كاملة أول ما الكاميرا تلمح الباركود");
-tools.append(shotBtn, torchBtn, zoomIn, zoomLbl, autoHiL);
-camMsg.after(tools);
+tools.append(shotBtn, torchBtn, focusBtn, zoomIn, zoomLbl, autoHiL);
+camMsg.after(tools); tools.after(camInfo);
+// بيعرض الدقة والتركيز والزوم الفعليين (من الجهاز نفسه) بدل التخمين
+async function showCamInfo() {
+  if (!track) { camInfo.hidden = true; return; }
+  const s = track.getSettings ? track.getSettings() : {};
+  const bits = [(video.videoWidth || s.width || "?") + "×" + (video.videoHeight || s.height || "?") + (s.frameRate ? " @" + Math.round(s.frameRate) + "fps" : "")];
+  bits.push("focus: " + (s.focusMode || "n/a"));
+  bits.push("zoom: ×" + (s.zoom ? Number(s.zoom).toFixed(1) : "1.0"));
+  try {
+    if (window.ImageCapture) { const pc = await new window.ImageCapture(track).getPhotoCapabilities(); if (pc && pc.imageWidth) bits.push("photo max: " + pc.imageWidth.max + "×" + pc.imageHeight.max); }
+  } catch { /* مش مدعوم */ }
+  camInfo.textContent = "Camera " + bits.join(" · "); camInfo.hidden = false;
+}
 
 const loadZx = () => zxPromise || (zxPromise = new Promise((res, rej) => {
   if (window.ZXing) return res(window.ZXing);
@@ -227,14 +241,26 @@ function camStop() {
   camGen++; camOn = false;
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; track = null; torchOn = false; video.srcObject = null;
-  tools.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
+  tools.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; focusBtn.hidden = true; camInfo.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
   cam.classList.remove("on", "ok", "seen", "snap"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
 }
 
 zoomIn.addEventListener("input", () => {
   if (!track) return;
   const z = Number(zoomIn.value); zoomLbl.textContent = "×" + z.toFixed(1);
-  track.applyConstraints({ advanced: [{ zoom: z }] }).catch(() => {});
+  track.applyConstraints({ advanced: [{ zoom: z }] }).then(showCamInfo).catch(() => {});
+});
+focusBtn.addEventListener("click", async () => {
+  if (!track) return;
+  const caps = track.getCapabilities ? track.getCapabilities() : {}, modes = caps.focusMode || [];
+  try {
+    if (modes.includes("single-shot")) await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
+    else if (modes.includes("manual")) await track.applyConstraints({ advanced: [{ focusMode: "manual" }] });
+    await new Promise((r) => setTimeout(r, 400));
+    if (modes.includes("continuous")) await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+    camMsg.textContent = "اتعاد ضبط التركيز. ثبّت الجوال ثانية.";
+  } catch { camMsg.textContent = "الجهاز مش بيسمح بالتحكم في التركيز من المتصفح."; }
+  showCamInfo();
 });
 torchBtn.addEventListener("click", async () => {
   if (!track) return;
@@ -269,11 +295,13 @@ async function camStart() {
   if (caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({ exposureMode: "continuous" });
   if (adv.length) { try { await track.applyConstraints({ advanced: adv }); } catch { /* مش مدعوم */ } }
   if (caps.zoom && caps.zoom.max > caps.zoom.min) {
-    const z0 = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 2));
+    const z0 = caps.zoom.min; // كان ×2 تلقائي: الزوم الرقمي بيقصّ الصورة ويقلّل التفاصيل. ابدأ من ×1 وكبّر بإيدك
     zoomIn.min = caps.zoom.min; zoomIn.max = caps.zoom.max; zoomIn.step = caps.zoom.step || 0.1; zoomIn.value = z0;
     try { await track.applyConstraints({ advanced: [{ zoom: z0 }] }); zoomLbl.textContent = "×" + z0.toFixed(1); zoomIn.hidden = false; tools.hidden = false; } catch { /* مش مدعوم */ }
   }
   if (caps.torch) { torchBtn.hidden = false; tools.hidden = false; }
+  if (caps.focusMode && caps.focusMode.length) { focusBtn.hidden = false; tools.hidden = false; }
+  setTimeout(showCamInfo, 600); // بعد ما الفيديو يستقر
 
   let det;
   try { det = await makeDetector(); }
