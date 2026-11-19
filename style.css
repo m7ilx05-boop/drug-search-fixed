@@ -567,3 +567,9 @@ body[data-view=home] #imgbox{display:none}
 .ing-tab{flex:none;max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:7px 14px;border-radius:999px;border:1px solid color-mix(in srgb,var(--fill-ink) 35%,transparent);background:transparent;color:var(--fill-ink);font:inherit;font-size:14px;font-weight:500;cursor:pointer}
 .ing-tab.on{background:var(--surface);color:var(--soft-ink,var(--ink));border-color:transparent;font-weight:700}
 .ing-hero{padding-top:18px;margin-top:-20px;padding-bottom:56px;z-index:0}
+
+/* كلام الانتظار («جاري …») بحركة لمعان — shine.js بيلفّ النص ده تلقائياً في أي مكان بيظهر فيه */
+.shine-text{--sh1:#7f8a96;--sh2:#0b1b2b;--sh3:#6b7682;background:linear-gradient(to right,var(--sh1) 0,var(--sh2) 10%,var(--sh3) 20%) 0 0/200px 100% repeat-x;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:shineTxt 3s infinite linear;font-weight:600}
+@media (prefers-color-scheme:dark){.shine-text{--sh1:#9f9f9f;--sh2:#fff;--sh3:#868686}}
+@keyframes shineTxt{0%{background-position:0 0}60%{background-position:200px 0}100%{background-position:200px 0}}
+@media (prefers-reduced-motion:reduce){.shine-text{animation:none;background:none;-webkit-text-fill-color:currentColor;color:inherit}}
