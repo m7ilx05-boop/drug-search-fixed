@@ -18,7 +18,8 @@
       c.setAttribute("aria-expanded", "false");
       // زرار صفحة المنتج: بيظهر في الكارت المفتوح بس
       const g = el("button", "goto", "صفحة المنتج ←"); g.type = "button";
-      c.prepend(g);
+      const ul = c.querySelector("ul.ing");
+      if (ul) ul.before(g); else c.prepend(g); // فوق المواد الفعّالة
       return c;
     };
   });
