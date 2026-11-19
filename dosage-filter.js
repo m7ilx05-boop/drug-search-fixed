@@ -6,12 +6,9 @@
 "use strict";
 const FORMS = [
   { id: "", label: "تلقائي" },
-  { id: "tablet", label: "أقراص", re: /tablet|caplet|قرص|أقراص|اقراص/i },
-  { id: "capsule", label: "كبسولات", re: /capsule|كبسول/i },
+  { id: "solid", label: "أقراص / كبسولات", re: /tablet|caplet|capsule|قرص|أقراص|اقراص|كبسول/i },
   { id: "syrup", label: "شراب / معلّق", re: /syrup|suspension|elixir|شراب|معلق/i },
-  { id: "ointment", label: "مرهم", re: /ointment|مرهم/i },
-  { id: "cream", label: "كريم", re: /cream|كريم/i },
-  { id: "gel", label: "جل", re: /\bgel\b|emulgel|(^|\s)جل(\s|$)/i },
+  { id: "topical", label: "مرهم / كريم / جل", re: /ointment|مرهم|cream|كريم|\bgel\b|emulgel|(^|\s)جل(\s|$)/i },
   { id: "injection", label: "حقن", re: /inject|vial|ampou?le|syringe|حقن|أمبول|امبول|فيال/i },
   { id: "drops", label: "قطرة", re: /drops?|قطرة|نقط/i },
   { id: "suppository", label: "تحاميل", re: /suppositor|تحاميل|لبوس/i },
@@ -22,23 +19,43 @@ window.__ff = ""; // الفلتر الشغال دلوقتي (id الشكل ال�
 
 // ===== الواجهة =====
 const btn = $("ffBtn"), strip = $("forms"), note = $("ffnote");
+// القائمة: فوق "نوع البحث" (الراديوهات اتنقلت هنا من الفورم)، وتحتها "الشكل الدوائي"، وزرار "تم" في الآخر
+strip.append(el("div", "set-h", "الشكل الدوائي"));
+const formsBox = el("div", "set-forms"); formsBox.setAttribute("role", "radiogroup"); formsBox.setAttribute("aria-label", "الشكل الدوائي");
+strip.append(formsBox);
 FORMS.forEach((f, i) => {
   const b = el("button", null, f.label); b.type = "button"; b.dataset.id = f.id;
   b.setAttribute("role", "radio"); b.setAttribute("aria-checked", i === 0 ? "true" : "false");
-  strip.append(b);
+  formsBox.append(b);
 });
-btn.addEventListener("click", () => {
-  const open = strip.hidden;
-  strip.hidden = !open; btn.setAttribute("aria-expanded", open ? "true" : "false");
-});
+const done = el("button", "set-done", "تم"); done.type = "button";
+strip.append(done);
+const typeChecked = () => { const r = document.querySelector("input[name=t]:checked"); return r ? r.value : "auto"; };
+// النقطة الصفرا على زرار الإعدادات: بتظهر لو في فلتر شكل دوائي أو نوع بحث غير "تلقائي"
+function syncDot() {
+  const t = typeChecked(), f = FORMS.find((x) => x.id === window.__ff);
+  btn.classList.toggle("on", !!window.__ff || t !== "auto");
+  const parts = [];
+  if (t !== "auto") { const r = document.querySelector("input[name=t]:checked"); const s = r && r.parentElement && r.parentElement.querySelector("span"); if (s) parts.push("نوع البحث: " + s.textContent); }
+  if (window.__ff && f) parts.push("الشكل الدوائي: " + f.label);
+  btn.title = parts.join(" · ");
+}
+function setOpen(open) { strip.hidden = !open; btn.setAttribute("aria-expanded", open ? "true" : "false"); }
+btn.addEventListener("click", () => setOpen(strip.hidden));
+done.addEventListener("click", () => setOpen(false));
+strip.addEventListener("change", syncDot); // تغيير نوع البحث
 strip.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-id]"); if (!b) return;
   window.__ff = b.dataset.id;
-  strip.querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", x === b ? "true" : "false"));
-  btn.classList.toggle("on", !!window.__ff);
-  btn.title = window.__ff ? "الشكل الدوائي: " + b.textContent : "";
+  formsBox.querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", x === b ? "true" : "false"));
+  syncDot();
   clearNote();
 });
+// النوع ممكن يتغيّر من الكود (آخر عمليات البحث، الماسح، الرجوع للرئيسية): نحدّث النقطة عند الفتح وبعد كل بحث
+btn.addEventListener("click", syncDot);
+const form = $("f"); if (form) form.addEventListener("submit", () => setTimeout(syncDot, 0));
+window.addEventListener("hashchange", () => setTimeout(syncDot, 0));
+syncDot();
 
 function clearNote() { note.hidden = true; note.textContent = ""; }
 function setNote(label, n) {
