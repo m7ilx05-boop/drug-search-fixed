@@ -135,6 +135,7 @@ const refocus = () => { if (active && document.activeElement !== inp) inp.focus(
 const WANT = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "itf", "qr_code", "data_matrix"];
 const ZX_URLS = ["vendor/zxing-0.21.3.min.js", "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"]; // نسخة على موقعنا الأول، وبعدها CDN
 let zxPromise = null, stream = null, track = null, camOn = false, camGen = 0, torchOn = false;
+let hiBusy = false, hiAt = 0, finishedGen = -1;
 
 phoneBtn.textContent = "🖼️ صورة بدقة عالية"; // بيفتح تطبيق الكاميرا الأصلي لصورة واحدة (للباركود الصغير جداً)
 const tools = el("div", "cam-tools"); tools.hidden = true;
@@ -142,7 +143,9 @@ const torchBtn = el("button", null, "🔦 فلاش"); torchBtn.type = "button"; 
 const zoomIn = el("input"); zoomIn.type = "range"; zoomIn.hidden = true; zoomIn.setAttribute("aria-label", "زوم الكاميرا");
 const zoomLbl = el("span", "meta", "");
 const shotBtn = el("button", null, "📸 التقاط بدقة كاملة"); shotBtn.type = "button"; shotBtn.hidden = true; // صورة ثابتة بدقة الكاميرا (ImageCapture) والباركود بيتقرا منها
-tools.append(shotBtn, torchBtn, zoomIn, zoomLbl);
+const autoHiL = el("label", "scan-opt"), autoHiChk = el("input"); autoHiChk.type = "checkbox"; autoHiChk.checked = true; autoHiL.hidden = !window.ImageCapture;
+autoHiL.append(autoHiChk, "تصوير تلقائي بدقة كاملة أول ما الكاميرا تلمح الباركود");
+tools.append(shotBtn, torchBtn, zoomIn, zoomLbl, autoHiL);
 camMsg.before(tools);
 
 const loadZx = () => zxPromise || (zxPromise = new Promise((res, rej) => {
@@ -288,6 +291,7 @@ async function camStart() {
       let dets = [];
       try { dets = await det.read(video, { roi: visibleROI(), maxW: det.native ? 2400 : 1400 }); } catch { /* نكمّل */ }
       if (gen !== camGen || done) return;
+      if (dets.length && autoHiChk.checked && !hiBusy && Date.now() - hiAt > 4000) hiCapture(gen, false); // لمحنا باركود: صوّر بدقة كاملة
       // أول كود منتج صالح (رقم المراجعة سليم) هو المرشح. الأرقام الغلط بتتجاهل والكاميرا بتفضل شغالة
       let cand = null, seen = null;
       for (const d of dets) {
@@ -301,13 +305,7 @@ async function camStart() {
         const key = AR(String(cand.raw)).trim(), now = Date.now();
         const n = votes && votes.key === key && now - votes.t < 1800 ? votes.n + 1 : 1;
         votes = { key, n, t: now };
-        if (n >= cand.need) {
-          done = true; cam.classList.add("ok"); // المربع يبقى أخضر لحظة قبل ما نقفل
-          try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ }
-          camMsg.textContent = "تم التقاط الباركود ✓";
-          setTimeout(() => { if (gen !== camGen) return; camStop(); camMsg.textContent = "تم التقاط الباركود وقفلنا الكاميرا. اضغط «📷 افتح الكاميرا» لمسح تاني."; submit(cand.raw); }, 450);
-          return;
-        }
+        if (n >= cand.need) { done = true; finishScan(cand.raw, gen); return; }
       }
       if (bad >= 4) { camMsg.textContent = "بنقرا أرقام غير صحيحة ونتجاهلها. قرّب شوية، ثبّت الموبايل أو شغّل الفلاش."; bad = 0; }
     }
@@ -317,11 +315,20 @@ async function camStart() {
 }
 camBtn.addEventListener("click", () => (camOn ? camStop() : camStart()));
 
-// التقاط بدقة كاملة: بنطلب من الكاميرا صورة ثابتة بأعلى دقة (مش لقطة من الفيديو) وبنقرا الباركود منها
-let shotBusy = false;
-shotBtn.addEventListener("click", async () => {
-  if (!camOn || !track || shotBusy) return;
-  shotBusy = true; shotBtn.disabled = true; camMsg.textContent = "بنلتقط صورة بدقة كاملة…";
+// التقاط بدقة كاملة: بنطلب من الكاميرا صورة ثابتة بأعلى دقة (مش لقطة من الفيديو) وبنقرا الباركود منها.
+// بيشتغل بالزرار، وتلقائي أول ما المسح المباشر يلمح أي باركود (لو الخيار مفعّل). لو فشل بنكمّل بالمسح المباشر.
+function finishScan(raw, gen) {
+  if (gen !== camGen || finishedGen === gen) return; // مرة واحدة بس لكل جلسة كاميرا
+  finishedGen = gen;
+  cam.classList.add("ok");
+  try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ }
+  camMsg.textContent = "تم التقاط الباركود ✓";
+  setTimeout(() => { if (gen !== camGen) return; camStop(); camMsg.textContent = "تم التقاط الباركود وقفلنا الكاميرا. اضغط «📷 افتح الكاميرا» لمسح تاني."; submit(raw); }, 450);
+}
+async function hiCapture(gen, manual) {
+  if (!camOn || !track || hiBusy || gen !== camGen || finishedGen === gen || !window.ImageCapture) return;
+  hiBusy = true; shotBtn.disabled = true;
+  camMsg.textContent = manual ? "بنلتقط صورة بدقة كاملة…" : "لمحنا باركود، بنصوّر بدقة كاملة… ثبّت الموبايل";
   try {
     const ic = new window.ImageCapture(track);
     let opts = {};
@@ -331,19 +338,16 @@ shotBtn.addEventListener("click", async () => {
     const det = await makeDetector();
     const r = await readStill(bmp, det);
     if (bmp.close) bmp.close();
-    if (r.raw) {
-      cam.classList.add("ok");
-      try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ }
-      camMsg.textContent = "تم التقاط الباركود ✓";
-      const raw = r.raw;
-      setTimeout(() => { camStop(); camMsg.textContent = "تم التقاط الباركود وقفلنا الكاميرا. اضغط «📷 افتح الكاميرا» لمسح تاني."; submit(raw); }, 450);
-    } else camMsg.textContent = r.invalid ? "اتقرا رقم بس رقم المراجعة بتاعه غلط، فاتجاهلناه. قرّب الباركود وثبّت الموبايل وجرّب تاني."
+    if (gen !== camGen) return;
+    if (r.raw) finishScan(r.raw, gen);
+    else if (manual) camMsg.textContent = r.invalid ? "اتقرا رقم بس رقم المراجعة بتاعه غلط، فاتجاهلناه. قرّب الباركود وثبّت الموبايل وجرّب تاني."
       : "ما لقيناش باركود واضح في الصورة. خلّي الباركود جوه الإطار وقرّب شوية وجرّب تاني.";
+    else camMsg.textContent = "الصورة الكاملة ما اتقرتش، بنكمّل مسح مباشر…";
   } catch (e) {
-    camMsg.textContent = "تعذّر التقاط الصورة (" + ((e && e.name) || "خطأ") + "). جرّب تاني أو استخدم «🖼️ صورة بدقة عالية».";
-  }
-  shotBusy = false; shotBtn.disabled = false;
-});
+    camMsg.textContent = manual ? "تعذّر التقاط الصورة (" + ((e && e.name) || "خطأ") + "). جرّب تاني أو استخدم «🖼️ صورة بدقة عالية»." : "تعذّر التصوير بدقة كاملة، بنكمّل مسح مباشر.";
+  } finally { hiBusy = false; hiAt = Date.now(); shotBtn.disabled = false; }
+}
+shotBtn.addEventListener("click", () => hiCapture(camGen, true));
 
 // صورة ثابتة: بنجرّب أكتر من مقياس وقصّ للمنتصف، وبنقبل بس الكود اللي رقم مراجعته سليم
 async function readStill(bmp, det) {
