@@ -524,11 +524,16 @@ body[data-view=home] #imgbox{display:none}
 .forms{max-height:min(60vh,470px);gap:6px}
 .forms .set-h{margin:6px 4px 0;font-size:13px;font-weight:600;color:var(--muted)}
 .forms .set-h:first-child{margin-top:0}
-/* الشكل الدوائي: نفس شكل نوع البحث (شريط بحبوب)، بس 3 في الصف عشان الاختيارات 9 */
-.forms .set-forms{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:2px 0 0;background:var(--soft);border:1px solid var(--line);border-radius:26px;padding:5px}
-.forms .set-forms button{justify-content:center;width:auto;min-height:40px;padding:8px 4px;text-align:center;border:0;background:transparent;border-radius:999px;font-size:12.5px;font-weight:500;line-height:1.3;transition:background .15s,color .15s}
+/* الشكل الدوائي: صف واحد بحبوب زي نوع البحث، بيتحرّك يمين وشمال، وتحته شريط بيبيّن مكانك */
+.forms .set-formswrap{display:flex;flex-direction:column;gap:6px;margin:2px 0 0}
+.forms .set-forms{display:flex;flex-direction:row;gap:4px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-x:contain;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:5px;--fl:0px;--fr:0px;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 var(--fl),#000 calc(100% - var(--fr)),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 var(--fl),#000 calc(100% - var(--fr)),transparent 100%)}
+.forms .set-forms::-webkit-scrollbar{display:none}
+.forms .set-forms button{flex:none;scroll-snap-align:center;justify-content:center;width:auto;min-height:40px;padding:0 16px;text-align:center;white-space:nowrap;border:0;background:transparent;border-radius:999px;font-size:13px;font-weight:500;line-height:1.3;transition:background .15s,color .15s}
 .forms .set-forms button[aria-checked=true]{background:var(--grad);color:#fff;font-weight:600;box-shadow:var(--grad-shadow)}
 .forms .set-forms button[aria-checked=true]::after{content:none}
+.forms .set-track{position:relative;height:4px;margin:0 22px;border-radius:999px;background:var(--line)}
+.forms .set-track[hidden]{display:none}
+.forms .set-thumb{position:absolute;top:0;height:100%;border-radius:999px;background:var(--accent);transition:inset-inline-start .08s linear}
 /* نوع البحث: شريط واحد بـ4 اختيارات (زي ما كان) بس جوه قايمة الإعدادات في نفس مكانه */
 .forms .types{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:2px 0 0;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:5px}
 .forms .types label{--tag-hole:var(--soft);position:relative;display:flex;align-items:center;justify-content:center;gap:5px;width:auto;min-height:0;padding:11px 2px;text-align:center;border-radius:999px;border:0;background:transparent;color:var(--ink);cursor:pointer;font-size:12.5px;font-weight:500;line-height:1.3;white-space:nowrap;transition:background .15s,color .15s}

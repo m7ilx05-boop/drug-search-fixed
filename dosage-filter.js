@@ -22,7 +22,29 @@ const btn = $("ffBtn"), strip = $("forms"), note = $("ffnote");
 // القائمة: فوق "نوع البحث" (الراديوهات اتنقلت هنا من الفورم)، وتحتها "الشكل الدوائي"، وزرار "تم" في الآخر
 strip.append(el("div", "set-h", "الشكل الدوائي"));
 const formsBox = el("div", "set-forms"); formsBox.setAttribute("role", "radiogroup"); formsBox.setAttribute("aria-label", "الشكل الدوائي");
-strip.append(formsBox);
+// صف واحد بيتحرّك يمين وشمال. تحته شريط صغير بيبيّن مكانك من باقي الاختيارات، وبيبهت الطرف اللي فيه اختيارات مخبية
+const formsWrap = el("div", "set-formswrap");
+const track = el("div", "set-track"); track.setAttribute("aria-hidden", "true");
+const thumb = el("div", "set-thumb"); track.append(thumb);
+formsWrap.append(formsBox, track);
+strip.append(formsWrap);
+function syncScroll() {
+  const max = formsBox.scrollWidth - formsBox.clientWidth;
+  if (formsBox.clientWidth === 0) return; // القايمة مقفولة
+  const more = max > 2;
+  track.hidden = !more;
+  if (!more) { formsBox.style.setProperty("--fl", "0px"); formsBox.style.setProperty("--fr", "0px"); return; }
+  const rtl = getComputedStyle(formsBox).direction === "rtl";
+  const pos = Math.min(Math.max(Math.abs(formsBox.scrollLeft), 0), max); // المسافة من أول القايمة (يمين في العربي)
+  const w = Math.max(track.clientWidth * (formsBox.clientWidth / formsBox.scrollWidth), 28);
+  thumb.style.width = w + "px";
+  thumb.style.insetInlineStart = (pos / max) * (track.clientWidth - w) + "px";
+  const startMore = pos > 2, endMore = pos < max - 2;       // start = أول القايمة، end = آخرها
+  formsBox.style.setProperty(rtl ? "--fr" : "--fl", startMore ? "26px" : "0px");
+  formsBox.style.setProperty(rtl ? "--fl" : "--fr", endMore ? "26px" : "0px");
+}
+formsBox.addEventListener("scroll", syncScroll, { passive: true });
+if (window.ResizeObserver) new ResizeObserver(syncScroll).observe(formsBox); else window.addEventListener("resize", syncScroll);
 FORMS.forEach((f, i) => {
   const b = el("button", null, f.label); b.type = "button"; b.dataset.id = f.id;
   b.setAttribute("role", "radio"); b.setAttribute("aria-checked", i === 0 ? "true" : "false");
@@ -40,7 +62,10 @@ function syncDot() {
   if (window.__ff && f) parts.push("الشكل الدوائي: " + f.label);
   btn.title = parts.join(" · ");
 }
-function setOpen(open) { strip.hidden = !open; btn.setAttribute("aria-expanded", open ? "true" : "false"); }
+function setOpen(open) {
+  strip.hidden = !open; btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) requestAnimationFrame(() => { const on = formsBox.querySelector("[aria-checked=true]"); if (on) on.scrollIntoView({ inline: "nearest", block: "nearest" }); syncScroll(); });
+}
 btn.addEventListener("click", () => setOpen(strip.hidden));
 done.addEventListener("click", () => setOpen(false));
 strip.addEventListener("change", syncDot); // تغيير نوع البحث
@@ -48,6 +73,7 @@ strip.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-id]"); if (!b) return;
   window.__ff = b.dataset.id;
   formsBox.querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", x === b ? "true" : "false"));
+  b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
   syncDot();
   clearNote();
 });
