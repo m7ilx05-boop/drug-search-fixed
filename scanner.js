@@ -115,7 +115,7 @@ inp.setAttribute("aria-label", "حقل استقبال السكانر"); inp.plac
 const optL = el("label", "scan-opt"); const noEnter = el("input"); noEnter.type = "checkbox";
 optL.append(noEnter, "السكانر لا يرسل Enter بعد المسح (الاكتشاف التلقائي بالسرعة)");
 const note = el("div", "meta");
-box.append(top, cam, camMsg, inp, optL, note, phoneIn);
+box.append(cam, camMsg, top, inp, optL, note, phoneIn); // الكاميرا فوق، وكل الأزرار تحتها
 const outBox = el("div"); outBox.setAttribute("aria-live", "polite");
 const logTitle = el("h3", "sec", "آخر عمليات المسح"); const logList = el("div", "scan-log");
 panel.append(box, outBox, logTitle, logList);
@@ -146,7 +146,7 @@ const shotBtn = el("button", null, "📸 التقاط بدقة كاملة"); sho
 const autoHiL = el("label", "scan-opt"), autoHiChk = el("input"); autoHiChk.type = "checkbox"; autoHiChk.checked = true; autoHiL.hidden = !window.ImageCapture;
 autoHiL.append(autoHiChk, "تصوير تلقائي بدقة كاملة أول ما الكاميرا تلمح الباركود");
 tools.append(shotBtn, torchBtn, zoomIn, zoomLbl, autoHiL);
-camMsg.before(tools);
+camMsg.after(tools);
 
 const loadZx = () => zxPromise || (zxPromise = new Promise((res, rej) => {
   if (window.ZXing) return res(window.ZXing);
