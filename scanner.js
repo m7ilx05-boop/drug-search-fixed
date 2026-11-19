@@ -101,13 +101,10 @@ const panel = el("section"); panel.id = "scanPanel"; panel.hidden = true;
 const box = el("div", "scan-box");
 const top = el("div", "scan-top");
 const state = el("span", "scan-state", "جاهز للمسح");
-const camBtn = el("button", null, "تشغيل الكاميرا"); camBtn.type = "button";
 const phoneBtn = el("button", null, "📷 كاميرا الجوال"); phoneBtn.type = "button"; // بيفتح تطبيق كاميرا الجوال نفسه ويقرا الباركود من الصورة
 const phoneIn = el("input"); phoneIn.type = "file"; phoneIn.accept = "image/*"; phoneIn.setAttribute("capture", "environment"); phoneIn.hidden = true;
 const stop = el("button", null, "إيقاف وضع المسح"); stop.type = "button";
-top.append(state, camBtn, phoneBtn, stop);
-const cam = el("div", "cam"); cam.append(Object.assign(el("video"), { muted: true, autoplay: true }), el("div", "frame"));
-const video = cam.firstChild; video.setAttribute("playsinline", "");
+top.append(state, phoneBtn, stop);
 const camMsg = el("div", "meta");
 const inp = el("input"); inp.id = "scanIn"; inp.type = "text"; inp.autocomplete = "off"; inp.spellcheck = false;
 inp.setAttribute("inputmode", "none"); // على الموبايل: من غير ما الكيبورد يطلع. السكانر الـ USB بيكتب عادي
@@ -115,7 +112,7 @@ inp.setAttribute("aria-label", "حقل استقبال السكانر"); inp.plac
 const optL = el("label", "scan-opt"); const noEnter = el("input"); noEnter.type = "checkbox";
 optL.append(noEnter, "السكانر لا يرسل Enter بعد المسح (الاكتشاف التلقائي بالسرعة)");
 const note = el("div", "meta");
-box.append(top, cam, camMsg, inp, optL, note, phoneIn);
+box.append(top, camMsg, inp, optL, note, phoneIn);
 const outBox = el("div"); outBox.setAttribute("aria-live", "polite");
 const logTitle = el("h3", "sec", "آخر عمليات المسح"); const logList = el("div", "scan-log");
 panel.append(box, outBox, logTitle, logList);
@@ -129,27 +126,13 @@ const hideIds = ["f", "out", "more", "status", "imgbox", "fam"];
 const setState = () => { const ok = document.activeElement === inp; state.textContent = ok ? "جاهز للمسح" : "التركيز مفقود — اضغط في أي مكان"; state.className = "scan-state" + (ok ? "" : " lost"); };
 const refocus = () => { if (active && document.activeElement !== inp) inp.focus({ preventScroll: true }); setState(); };
 
-// ===== مسح بالكاميرا جوه البرنامج (باركود خطي + QR + DataMatrix) =====
-// الكاميرا بتفتح جوه الصفحة نفسها، ومربع بيتتبع الباركود وبيقفل عليه (أصفر = بيقرا، أخضر = اتلقط، أحمر = رقم غلط).
-// القراءة جوه المتصفح: BarcodeDetector لو بيدعم الأنواع المطلوبة، وإلا مكتبة ZXing (نسخة على موقعنا). الفيديو ما بيتبعتش لأي سيرفر.
-// دقة 1080p + تركيز مستمر + زوم وفلاش. وكل قراءة بتتراجع (رقم المراجعة) وبتتكرر مرتين ورا بعض قبل ما تتقبل، فالرقم الغلط ما بيعدّيش.
-// بنقرا بس الجزء اللي ظاهر قدامك على الشاشة، بدقته الكاملة.
+// ===== قراءة الباركود من صورة كاميرا الجوال (تطبيق الكاميرا الأصلي) =====
+// مفيش كاميرا جوه الصفحة: الكاميرا الأصلية في الجوال بتصوّر، والصورة بتتقرا جوه المتصفح (BarcodeDetector أو ZXing). الصورة مبتتبعتش لأي سيرفر.
 const WANT = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "itf", "qr_code", "data_matrix"];
 const ZX_URLS = ["vendor/zxing-0.21.3.min.js", "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"]; // نسخة على موقعنا الأول، وبعدها CDN
-let zxPromise = null, stream = null, track = null, camOn = false, camGen = 0, torchOn = false;
+let zxPromise = null;
 
-camBtn.textContent = "📷 افتح الكاميرا"; phoneBtn.textContent = "🖼️ صورة بدقة عالية"; // الزر التاني بيفتح تطبيق الكاميرا الأصلي لصورة واحدة (للباركود الصغير جداً)
-const css2 = document.createElement("style");
-css2.textContent = ".cam-tools{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}.cam-tools input[type=range]{flex:1;min-width:120px}"
-  + ".cam canvas.trk{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.cam.live .frame{display:none}"
-  + "@media (pointer:coarse){.cam{aspect-ratio:3/4}}";
-document.head.append(css2);
-const tools = el("div", "cam-tools"); tools.hidden = true;
-const torchBtn = el("button", null, "🔦 فلاش"); torchBtn.type = "button"; torchBtn.hidden = true;
-const zoomIn = el("input"); zoomIn.type = "range"; zoomIn.hidden = true; zoomIn.setAttribute("aria-label", "زوم الكاميرا");
-const zoomLbl = el("span", "meta", "");
-tools.append(torchBtn, zoomIn, zoomLbl);
-camMsg.before(tools);
+phoneBtn.textContent = "📷 صوّر الباركود بكاميرا الجوال";
 
 const loadZx = () => zxPromise || (zxPromise = new Promise((res, rej) => {
   if (window.ZXing) return res(window.ZXing);
@@ -176,20 +159,6 @@ function drawROI(src, roi, maxW) {
   lastROI = { x, y, k }; // عشان نرجّع إحداثيات الكود لمكانه في الفريم الأصلي
   return cvs;
 }
-// أربع نقط للمربع من نقط القراءة (الباركود الخطي بيرجّع نقطتين بس: بنرسم حواليهم مستطيل)
-function quadFrom(pts) {
-  if (!pts || pts.length < 2) return null;
-  if (pts.length >= 3) {
-    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const px = (x1 - x0) * 0.12 + 6, py = (y1 - y0) * 0.12 + 6;
-    return [[x0 - px, y0 - py], [x1 + px, y0 - py], [x1 + px, y1 + py], [x0 - px, y1 + py]];
-  }
-  const a = pts[0], b = pts[1], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len, ny = dx / len, h = len * 0.18 + 6;
-  return [[a[0] + nx * h, a[1] + ny * h], [b[0] + nx * h, b[1] + ny * h], [b[0] - nx * h, b[1] - ny * h], [a[0] - nx * h, a[1] - ny * h]];
-}
-
 // read(src, { roi, maxW }) بترجّع [{ text, pts }] (ممكن أكتر من كود في الفريم، زي EAN و DataMatrix على نفس العلبة)
 async function makeDetector() {
   if ("BarcodeDetector" in window) {
@@ -232,138 +201,6 @@ async function makeDetector() {
   };
 }
 
-// ===== المربع اللي بيتتبع الباركود =====
-const trk = document.createElement("canvas"); trk.className = "trk"; cam.append(trk);
-const tctx = trk.getContext("2d");
-const COL = { ok: "#22c55e", warn: "#facc15", bad: "#ef4444" };
-let tgt = null, cur = null, tcol = "warn", tgtAt = 0, raf = 0;
-const setTarget = (pts, c) => { const q = quadFrom(pts); if (!q) return; tgt = q; tcol = c; tgtAt = performance.now(); };
-function mapPt(p) { // من إحداثيات الفيديو لإحداثيات الشاشة (الفيديو object-fit: cover)
-  const vw = video.videoWidth || 1, vh = video.videoHeight || 1, cw = trk.clientWidth, ch = trk.clientHeight;
-  const s = Math.max(cw / vw, ch / vh);
-  return [(cw - vw * s) / 2 + p[0] * s, (ch - vh * s) / 2 + p[1] * s];
-}
-function paint() {
-  raf = requestAnimationFrame(paint);
-  const dpr = window.devicePixelRatio || 1, cw = trk.clientWidth, ch = trk.clientHeight;
-  if (trk.width !== Math.round(cw * dpr) || trk.height !== Math.round(ch * dpr)) { trk.width = Math.round(cw * dpr); trk.height = Math.round(ch * dpr); }
-  tctx.setTransform(dpr, 0, 0, dpr, 0, 0); tctx.clearRect(0, 0, cw, ch);
-  if (!tgt || performance.now() - tgtAt > 500) { cur = null; return; } // الكود اختفى: المربع يختفي
-  const goal = tgt.map(mapPt);
-  cur = cur ? cur.map((p, i) => [p[0] + (goal[i][0] - p[0]) * 0.4, p[1] + (goal[i][1] - p[1]) * 0.4]) : goal; // حركة ناعمة ورا الكود
-  const col = COL[tcol] || COL.warn;
-  tctx.beginPath(); cur.forEach((p, i) => (i ? tctx.lineTo(p[0], p[1]) : tctx.moveTo(p[0], p[1]))); tctx.closePath();
-  tctx.fillStyle = col + "33"; tctx.fill();
-  tctx.lineWidth = 4; tctx.lineJoin = "round"; tctx.strokeStyle = col; tctx.stroke();
-  if (tcol === "ok") { tctx.font = "bold 20px sans-serif"; tctx.fillStyle = col; tctx.fillText("✓", Math.min(...cur.map((p) => p[0])) + 4, Math.min(...cur.map((p) => p[1])) - 6); }
-}
-// الجزء اللي ظاهر فعلاً على الشاشة من الفريم (نسب)، عشان نقرا اللي بتشوفه بس
-function visibleROI() {
-  const vw = video.videoWidth, vh = video.videoHeight, cw = cam.clientWidth, ch = cam.clientHeight;
-  if (!vw || !vh || !cw || !ch) return [0.05, 0.1, 0.9, 0.8];
-  const s = Math.max(cw / vw, ch / vh), fw = Math.min(1, cw / (vw * s)), fh = Math.min(1, ch / (vh * s)), m = 0.03;
-  return [(1 - fw) / 2 + fw * m, (1 - fh) / 2 + fh * m, fw * (1 - 2 * m), fh * (1 - 2 * m)];
-}
-
-function camStop() {
-  camGen++; camOn = false;
-  cancelAnimationFrame(raf); tgt = null; cur = null; tctx.clearRect(0, 0, trk.width, trk.height);
-  if (stream) stream.getTracks().forEach((t) => t.stop());
-  stream = null; track = null; torchOn = false; video.srcObject = null;
-  tools.hidden = true; torchBtn.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
-  cam.classList.remove("on", "live"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
-}
-
-zoomIn.addEventListener("input", () => {
-  if (!track) return;
-  const z = Number(zoomIn.value); zoomLbl.textContent = "×" + z.toFixed(1);
-  track.applyConstraints({ advanced: [{ zoom: z }] }).catch(() => {});
-});
-torchBtn.addEventListener("click", async () => {
-  if (!track) return;
-  torchOn = !torchOn;
-  try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); torchBtn.textContent = torchOn ? "🔦 إطفاء الفلاش" : "🔦 فلاش"; }
-  catch { torchOn = false; }
-});
-
-async function camStart() {
-  if (camOn) return;
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { camMsg.textContent = "الكاميرا مش متاحة في المتصفح ده (محتاجة HTTPS ومتصفح حديث)."; return; }
-  camBtn.disabled = true; camMsg.textContent = "جاري تشغيل الكاميرا…";
-  const gen = ++camGen;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }, audio: false });
-  } catch (e) {
-    camBtn.disabled = false;
-    camMsg.textContent = e.name === "NotAllowedError" ? "صلاحية الكاميرا اتمنعت. فعّلها من إعدادات المتصفح وجرّب تاني."
-      : e.name === "NotFoundError" ? "مفيش كاميرا على الجهاز ده." : "تعذّر تشغيل الكاميرا (" + e.name + ").";
-    return;
-  }
-  if (gen !== camGen) { stream.getTracks().forEach((t) => t.stop()); stream = null; return; }
-  video.srcObject = stream;
-  cam.classList.add("on", "live"); camMsg.textContent = "الكاميرا اشتغلت. جاري تجهيز قارئ الباركود…";
-  try { await video.play(); } catch { /* autoplay هيشتغل أول ما الفريم يجهز */ }
-
-  // تركيز مستمر + زوم + فلاش (لو الجهاز بيدعمهم)
-  track = stream.getVideoTracks()[0] || null;
-  const caps = track && track.getCapabilities ? track.getCapabilities() : {};
-  const adv = [];
-  if (caps.focusMode && caps.focusMode.includes("continuous")) adv.push({ focusMode: "continuous" });
-  if (caps.exposureMode && caps.exposureMode.includes("continuous")) adv.push({ exposureMode: "continuous" });
-  if (adv.length) { try { await track.applyConstraints({ advanced: adv }); } catch { /* مش مدعوم */ } }
-  if (caps.zoom && caps.zoom.max > caps.zoom.min) {
-    const z0 = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 2));
-    zoomIn.min = caps.zoom.min; zoomIn.max = caps.zoom.max; zoomIn.step = caps.zoom.step || 0.1; zoomIn.value = z0;
-    try { await track.applyConstraints({ advanced: [{ zoom: z0 }] }); zoomLbl.textContent = "×" + z0.toFixed(1); zoomIn.hidden = false; tools.hidden = false; } catch { /* مش مدعوم */ }
-  }
-  if (caps.torch) { torchBtn.hidden = false; tools.hidden = false; }
-
-  let det;
-  try { det = await makeDetector(); }
-  catch (e) { camStop(); camMsg.textContent = "تعذّر تحميل قارئ الباركود (" + e.message + "). تأكد من الإنترنت وجرّب تاني، أو استخدم السكانر أو ابحث بصورة المنتج."; return; }
-  if (gen !== camGen) return;
-  camOn = true; camBtn.disabled = false; camBtn.textContent = "إيقاف الكاميرا";
-  camMsg.textContent = "وجّه الكاميرا ناحية الباركود وهيتلقط لوحده، والمربع بيتتبعه. لو صغير استخدم الزوم والفلاش.";
-  cancelAnimationFrame(raf); raf = requestAnimationFrame(paint);
-
-  let votes = null, bad = 0, done = false;
-  const schedule = () => { if (gen !== camGen || done) return; if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => tick()); else setTimeout(tick, 100); };
-  const tick = async () => {
-    if (gen !== camGen || done) return;
-    if (video.readyState >= 2 && video.videoWidth) {
-      let dets = [];
-      try { dets = await det.read(video, { roi: visibleROI(), maxW: det.native ? 2400 : 1400 }); } catch { /* نكمّل */ }
-      if (gen !== camGen || done) return;
-      // أول كود منتج صالح (رقم المراجعة سليم) هو المرشح. الأرقام الغلط بتتجاهل والكاميرا بتفضل شغالة
-      let cand = null, seen = null;
-      for (const d of dets) {
-        const p = parseScan(d.text);
-        if (p.kind === "empty") continue;
-        if (p.gtins) { cand = { raw: d.text, need: 2, d }; break; }
-        if ((p.kind === "gtin" || p.kind === "gs1") && p.error) { bad++; if (!seen) seen = d; continue; }
-        if (!cand) cand = { raw: d.text, need: 3, d }; // QR/نص مش رقم منتج: بنطلب تكرار أكتر قبل ما نوقف
-      }
-      if (cand) {
-        const key = AR(String(cand.raw)).trim(), now = Date.now();
-        const n = votes && votes.key === key && now - votes.t < 1800 ? votes.n + 1 : 1;
-        votes = { key, n, t: now };
-        if (n >= cand.need) {
-          done = true; setTarget(cand.d.pts, "ok"); // المربع يبقى أخضر لحظة قبل ما نقفل
-          try { if (navigator.vibrate) navigator.vibrate(60); } catch { /* مش مدعوم */ }
-          camMsg.textContent = "تم التقاط الباركود ✓";
-          setTimeout(() => { if (gen !== camGen) return; camStop(); camMsg.textContent = "تم التقاط الباركود وقفلنا الكاميرا. اضغط «📷 افتح الكاميرا» لمسح تاني."; submit(cand.raw); }, 450);
-          return;
-        }
-        setTarget(cand.d.pts, "warn");
-      } else if (seen) setTarget(seen.pts, "bad"); // اتقرا رقم غلط: مربع أحمر والكاميرا مكمّلة
-      if (bad >= 4) { camMsg.textContent = "بنقرا أرقام غير صحيحة ونتجاهلها. قرّب شوية، ثبّت الموبايل أو شغّل الفلاش."; bad = 0; }
-    }
-    schedule();
-  };
-  tick();
-}
-camBtn.addEventListener("click", () => (camOn ? camStop() : camStart()));
-
 // صورة ثابتة: بنجرّب أكتر من مقياس وقصّ للمنتصف، وبنقبل بس الكود اللي رقم مراجعته سليم
 async function readStill(bmp, det) {
   const tries = [{ maxW: 1800 }, { maxW: 3000 }, { roi: [0.1, 0.2, 0.8, 0.6], maxW: 3000 }, { roi: [0, 0.3, 1, 0.4], maxW: 3000 }];
@@ -384,7 +221,6 @@ async function readStill(bmp, det) {
 phoneBtn.addEventListener("click", () => { phoneIn.value = ""; phoneIn.click(); });
 phoneIn.addEventListener("change", async () => {
   const f = phoneIn.files && phoneIn.files[0]; if (!f) return;
-  if (camOn) camStop();
   phoneBtn.disabled = true; camMsg.textContent = "جاري قراءة الباركود من الصورة…";
   try {
     const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
@@ -399,16 +235,15 @@ phoneIn.addEventListener("change", async () => {
   }
   phoneBtn.disabled = false; phoneIn.value = "";
 });
-document.addEventListener("visibilitychange", () => { if (document.hidden && camOn) { camStop(); camMsg.textContent = "الكاميرا اتقفلت لأنك سبت الصفحة. شغّلها تاني لو عايز."; } });
 
 function start() {
   active = true;
   try { polling++; clearMore(); } catch {}
   hideIds.forEach((id) => { const n = $(id); if (n) n.style.display = "none"; });
-  panel.hidden = false; refocus(); if (window.matchMedia && window.matchMedia("(pointer:coarse)").matches) camStart();
+  panel.hidden = false; refocus(); if (window.matchMedia && window.matchMedia("(pointer:coarse)").matches) { phoneIn.value = ""; phoneIn.click(); } // على الموبايل: بيفتح كاميرا الجوال على طول
 }
 function end() {
-  active = false; camStop(); camMsg.textContent = ""; panel.hidden = true; inp.value = "";
+  active = false; camMsg.textContent = ""; panel.hidden = true; inp.value = "";
   hideIds.forEach((id) => { const n = $(id); if (n) n.style.display = ""; });
   $("q").focus();
 }
