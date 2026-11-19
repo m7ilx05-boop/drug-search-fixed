@@ -86,6 +86,11 @@ css.textContent = `.scan-btn{display:block;width:100%;margin-top:12px;background
 .scan-top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .scan-state{font-weight:600;padding:3px 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok)}
 .scan-state.lost{background:var(--warn-bg);color:var(--warn)}
+.cam-state{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:3;display:inline-flex;align-items:center;gap:8px;padding:5px 14px;font-size:13px;white-space:nowrap;background:rgba(0,0,0,.6);color:#fff;pointer-events:none}
+.cam-state::before{content:"";flex:none;width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px 2px rgba(34,197,94,.8);animation:scanDot 1.2s ease-in-out infinite}
+.cam-state.lost{background:rgba(0,0,0,.6);color:#fde68a}.cam-state.lost::before{background:#fbbf24;box-shadow:0 0 8px 2px rgba(251,191,36,.8)}
+@keyframes scanDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.15;transform:scale(.7)}}
+@media (prefers-reduced-motion:reduce){.cam-state::before{animation:none}}
 #scanIn{width:100%;margin-top:10px;direction:ltr;text-align:center;font:inherit;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
 .cam-ctl{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--accent);border-radius:14px;background:rgba(127,127,127,.08)}
 .cam-ctl input[type=range]{flex:1 1 auto;min-width:0}.cam-ctl button{flex:none;white-space:nowrap}
@@ -110,6 +115,7 @@ const stop = el("button", null, "إيقاف وضع المسح"); stop.type = "bu
 top.append(state, camBtn, phoneBtn, stop);
 const cam = el("div", "cam"); cam.append(Object.assign(el("video"), { muted: true, autoplay: true }), el("div", "frame"), el("div", "scanline"));
 const video = cam.firstChild; video.setAttribute("playsinline", "");
+const camState = el("span", "scan-state cam-state", "جاهز للمسح"); cam.append(camState); // نفس حالة «جاهز للمسح» فوق الكاميرا بنقطة خضراء بتنوّر وتطفي
 const camMsg = el("div", "meta");
 const inp = el("input"); inp.id = "scanIn"; inp.type = "text"; inp.autocomplete = "off"; inp.spellcheck = false;
 inp.setAttribute("inputmode", "none"); inp.setAttribute("enterkeyhint", "search"); // على الموبايل: من غير ما الكيبورد يطلع. السكانر الـ USB بيكتب عادي
@@ -128,7 +134,7 @@ const inflight = new Set(), log = [];
 const OUT = { found: ["تم العثور", "ok"], ambiguous: ["باركود مشترك", "warn"], not_found: ["غير موجود", "bad"], invalid: ["غير صالح", "bad"], error: ["خطأ", "bad"], pending: ["جاري البحث", "warn"] };
 const hideIds = ["f", "out", "more", "status", "imgbox", "fam"];
 
-const setState = () => { const ok = document.activeElement === inp; state.textContent = ok ? "جاهز للمسح" : "التركيز مفقود — اضغط في أي مكان"; state.className = "scan-state" + (ok ? "" : " lost"); };
+const setState = () => { const ok = document.activeElement === inp; state.textContent = ok ? "جاهز للمسح" : "التركيز مفقود — اضغط في أي مكان"; state.className = "scan-state" + (ok ? "" : " lost"); camState.textContent = ok ? "جاهز للمسح" : "التركيز مفقود"; camState.className = "scan-state cam-state" + (ok ? "" : " lost"); };
 const refocus = () => { if (active && document.activeElement !== inp) inp.focus({ preventScroll: true }); setState(); };
 
 // ===== مسح بالكاميرا جوه البرنامج (باركود خطي + QR + DataMatrix) =====
