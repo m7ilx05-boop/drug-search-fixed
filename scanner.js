@@ -87,6 +87,8 @@ css.textContent = `.scan-btn{display:block;width:100%;margin-top:12px;background
 .scan-state{font-weight:600;padding:3px 12px;border-radius:999px;background:var(--ok-bg);color:var(--ok)}
 .scan-state.lost{background:var(--warn-bg);color:var(--warn)}
 #scanIn{width:100%;margin-top:10px;direction:ltr;text-align:center;font:inherit;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.cam-ctl{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--accent);border-radius:14px;background:rgba(127,127,127,.08)}
+.cam-ctl input[type=range]{flex:1 1 auto;min-width:0}.cam-ctl button{flex:none;white-space:nowrap}
 .scan-opt{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:14px;color:var(--muted)}
 .scan-msg{padding:12px 14px;border-radius:10px;margin-top:12px;font-weight:500}
 .scan-msg.warn{background:var(--warn-bg);color:var(--warn)}.scan-msg.bad{background:var(--bad-bg);color:var(--bad)}
@@ -110,8 +112,8 @@ const cam = el("div", "cam"); cam.append(Object.assign(el("video"), { muted: tru
 const video = cam.firstChild; video.setAttribute("playsinline", "");
 const camMsg = el("div", "meta");
 const inp = el("input"); inp.id = "scanIn"; inp.type = "text"; inp.autocomplete = "off"; inp.spellcheck = false;
-inp.setAttribute("inputmode", "none"); // على الموبايل: من غير ما الكيبورد يطلع. السكانر الـ USB بيكتب عادي
-inp.setAttribute("aria-label", "حقل استقبال السكانر"); inp.placeholder = "امسح العبوة بالسكانر…";
+inp.setAttribute("inputmode", "none"); inp.setAttribute("enterkeyhint", "search"); // على الموبايل: من غير ما الكيبورد يطلع. السكانر الـ USB بيكتب عادي
+inp.setAttribute("aria-label", "حقل استقبال السكانر"); inp.placeholder = "امسح العبوة بالسكانر… أو اضغط هنا واكتب الكود";
 const optL = el("label", "scan-opt"); const noEnter = el("input"); noEnter.type = "checkbox";
 optL.append(noEnter, "السكانر لا يرسل Enter بعد المسح (الاكتشاف التلقائي بالسرعة)");
 const note = el("div", "meta");
@@ -147,7 +149,9 @@ const camInfo = el("div", "meta cam-info"); camInfo.hidden = true; camInfo.dir =
 const shotBtn = el("button", null, "📸 التقاط بدقة كاملة"); shotBtn.type = "button"; shotBtn.hidden = true; // صورة ثابتة بدقة الكاميرا (ImageCapture) والباركود بيتقرا منها
 const autoHiL = el("label", "scan-opt"), autoHiChk = el("input"); autoHiChk.type = "checkbox"; autoHiChk.checked = true; autoHiL.hidden = !window.ImageCapture;
 autoHiL.append(autoHiChk, "تصوير تلقائي بدقة كاملة أول ما الكاميرا تلمح الباركود");
-tools.append(shotBtn, torchBtn, zoomIn, zoomLbl, autoHiL);
+const ctl = el("div", "cam-ctl"); ctl.hidden = true; // إطار واحد للفلاش + الزوم
+ctl.append(torchBtn, zoomIn, zoomLbl);
+tools.append(ctl, autoHiL); // زر «التقاط بدقة كاملة» اتشال: الالتقاط بيحصل تلقائياً
 camMsg.after(tools); tools.after(camInfo);
 // بيعرض الدقة والتركيز والزوم الفعليين (من الجهاز نفسه) بدل التخمين
 async function showCamInfo() {
@@ -286,7 +290,7 @@ function camStop() {
   camGen++; camOn = false; stopScanAnim(); clearInterval(afTimer); afTimer = 0;
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; track = null; torchOn = false; video.srcObject = null;
-  tools.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; camInfo.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
+  tools.hidden = true; ctl.hidden = true; shotBtn.hidden = true; torchBtn.hidden = true; camInfo.hidden = true; zoomIn.hidden = true; torchBtn.textContent = "🔦 فلاش";
   cam.classList.remove("on", "ok", "seen", "snap"); camBtn.disabled = false; camBtn.textContent = "📷 افتح الكاميرا";
 }
 
@@ -347,9 +351,9 @@ async function camStart() {
   if (caps.zoom && caps.zoom.max > caps.zoom.min) {
     const z0 = Math.min(Math.max(MIN_ZOOM, caps.zoom.min), caps.zoom.max); // يبدأ من MIN_ZOOM (أو أقصى زوم للجهاز لو أقل)
     zoomIn.min = z0; zoomIn.max = caps.zoom.max; zoomIn.step = caps.zoom.step || 0.1; zoomIn.value = z0;
-    try { await track.applyConstraints({ advanced: [{ zoom: z0 }] }); zoomLbl.textContent = "×" + z0.toFixed(1); zoomIn.hidden = false; tools.hidden = false; } catch { /* مش مدعوم */ }
+    try { await track.applyConstraints({ advanced: [{ zoom: z0 }] }); zoomLbl.textContent = "×" + z0.toFixed(1); zoomIn.hidden = false; ctl.hidden = false; tools.hidden = false; } catch { /* مش مدعوم */ }
   }
-  if (caps.torch) { torchBtn.hidden = false; tools.hidden = false; }
+  if (caps.torch) { torchBtn.hidden = false; ctl.hidden = false; tools.hidden = false; }
   startAutoFocus(caps);
   setTimeout(showCamInfo, 600); // بعد ما الفيديو يستقر
 
@@ -358,7 +362,7 @@ async function camStart() {
   catch (e) { camStop(); camMsg.textContent = "تعذّر تحميل قارئ الباركود (" + e.message + "). تأكد من الإنترنت وجرّب تاني، أو استخدم السكانر أو ابحث بصورة المنتج."; return; }
   if (gen !== camGen) return;
   camOn = true; camBtn.disabled = false; camBtn.textContent = "إيقاف الكاميرا";
-  if (window.ImageCapture && track) { shotBtn.hidden = false; tools.hidden = false; } // الزرار بيظهر بس لو المتصفح بيدعم التقاط صورة ثابتة
+  if (window.ImageCapture && track) { tools.hidden = false; } // الزرار بيظهر بس لو المتصفح بيدعم التقاط صورة ثابتة
   camMsg.textContent = "ابعد العلبة لحد ما الباركود يبقى كله جوه الإطار وهيتلقط لوحده. لو الإضاءة ضعيفة استخدم الفلاش.";
 
   let votes = null, bad = 0, done = false;
@@ -493,7 +497,11 @@ document.addEventListener("keydown", (e) => { // لو التركيز ضاع (م�
   if (e.key.length === 1 || e.key === "Enter") refocus();
 }, true);
 
-function flush() { const v = inp.value; inp.value = ""; times = []; clearTimeout(timer); submit(v); }
+// إدخال يدوي: الضغط على الحقل يفتح كيبورد الأرقام، وبعد الإرسال بيرجع يقفل (عشان السكانر ميفتحش الكيبورد)
+function manualOn() { if (inp.getAttribute("inputmode") === "numeric") return; inp.setAttribute("inputmode", "numeric"); inp.blur(); inp.focus({ preventScroll: true }); }
+function manualOff() { if (inp.getAttribute("inputmode") === "none") return; inp.setAttribute("inputmode", "none"); inp.blur(); inp.focus({ preventScroll: true }); }
+inp.addEventListener("click", manualOn);
+function flush() { const v = inp.value; inp.value = ""; times = []; clearTimeout(timer); manualOff(); submit(v); }
 inp.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); flush(); }
   else if (e.ctrlKey && e.key === "]") { e.preventDefault(); inp.value += GS; } // بعض السكانرات بتبعت GS كـ Ctrl+]
