@@ -392,7 +392,7 @@ const RX_ST = { matched: ["مطابق في السجل", "ok"], uncertain: ["مح
 const RX_SC = { exact: "الاسم والتركيز المكتوب مطابقين لمنتج واحد في السجل.", ambiguous: "أكتر من منتج في السجل بنفس الاسم والتركيز. راجع الشكل والحجم.", partial: "التركيز المكتوب موجود في تركيبة أو أكتر من منتج. راجع المنتج الصح.", dose_not_found: "التركيز المكتوب مش موجود في السجل لنفس الاسم. راجع الروشتة.", no_dose: "مفيش تركيز مقروء نقارن بيه، فالمطابقة بالاسم بس." };
 const RX_LEG = { good: "واضح", medium: "متوسط", poor: "ضعيف" };
 (() => { const s = document.createElement("style");
-  s.textContent = ".rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"
+  s.textContent = ".rx-block{margin-bottom:18px}.rx-prods{margin-top:8px;display:grid;gap:10px}.rx-prods .card{margin:0}.rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"
     + ".qs .scan-btn.rx-pick::before{-webkit-mask-image:var(--ic-rx);mask-image:var(--ic-rx)}"
     + ":root{--ic-rx:url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M14%202H6a2%202%200%200%200-2%202v16a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V8z'/%3E%3Cpath%20d='M14%202v6h6M8%2013h8M8%2017h8M8%209h2'/%3E%3C/svg%3E\")}"
     + ".ip-hint{position:absolute;inset-inline:16px;bottom:100px;z-index:2;padding:7px 12px;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;text-align:center;pointer-events:none}"
@@ -438,6 +438,51 @@ function rxCard(it) {
   return c;
 }
 
+// ===== منتجات فعلية لكل دواء في الروشتة: بحث بالاسم + مطابقة التركيز (مطابق تمامًا فقط، وإلا أقرب تركيز بتنبيه واضح) =====
+const RX_AMT = /(\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)*)\s*(mg|mcg|µg|μg|ug|gm|g|iu|ml|%)(?![a-z])/gi;
+function rxAmts(text) { // أرقام التركيز اللي وراها وحدة بس (عدد الأقراص في العبوة مش بيتحسب)، الكتلة بتتحوّل لـ mg
+  const out = []; if (!text) return out;
+  String(text).replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x660)).replace(RX_AMT, (_m, nums, u) => {
+    u = u.toLowerCase(); if (u === "gm") u = "g";
+    nums.split("/").forEach((n) => { const a = normAmt(Number(n.replace(",", ".").trim()), u); if (a.v > 0) out.push(a); });
+    return _m;
+  });
+  return out;
+}
+const sameAmts = (a, b) => { if (a.length !== b.length) return false; const x = a.slice().sort((p, q) => p.v - q.v), y = b.slice().sort((p, q) => p.v - q.v); return x.every((v, i) => v.c === y[i].c && Math.abs(v.v - y[i].v) < 1e-6); };
+const rxBrand = (n) => String(n || "").replace(RX_AMT, " ").replace(/\b(tabs?|tablets?|caps?|capsules?|syrup|susp(?:ension)?|drops?|cream|gel|oint(?:ment)?|amps?|ampoules?|inj(?:ection)?|sachets?|supp(?:ositories)?|spray|f\.?c\.?|film|coated)\b\.?/gi, " ").replace(/\b\d+\b/g, " ").replace(/(^|\s)[\/+.,]+(?=\s|$)/g, " ").replace(/\s+/g, " ").trim();
+const prodAmtsAll = (p) => { const n = rxAmts(p.product_name); return n.length ? n : prodAmts(p); }; // الاسم الأول (بيشيل لبس العبوات) وبعدين التركيبة المسجّلة
+
+async function fillRxProducts(it, box, token) {
+  const brand = rxBrand(it.read_name);
+  if (brand.length < 2) { box.remove(); return; }
+  const need = rxAmts(it.dose).length ? rxAmts(it.dose) : rxAmts(it.read_name);
+  box.replaceChildren(el("div", "meta", "جاري البحث عن «" + brand + "»…"));
+  try {
+    const d = await call("drug-search", { query: brand, search_type: "brand" });
+    if (token !== polling) return;
+    const list = (d.tiers && d.tiers.official) || d.results || [];
+    box.replaceChildren();
+    if (!list.length) { box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» في السجل.")); return; }
+    if (!need.length) {
+      box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فمش قادرين نأكد التركيز. دي أقرب نتايج بالاسم، راجع الصيدلي."));
+      list.slice(0, 3).forEach((p) => box.append(card(p, 3)));
+      return;
+    }
+    const exact = list.filter((p) => sameAmts(need, prodAmtsAll(p)));
+    if (exact.length) {
+      box.append(el("p", "sec-note", "نفس الاسم والتركيز المكتوب (" + (it.dose || need.map((a) => a.v).join(" + ")) + ") — " + exact.length + " منتج."));
+      exact.slice(0, 5).forEach((p) => box.append(card(p, 1)));
+      return;
+    }
+    const closest = list.map((p) => ({ p, g: strengthGap(need, prodAmtsAll(p)) })).filter((o) => isFinite(o.g)).sort((x, y) => x.g - y.g).slice(0, 2);
+    box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» بنفس التركيز المكتوب (" + (it.dose || it.read_name) + ")."));
+    if (closest.length) { box.append(el("p", "sec-note", "أقرب تركيز متاح — مش نفس التركيز المطلوب:")); closest.forEach((o) => box.append(card(o.p, 3))); }
+  } catch (err) {
+    box.replaceChildren(el("div", "scan-msg warn", "تعذّر البحث عن «" + brand + "». جرّب زر «ابحث عن الدواء»."));
+  }
+}
+
 async function handleRx(f) {
   if (!/^image\//.test(f.type)) { imgErr("الملف ده مش صورة."); return; }
   const token = ++polling;
@@ -467,7 +512,8 @@ async function handleRx(f) {
     out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
     out.append(el("div", "scan-msg warn", "القراءة آلية وممكن تغلط في حرف أو رقم، وكل سطر محتاج مراجعة صيدلي قبل الصرف. قارنها بالروشتة الأصلية."));
     if (r.overall_legibility === "poor") out.append(el("div", "scan-msg warn", "الخط مش واضح، فالقراءة غالبًا ناقصة أو غلط. جرّب تصوّر الروشتة تاني بإضاءة أحسن."));
-    items.forEach((it) => out.append(rxCard(it)));
+    const boxes = items.map((it) => { const w = el("section", "rx-block"), pb = el("div", "rx-prods"); w.append(rxCard(it), pb); out.append(w); return { it, pb }; });
+    { let i = 0; const worker = async () => { while (i < boxes.length && token === polling) { const o = boxes[i++]; await fillRxProducts(o.it, o.pb, token); } }; Promise.all([worker(), worker(), worker()]); } // 3 بحث في نفس الوقت
     quiet();
   } catch (err) {
     st.fail("حصلت مشكلة في الخطوة دي", [["كود الخطأ", (err && (err.code || err.message)) || "unknown"]]);
