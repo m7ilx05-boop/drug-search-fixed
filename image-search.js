@@ -39,6 +39,11 @@ const modes = el("div", "ip-modes");
 const prodMode = el("button", "ip-mode on", "منتج"); prodMode.type = "button"; prodMode.setAttribute("aria-pressed", "true");
 const rxMode = el("button", "ip-mode", "روشتة"); rxMode.type = "button"; rxMode.setAttribute("aria-pressed", "false");
 modes.append(prodMode, rxMode);
+// نسخة تانية من الزرين تحت الكاميرا (فوق زراير الكاميرا/المعرض): الاتنين بيتزامنوا مع بعض
+const modes2 = el("div", "ip-modes");
+const prodMode2 = el("button", "ip-mode on", "منتج"), rxMode2 = el("button", "ip-mode", "روشتة");
+prodMode2.type = "button"; rxMode2.type = "button"; prodMode2.setAttribute("aria-pressed", "true"); rxMode2.setAttribute("aria-pressed", "false");
+modes2.append(prodMode2, rxMode2);
 // وضع الصورة: "prod" = علبة منتج (drug-image-search)، "rx" = روشتة (read-prescription)
 let mode = "prod", tipEl = null;
 const TIPS = { prod: "", rx: "صوّر الروشتة كاملة من فوق وبإضاءة كويسة، وخلّي كل الأسطر باينة من غير ضل. القراءة آلية وممكن تغلط في اسم أو رقم، فراجع كل سطر مع الصيدلي." };
@@ -52,17 +57,17 @@ const setMode = (m) => {
   mode = m;
   camBox.classList.toggle("rx", m === "rx"); camHint.hidden = m !== "rx";
   if (location.hash === "#/img") syncBar();
-  prodMode.classList.toggle("on", m === "prod"); rxMode.classList.toggle("on", m === "rx");
-  prodMode.setAttribute("aria-pressed", m === "prod" ? "true" : "false"); rxMode.setAttribute("aria-pressed", m === "rx" ? "true" : "false");
+  [prodMode, prodMode2].forEach((b) => { b.classList.toggle("on", m === "prod"); b.setAttribute("aria-pressed", m === "prod" ? "true" : "false"); });
+  [rxMode, rxMode2].forEach((b) => { b.classList.toggle("on", m === "rx"); b.setAttribute("aria-pressed", m === "rx" ? "true" : "false"); });
   if (tipEl && TIPS[m]) tipEl.textContent = TIPS[m];
   shotBtn.setAttribute("aria-label", m === "rx" ? "صوّر الروشتة واقرأها" : "صوّر وابحث");
   say("");
 };
-prodMode.addEventListener("click", () => setMode("prod"));
-rxMode.addEventListener("click", () => setMode("rx"));
+[prodMode, prodMode2].forEach((b) => b.addEventListener("click", () => setMode("prod")));
+[rxMode, rxMode2].forEach((b) => b.addEventListener("click", () => setMode("rx")));
 const shotBtn = el("button", "ip-shot"); shotBtn.type = "button"; shotBtn.setAttribute("aria-label", "صوّر وابحث"); shotBtn.disabled = true;
 const retryBtn = el("button", "ip-retry", "تشغيل الكاميرا"); retryBtn.type = "button";
-camBox.append(video, el("div", "ip-frame"), camHint, retryBtn, shotBtn); // أزرار منتج/روشتة بتتحط فوق زراير المعرض (تحت الكاميرا) مش جوه الكاميرا
+camBox.append(video, el("div", "ip-frame"), modes, camHint, retryBtn, shotBtn); // أزرار منتج/روشتة فوق الكاميرا، ونسخة تانية تحتها
 const camRow = el("button", "img-opt photo", "تصوير بكاميرا التليفون (أعلى دقة)"); camRow.type = "button";
 camRow.addEventListener("click", () => { camIn.value = ""; camIn.click(); });
 const galRow = el("button", "img-opt gal", "استيراد صورة من المعرض"); galRow.type = "button";
@@ -149,7 +154,7 @@ window.imagePage = () => {
   if (!built) {
     built = true;
     const c = el("div", "ip-card");
-    c.append(modes, camRow, galRow, el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين. «كاميرا التليفون» بتفتح تطبيق الكاميرا الأصلي بأعلى دقة."));
+    c.append(modes2, camRow, galRow, el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين. «كاميرا التليفون» بتفتح تطبيق الكاميرا الأصلي بأعلى دقة."));
     tipEl = c.querySelector(".ip-tip");
     if (tipEl) { TIPS.prod = tipEl.textContent; if (mode === "rx") tipEl.textContent = TIPS.rx; }
     pg.append(camBox, ipMsg, c);
