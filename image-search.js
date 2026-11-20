@@ -451,6 +451,17 @@ function rxAmts(text) { // أرقام التركيز اللي وراها وحد�
 }
 const sameAmts = (a, b) => { if (a.length !== b.length) return false; const x = a.slice().sort((p, q) => p.v - q.v), y = b.slice().sort((p, q) => p.v - q.v); return x.every((v, i) => v.c === y[i].c && Math.abs(v.v - y[i].v) < 1e-6); };
 const rxBrand = (n) => String(n || "").replace(RX_AMT, " ").replace(/\b(tabs?|tablets?|caps?|capsules?|syrup|susp(?:ension)?|drops?|cream|gel|oint(?:ment)?|amps?|ampoules?|inj(?:ection)?|sachets?|supp(?:ositories)?|spray|f\.?c\.?|film|coated)\b\.?/gi, " ").replace(/\b\d+\b/g, " ").replace(/(^|\s)[\/+.,]+(?=\s|$)/g, " ").replace(/\s+/g, " ").trim();
+// جرعة مكتوبة رقم من غير وحدة (زي "75 tab" أو "40"): بنفترضها mg لو الرقم 5 فأكتر (1-4 غالبًا عدد أقراص)
+function rxNeed(it) {
+  let a = rxAmts(it.dose); if (!a.length) a = rxAmts(it.read_name);
+  if (a.length) return { amts: a, assumed: false };
+  const m = String(it.dose || "").replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x660)).match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:tabs?|tablets?|caps?|capsules?|قرص|اقراص|أقراص|كبسول\w*)?\s*$/i);
+  if (m) { const n = Number(m[1].replace(",", ".")); if (n >= 5) return { amts: [{ v: n, c: "mass" }], assumed: true }; }
+  return { amts: [], assumed: false };
+}
+// مجموعة الشكل الدوائي: صلب (أقراص/كبسول) / سائل / حقن / موضعي. لو المكتوب والمنتج في مجموعتين مختلفتين نعتبره شكل مختلف.
+const RX_FORMS = [["inj", /\b(amps?|ampoules?|vials?|inj(?:ection)?)\b|امبول|أمبول|حقن/i], ["liquid", /\b(syrup|susp(?:ension)?|drops?|solution)\b|شراب|معلق|قطر/i], ["topical", /\b(cream|gel|oint(?:ment)?|lotion)\b|كريم|جل|مرهم/i], ["solid", /\b(tabs?|tablets?|caps?|capsules?)\b|قرص|اقراص|أقراص|كبسول/i]];
+const rxForm = (t) => { for (const [k, r] of RX_FORMS) if (r.test(String(t || ""))) return k; return null; };
 const prodAmtsAll = (p) => { const n = rxAmts(p.product_name); return n.length ? n : prodAmts(p); }; // الاسم الأول (بيشيل لبس العبوات) وبعدين التركيبة المسجّلة
 
 // «قصدك؟»: أقرب أسماء حقيقية من جدول الأدوية المصرية (دالة drug-name-fuzzy)، وبعدها اقتراحات السجل، وبعدها أسماء بتبدأ بنفس أول 4 حروف.
@@ -499,7 +510,8 @@ async function fillRxProducts(it, box, token, opt) {
   opt = opt || {};
   const brand = opt.name || rxBrand(it.read_name);
   if (brand.length < 2) { box.remove(); return; }
-  const need = rxAmts(it.dose).length ? rxAmts(it.dose) : rxAmts(it.read_name);
+  const nd = rxNeed(it), need = nd.amts, wantForm = rxForm((it.dose || "") + " " + (it.read_name || ""));
+  const formOk = (p) => { const pf = rxForm((p.product_name || "") + " " + (p.dosage_form || "")); return !wantForm || !pf || pf === wantForm; };
   box.replaceChildren(el("div", "meta", "جاري البحث عن «" + brand + "»…"));
   try {
     let d = await call("drug-search", { query: brand, search_type: "brand" });
@@ -519,18 +531,26 @@ async function fillRxProducts(it, box, token, opt) {
     if (note) box.append(el("p", "sec-note", note));
     if (!list.length) { box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» في السجل.")); await rxSuggest(brand, d, it, box, token, opt.auto); return; }
     if (!need.length) {
-      box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فمش قادرين نأكد التركيز. دي أقرب نتايج بالاسم، راجع الصيدلي."));
-      list.slice(0, 3).forEach((p) => box.append(card(p, 3)));
+      const pref = list.filter(formOk), shown = (pref.length ? pref : list).slice(0, 3);
+      box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فمش قادرين نأكد التركيز. دي أقرب نتايج بالاسم" + (wantForm && !pref.length ? " (ومفيش منها بالشكل المكتوب)" : "") + "، راجع الصيدلي."));
+      shown.forEach((p) => box.append(card(p, 3)));
       return;
     }
-    const exact = list.filter((p) => sameAmts(need, prodAmtsAll(p)));
+    const sameS = list.filter((p) => sameAmts(need, prodAmtsAll(p)));
+    const exact = sameS.filter(formOk), otherForm = sameS.filter((p) => !formOk(p));
+    if (nd.assumed) box.append(el("p", "sec-note", "الجرعة مكتوبة «" + it.dose + "» من غير وحدة، فافترضنا إن الرقم بالـ mg."));
     if (exact.length) {
-      box.append(el("p", "sec-note", "نفس الاسم والتركيز المكتوب (" + (it.dose || need.map((a) => a.v).join(" + ")) + ") — " + exact.length + " منتج."));
+      box.append(el("p", "sec-note", "نفس الاسم والتركيز المكتوب (" + need.map((a) => a.v).join(" + ") + (nd.assumed ? " mg" : "") + (wantForm ? " والشكل" : "") + ") — " + exact.length + " منتج."));
       exact.slice(0, 5).forEach((p) => box.append(card(p, 1)));
       return;
     }
+    if (otherForm.length) {
+      box.append(el("div", "scan-msg warn", "لقينا «" + brand + "» بنفس التركيز لكن بشكل دوائي مختلف عن المكتوب (" + (it.dose || it.read_name) + "). مش نفس المنتج غالبًا:"));
+      otherForm.slice(0, 3).forEach((p) => box.append(card(p, 3)));
+      return;
+    }
     const closest = list.map((p) => ({ p, g: strengthGap(need, prodAmtsAll(p)) })).filter((o) => isFinite(o.g)).sort((x, y) => x.g - y.g).slice(0, 2);
-    box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» بنفس التركيز المكتوب (" + (it.dose || it.read_name) + ")."));
+    box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» بنفس التركيز المكتوب (" + need.map((a) => a.v).join(" + ") + (nd.assumed ? " mg" : "") + ")."));
     if (closest.length) { box.append(el("p", "sec-note", "أقرب تركيز متاح — مش نفس التركيز المطلوب:")); closest.forEach((o) => box.append(card(o.p, 3))); }
     if (!closest.length) await rxSuggest(brand, d, it, box, token, opt.auto);
   } catch (err) {
