@@ -508,6 +508,26 @@ async function rxSuggest(brand, d, it, box, token, auto) {
   return true;
 }
 
+// بحث + انتظار: لو الدواء مش محفوظ، drug-search بيبدأ مهمة جلب من المصادر في الخلفية (job_id). بنتابعها بنفس طريقة شاشة البحث العادية
+// (drug-job-status كل 3 ثواني، لحد حوالي دقيقة)، وبعد ما تخلص بنعيد البحث عشان نجيب اللي اتحفظ.
+async function rxSearchWait(query, type, token, say) {
+  let d = await call("drug-search", { query, search_type: type });
+  let list = (d.tiers && d.tiers.official) || d.results || [];
+  if (list.length || !d.job_id || !["queued", "running"].includes(d.refresh_status)) return { d, list, job: null };
+  let job = null;
+  for (let i = 0; i < 20 && token === polling; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    if (token !== polling) return { d, list, job: null, stop: true };
+    let j; try { j = await call("drug-job-status", { job_id: d.job_id }); } catch { continue; }
+    if (j.status === "completed" || j.status === "failed") { job = j; break; }
+    if (say) say("جاري جلب «" + query + "» من المصادر… (" + (i + 1) * 3 + " ث)");
+  }
+  if (job && job.status === "completed") {
+    try { const d2 = await call("drug-search", { query, search_type: type }); d = d2; list = (d2.tiers && d2.tiers.official) || d2.results || []; } catch { /* نفضل على الأول */ }
+  }
+  return { d, list, job, timedOut: !job };
+}
+
 async function fillRxProducts(it, box, token, opt) {
   opt = opt || {};
   const brand = opt.name || rxBrand(it.read_name);
@@ -525,22 +545,31 @@ async function fillRxProducts(it, box, token, opt) {
     return;
   }
   try {
-    let d = await call("drug-search", { query: brand, search_type: "brand" });
-    if (token !== polling) return;
-    let list = (d.tiers && d.tiers.official) || d.results || [];
+    const say = (t) => { const m = box.querySelector(".meta"); if (m) m.textContent = t; };
+    let { d, list, job, stop } = await rxSearchWait(brand, "brand", token, say);
+    if (stop || token !== polling) return;
     let note = "";
     if (!list.length && opt.sci) { // الاسم التجاري مش في دليل الأسعار: نجرّب بالمادة الفعّالة
       const ing = String(opt.sci).split("+")[0].trim();
       if (ing) {
-        const d2 = await call("drug-search", { query: ing, search_type: "ingredient" });
-        if (token !== polling) return;
-        list = (d2.tiers && d2.tiers.official) || d2.results || [];
+        say("جاري البحث بالمادة الفعّالة (" + ing + ")…");
+        const r2 = await rxSearchWait(ing, "ingredient", token, say);
+        if (r2.stop || token !== polling) return;
+        list = r2.list;
         if (list.length) note = "«" + brand + "» مش موجود في دليل الأسعار، فدي منتجات بنفس المادة الفعّالة (" + ing + "):";
       }
     }
     box.replaceChildren();
     if (note) box.append(el("p", "sec-note", note));
-    if (!list.length) { box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» في السجل.")); await rxSuggest(brand, d, it, box, token, opt.auto); return; }
+    if (!list.length) {
+      const pend = (job && Array.isArray(job.pending_products) ? job.pending_products : []).filter((x) => x && typeof x.name === "string");
+      const dym = (job && Array.isArray(job.did_you_mean) ? job.did_you_mean : []).filter((x) => typeof x === "string" && x.trim());
+      if (job) d = Object.assign({}, d, { suggestions: (d.suggestions || []).concat(dym.map((t) => ({ text: t, kind: "brand", search_type: "auto" }))) });
+      if (pend.length) box.append(el("div", "scan-msg warn", "لقينا «" + brand + "» على الإنترنت، وهو في انتظار المراجعة قبل ما يتضاف لقاعدة البيانات: " + pend.slice(0, 3).map((x) => x.name).join("، ")));
+      else if (job && job.message_ar) box.append(el("div", "scan-msg warn", job.message_ar));
+      else box.append(el("div", "scan-msg warn", (job ? "بحثنا عن «" + brand + "» في المصادر ومالقيناش نتيجة مؤكدة." : "ما لقيناش «" + brand + "» في السجل.") + " ده معناه إنه مش ظاهر في المصادر اللي بنبحث فيها، مش إنه مش موجود في السوق."));
+      await rxSuggest(brand, d, it, box, token, opt.auto); return;
+    }
     if (!need.length) {
       const pref = list.filter(formOk), shown = (pref.length ? pref : list).slice(0, 3);
       box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فمش قادرين نأكد التركيز. دي أقرب نتايج بالاسم" + (wantForm && !pref.length ? " (ومفيش منها بالشكل المكتوب)" : "") + "، راجع الصيدلي."));
