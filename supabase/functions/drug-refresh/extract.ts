@@ -92,7 +92,7 @@ function clean(v: unknown, max: number): string | null {
 // contains a digit after this (e.g. "Vitamin B12", a bare "Cetal 500") is rejected, never guessed at.
 // (Cosmetics are exempt from the last rule: validateProducts gets allowDigits for them.)
 const NUM = "[0-9\\u0660-\\u0669]+(?:[.,\\u066B][0-9\\u0660-\\u0669]+)?";
-const PACK_UNITS = "g|gm|gms|gram|grams|ml|tab|tabs|tablet|tablets|cap|caps|capsule|capsules|amp|amps|ampoule|ampoules|sachet|sachets|strip|strips|vial|vials|pcs|pc|piece|pieces|جم|جرام|غرام|مل|قرص|اقراص|أقراص|كبسولة|كبسوله|كبسولات|امبول|أمبول|امبولات|كيس|اكياس|أكياس";
+const PACK_UNITS = "g|gm|gms|gram|grams|ml|tab|tabs|tablet|tablets|cap|caps|capsule|capsules|amp|amps|ampoule|ampoules|sachet|sachets|strip|strips|vial|vials|pcs|pc|piece|pieces|supp|supps|suppository|suppositories|جم|جرام|غرام|مل|قرص|اقراص|أقراص|كبسولة|كبسوله|كبسولات|امبول|أمبول|امبولات|كيس|اكياس|أكياس|لبوس|لبوسة|لبوسه|تحاميل|تحميلة|تحميله";
 const STRENGTH_UNITS = "mg|mcg|ug|µg|iu|%|مجم|ملجم|ملغ|ملغم";
 const PACK_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${NUM})\\s*(${PACK_UNITS})(?![\\p{L}\\p{N}])`, "giu");
 const STRENGTH_RE = new RegExp(`(?<![\\p{L}\\p{N}])${NUM}\\s*(?:${STRENGTH_UNITS})(?![\\p{L}\\p{N}])`, "giu");
@@ -112,6 +112,8 @@ const PACK_CANON: Record<string, string> = {
   amp: "ampoules", amps: "ampoules", ampoule: "ampoules", ampoules: "ampoules", "امبول": "ampoules", "أمبول": "ampoules", "امبولات": "ampoules",
   sachet: "sachets", sachets: "sachets", "كيس": "sachets", "اكياس": "sachets", "أكياس": "sachets",
   strip: "strips", strips: "strips", vial: "vials", vials: "vials",
+  supp: "suppositories", supps: "suppositories", suppository: "suppositories", suppositories: "suppositories",
+  "لبوس": "suppositories", "لبوسة": "suppositories", "لبوسه": "suppositories", "تحاميل": "suppositories", "تحميلة": "suppositories", "تحميله": "suppositories",
   pcs: "pcs", pc: "pcs", piece: "pcs", pieces: "pcs",
 };
 const asciiNum = (n: string) =>

@@ -71,8 +71,14 @@ async function eligibleSources(db: SupabaseClient, searchType: string, phase: Ph
 // that sits right next to its unit ("14 tab"), so the number stayed in the name and the product was rejected (names never
 // contain digits). Dropping the in-between word lets the normal cleaner move the size to pack_size. The space between the
 // coating word and the form word is optional ("f.c.tabs" is written without one).
-const DWA_COAT = /(\d+(?:[.,]\d+)?)\s+(?:(?:f\.?\s?c\.?|s\.?\s?r\.?|e\.?\s?r\.?|film[- ]?coated|enteric[- ]?coated|coated|chewable|chew|effervescent|eff\.?|dispersible|orodispersible)\s*)+(tabs?|tablets?|caps?|capsules?)(?![a-z])/gi;
-const dwaName = (s: string) => s.replace(DWA_COAT, "$1 $2");
+const DWA_COAT = /(\d+(?:[.,]\d+)?)\s+(?:(?:f\.?\s?c\.?|s\.?\s?r\.?|e\.?\s?r\.?|film[- ]?coated|enteric[- ]?coated|coated|chewable|chew|effervescent|eff\.?|dispersible|orodispersible|scored)\s*)+(tabs?|tablets?|caps?|capsules?)(?![a-z])/gi;
+// "Epinephrine 5 / amp": a slash between the count and its unit. The slash is dropped so the count is read as a pack size.
+const DWA_SLASH = /(\d+(?:[.,]\d+)?)\s*\/\s*(amps?|ampoules?|vials?|tabs?|tablets?|caps?|capsules?|supps?|suppositor(?:y|ies)|sachets?)(?![a-z])/gi;
+// "Paralex 125 mg 5 rectal pediatric supp": descriptive words between the count and the form. The words stay in the name
+// (they tell products apart) and only move in front of the count, so the count sits next to its unit like "5 supp".
+const DWA_DESC = /(\d+(?:[.,]\d+)?)\s+((?:(?:rectal|vaginal|pediatric|paediatric|infant|adults?|children)\s+)+)(supps?|suppositor(?:y|ies))(?![a-z])/gi;
+const dwaName = (s: string) =>
+  s.replace(DWA_SLASH, "$1 $2").replace(DWA_DESC, (_m, n: string, w: string, u: string) => `${w.trim()} ${n} ${u}`).replace(DWA_COAT, "$1 $2");
 
 // Injectable pens / cartridges / syringes ("Saxenda 1 prefilled pen s.c", "Victoza 2 pre-filled pen s.c"): "pen" is not a unit the
 // generic cleaner knows, so the count stayed in the name and the product was rejected. The count moves to pack_size and the
