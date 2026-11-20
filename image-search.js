@@ -62,7 +62,7 @@ prodMode.addEventListener("click", () => setMode("prod"));
 rxMode.addEventListener("click", () => setMode("rx"));
 const shotBtn = el("button", "ip-shot"); shotBtn.type = "button"; shotBtn.setAttribute("aria-label", "صوّر وابحث"); shotBtn.disabled = true;
 const retryBtn = el("button", "ip-retry", "تشغيل الكاميرا"); retryBtn.type = "button";
-camBox.append(video, el("div", "ip-frame"), modes, camHint, retryBtn, shotBtn);
+camBox.append(video, el("div", "ip-frame"), camHint, retryBtn, shotBtn); // أزرار منتج/روشتة بتتحط فوق زراير المعرض (تحت الكاميرا) مش جوه الكاميرا
 const camRow = el("button", "img-opt photo", "تصوير بكاميرا التليفون (أعلى دقة)"); camRow.type = "button";
 camRow.addEventListener("click", () => { camIn.value = ""; camIn.click(); });
 const galRow = el("button", "img-opt gal", "استيراد صورة من المعرض"); galRow.type = "button";
@@ -149,7 +149,7 @@ window.imagePage = () => {
   if (!built) {
     built = true;
     const c = el("div", "ip-card");
-    c.append(camRow, galRow, el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين. «كاميرا التليفون» بتفتح تطبيق الكاميرا الأصلي بأعلى دقة."));
+    c.append(modes, camRow, galRow, el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين. «كاميرا التليفون» بتفتح تطبيق الكاميرا الأصلي بأعلى دقة."));
     tipEl = c.querySelector(".ip-tip");
     if (tipEl) { TIPS.prod = tipEl.textContent; if (mode === "rx") tipEl.textContent = TIPS.rx; }
     pg.append(camBox, ipMsg, c);
@@ -391,7 +391,10 @@ const RX_LEG = { good: "واضح", medium: "متوسط", poor: "ضعيف" };
     + ".qs .scan-btn.rx-pick::before{-webkit-mask-image:var(--ic-rx);mask-image:var(--ic-rx)}"
     + ":root{--ic-rx:url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M14%202H6a2%202%200%200%200-2%202v16a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V8z'/%3E%3Cpath%20d='M14%202v6h6M8%2013h8M8%2017h8M8%209h2'/%3E%3C/svg%3E\")}"
     + ".ip-hint{position:absolute;inset-inline:16px;bottom:100px;z-index:2;padding:7px 12px;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;text-align:center;pointer-events:none}"
-    + ".ip-cam.off .ip-hint{display:none}.ip-cam.rx .ip-frame{inset:7% 4% 21%}";
+    + ".ip-cam.off .ip-hint{display:none}.ip-cam.rx .ip-frame{inset:7% 4% 21%}"
+    + ".ip-card .ip-modes{position:static;inset:auto;margin:0 0 12px;gap:8px;pointer-events:auto;justify-content:center}"
+    + ".ip-card .ip-mode{flex:1 1 0;max-width:180px;height:40px;font-size:14px;justify-content:center;color:var(--text);border:1px solid var(--line);background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}"
+    + ".ip-card .ip-mode.on{background:var(--accent);color:var(--accent-ink,#fff);border-color:var(--accent)}";
   document.head.append(s); })();
 
 function rxCard(it) {
