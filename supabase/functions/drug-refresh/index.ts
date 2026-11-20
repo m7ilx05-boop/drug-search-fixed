@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { tavilySearch, ProviderExhausted } from "./tavily.ts";
 import { firecrawlScrapeJson, firecrawlScrapeMarkdown, FirecrawlUnavailable, type ScrapeResult } from "./firecrawl.ts";
-import { PRODUCT_SCHEMA, buildPrompt, validateProducts, norm, splitName } from "./extract.ts";
+import { PRODUCT_SCHEMA, RULES_VERSION, buildPrompt, validateProducts, norm, splitName } from "./extract.ts";
 import { persistProducts, identityTtlMs, type Src } from "./persist.ts";
 import { type Code, type Found, dwaProductPages, exactMentioned, fallbackQueries, hostMatches, hostOf, noScrapeCode, pageKind, planPages, relevance, strengthsOf, NON_PRODUCT, pathRaw } from "./select.ts";
 import { suggestNames } from "./fuzzy.ts";
@@ -472,24 +472,28 @@ Deno.serve(async (req) => {
       for (const p of beforePicks) if (!plan.picks.includes(p)) mark(p.url, { st: "skipped_recent", why: "read_within_30d" });
     }
 
-    // Normal search only (job kind "full"): a page that Firecrawl already read successfully in the last 30 days is not read again,
-    // whatever came out of it. A page that gave no product (rejected) leaves no row in dwaprices_products, so the check above
-    // never saw it and it was read again on every search. Source: key_usage_log, one row per successful Firecrawl call with the
-    // page in meta.url. A failed lookup only means that nothing extra is skipped. The 30 day price window above is unchanged.
+    // Normal search only (job kind "full"): a page that was read and rejected is not read again for 30 days, but only where the
+    // rejection still holds. page_read_outcomes holds one row per rejected read: (page, this search's name) when the page was
+    // rejected only because it does not match that search, or (page, '*') when the page is rejected for its own content. The first
+    // is skipped for the same search only, the second for every search; both only while rules_version is the current one
+    // (a change in the validation rules makes every page readable again). A failed lookup only means nothing extra is skipped.
+    const pageKey = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").slice(0, 160);
+    const queryKey = norm(matchName);
     if (jobKind === "full" && plan.picks.length) {
-      const fcUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").slice(0, 160);
-      const seen = await db.from("key_usage_log").select("meta")
-        .eq("provider", "firecrawl").eq("status", 200)
-        .gte("created_at", new Date(Date.now() - SKIP_RECENT_MS).toISOString())
-        .in("meta->>url", plan.picks.map((p) => fcUrl(p.url)));
+      const seen = await db.from("page_read_outcomes").select("page_key,query_key")
+        .in("page_key", plan.picks.map((p) => pageKey(p.url))).in("query_key", [queryKey, "*"])
+        .eq("rules_version", RULES_VERSION).gte("read_at", new Date(Date.now() - SKIP_RECENT_MS).toISOString());
       if (seen.error) console.error("recent_reads_error", seen.error.message);
       else {
-        const readBefore = new Set((seen.data ?? []).map((r) => String((r.meta as { url?: unknown } | null)?.url ?? "")));
-        const dropped = plan.picks.filter((p) => readBefore.has(fcUrl(p.url)));
+        const rejectedBefore = new Map<string, string>();
+        for (const r of seen.data ?? []) rejectedBefore.set(String(r.page_key), String(r.query_key));
+        const dropped = plan.picks.filter((p) => rejectedBefore.has(pageKey(p.url)));
         if (dropped.length) {
-          plan = { ...plan, picks: plan.picks.filter((p) => !readBefore.has(fcUrl(p.url))) };
+          plan = { ...plan, picks: plan.picks.filter((p) => !rejectedBefore.has(pageKey(p.url))) };
           skippedKnown += dropped.length;
-          for (const p of dropped) mark(p.url, { st: "skipped_recent", why: "read_by_firecrawl_within_30d" });
+          for (const p of dropped) {
+            mark(p.url, { st: "skipped_recent", why: rejectedBefore.get(pageKey(p.url)) === "*" ? "rejected_page_within_30d" : "rejected_for_this_search_within_30d" });
+          }
         }
       }
     }
@@ -658,8 +662,22 @@ Deno.serve(async (req) => {
 
         // Ledger, part 2: what happened to this page.
         const stN = newProducts.length;
+        const pageSt = stN ? (savedN ? "saved+pending_review" : "pending_review") : savedN ? "saved" : lockedN ? "official_locked" : "rejected";
+        // A page that gave no product is remembered (normal search only) so the same search does not read it again. If no product of
+        // the page is valid on its own (digit in the name, nothing listed...) the page itself is the reason and it is skipped for
+        // every search; if some product would be valid for its own name, only this search's name is skipped.
+        if (pageSt === "rejected" && jobKind === "full") {
+          const items = Array.isArray(rawList) ? rawList.slice(0, 30) : [];
+          const validAlone = items.some((it) => validateProducts({ products: [it] }, matchName, extra, { trustSingle: true, allowDigits: cosmetic }).length > 0);
+          const up = await db.from("page_read_outcomes").upsert({
+            page_key: pageKey(p.url), query_key: validAlone ? queryKey : "*",
+            outcome: validAlone ? "rejected_query" : "rejected_page", reason: validAlone ? "not_matching_search" : "no_valid_product_on_page",
+            rules_version: RULES_VERSION, read_at: new Date().toISOString(),
+          }, { onConflict: "page_key,query_key" });
+          if (up.error) console.error("page_outcome_error", up.error.message);
+        }
         mark(p.url, {
-          st: stN ? (savedN ? "saved+pending_review" : "pending_review") : savedN ? "saved" : lockedN ? "official_locked" : "rejected",
+          st: pageSt,
           ...(rejNames.length ? { names: rejNames } : {}),
           ...(savedN ? { saved: savedN } : {}), ...(stN ? { staged: stN } : {}), ...(lockedN ? { locked: lockedN } : {}),
         });
