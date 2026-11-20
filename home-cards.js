@@ -66,6 +66,7 @@
     if (p.strength) chips.append(el("span", "hc-chip", p.strength));
     var pr = price(p.current_price); if (pr) chips.append(el("span", "hc-chip", pr));
     if (chips.childNodes.length) card.append(chips);
+    if (p.barcode) { var bc = el("div", "hc-bc"); bc.append(el("span", "hc-bc-l", "الباركود"), el("b", null, p.barcode)); card.append(bc); }
     var go = el("button", "hc-go", "افتح المنتج"); go.type = "button";
     card.append(go);
     ov.append(card); document.body.append(ov); openOv = ov;
