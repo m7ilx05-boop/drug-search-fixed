@@ -70,9 +70,11 @@ button:disabled{opacity:.55;cursor:wait}
 .img-opt.gal::before{-webkit-mask-image:var(--ic-gallery);mask-image:var(--ic-gallery)}
 
 /* كروت الأدوية اللي بتلف (الرئيسية): نفس شكل كارت المنتج (صورة على تدرّج + الاسم) */
-.drugs3d{position:relative;height:300px;margin:0;overflow:hidden;display:flex;justify-content:center}
+.drugs3d{position:relative;height:300px;margin:0;overflow:hidden;display:flex;justify-content:center;touch-action:pan-y;cursor:grab;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.drugs3d:active{cursor:grabbing}
+.drugs3d img{-webkit-user-drag:none;user-drag:none}
 #scanPanel:not([hidden])~.drugs3d{display:none}
-.d3-inner{--w:112px;--h:178px;--z:190px;--rx:-10deg;--persp:800px;position:absolute;top:30px;left:calc(50% - var(--w) / 2);width:var(--w);height:var(--h);transform-style:preserve-3d;transform:perspective(var(--persp)) rotateX(var(--rx));animation:d3spin 36s linear infinite}
+.d3-inner{--w:112px;--h:178px;--z:190px;--rx:-10deg;--persp:800px;position:absolute;top:30px;left:calc(50% - var(--w) / 2);width:var(--w);height:var(--h);transform-style:preserve-3d;transform:perspective(var(--persp)) rotateX(var(--rx));will-change:transform}
 @media (hover:hover){.drugs3d:hover .d3-inner{animation-play-state:paused}}
 @keyframes d3spin{from{transform:perspective(var(--persp)) rotateX(var(--rx)) rotateY(0)}to{transform:perspective(var(--persp)) rotateX(var(--rx)) rotateY(1turn)}}
 .dcard{--g1:#8FD3FA;--g2:#2388EA;--cbg:#e0e0e0;position:absolute;inset:0;display:flex;flex-direction:column;padding:0;margin:0;min-height:0;border:0;border-radius:24px;overflow:hidden;cursor:pointer;color:var(--ink,#0b2447);font:inherit;background:var(--cbg);backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:rotateY(calc(360deg / var(--q) * var(--i))) translateZ(var(--z));box-shadow:0 6px 16px rgba(0,0,0,.22)}

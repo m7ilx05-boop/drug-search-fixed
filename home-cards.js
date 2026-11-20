@@ -9,6 +9,63 @@
   var FALLBACK = ["Panadol", "Brufen", "Cataflam", "Voltaren", "Augmentin", "Zithromax", "Flagyl", "Antinal", "Zyrtec", "Claritine"];
   var CARD_W = 112;
 
+  /* ===== اللف: أوتوماتيك + سحب بالصباع يمين وشمال (مع قصور بسيط) =====
+     بيقف وإنت ماسك الشريط، وبيقف خالص لما تدوس على منتج عشان يفتح صفحته، ويرجع يلف لما ترجع للرئيسية. */
+  var stage = host.parentElement;
+  var reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion:reduce)").matches;
+  var AUTO = reduceMotion ? 4 : 10;      // درجة في الثانية (دورة كاملة كل 36 ثانية)
+  var ang = 0, vel = 0, dragging = false, hovering = false, held = false, moved = false;
+  var lastX = 0, lastT = 0, startX = 0, startY = 0, pid = null, tPrev = 0;
+  var K = 0.42;                            // درجة لكل بكسل سحب
+
+  function paint() {
+    host.style.transform = "perspective(800px) rotateX(-10deg) rotateY(" + ang.toFixed(2) + "deg)";
+  }
+  function frame(now) {
+    var dt = Math.min(0.05, (now - tPrev) / 1000 || 0); tPrev = now;
+    if (stage.offsetParent !== null) {     // لو الشريط مش ظاهر (صفحة تانية) منحسبش حاجة
+      if (!dragging) {
+        var auto = (held || hovering) ? 0 : AUTO;
+        ang += (auto + vel) * dt;
+        vel *= Math.exp(-3.2 * dt);
+        if (Math.abs(vel) < 0.05) vel = 0;
+        paint();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  paint(); requestAnimationFrame(function (n) { tPrev = n; requestAnimationFrame(frame); });
+
+  stage.addEventListener("pointerdown", function (e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    dragging = true; moved = false; pid = e.pointerId;
+    startX = lastX = e.clientX; startY = e.clientY; lastT = e.timeStamp; vel = 0;
+  });
+  window.addEventListener("pointermove", function (e) {
+    if (!dragging || e.pointerId !== pid) return;
+    var dx = e.clientX - lastX, dtm = Math.max(1, e.timeStamp - lastT);
+    if (!moved && Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 6) moved = true;
+    if (moved) { ang += dx * K; paint(); vel = (dx * K) / (dtm / 1000) * 0.6 + vel * 0.4; }
+    lastX = e.clientX; lastT = e.timeStamp;
+  });
+  function release(e) {
+    if (!dragging || (e && e.pointerId !== pid)) return;
+    dragging = false;
+    if (e && e.timeStamp - lastT > 120) vel = 0;           // وقف الصباع قبل ما يرفعه = من غير قصور
+    vel = Math.max(-240, Math.min(240, vel));
+  }
+  window.addEventListener("pointerup", release);
+  window.addEventListener("pointercancel", release);
+  // لو كان سحب مش دوسة، نمنع فتح المنتج
+  stage.addEventListener("click", function (e) { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
+  if (window.matchMedia && matchMedia("(hover:hover)").matches) {
+    stage.addEventListener("pointerenter", function () { hovering = true; });
+    stage.addEventListener("pointerleave", function () { hovering = false; });
+  }
+  function holdSpin() { held = true; vel = 0; }
+  function resumeSpin() { held = false; }
+  window.addEventListener("hashchange", function () { if (document.body.dataset.view === "home") resumeSpin(); });
+
   function brand(n) { return String(n || "").replace(/\s+\d.*$/, "").trim() || String(n || ""); }
   function safeUrl(u) { try { var x = new URL(u); return x.protocol === "https:" ? x.href : null; } catch (e) { return null; } }
   function price(v) { return v == null || v === "" || isNaN(Number(v)) ? null : Number(v).toLocaleString("ar-EG") + " ج.م"; }
@@ -24,7 +81,7 @@
   function picBox(p, cls) {
     var box = el("div", cls), u = safeUrl(p.image && p.image.url);
     if (u) {
-      var im = el("img"); im.src = u; im.alt = p.product_name || ""; im.loading = "lazy"; im.referrerPolicy = "no-referrer";
+      var im = el("img"); im.src = u; im.alt = p.product_name || ""; im.loading = "lazy"; im.draggable = false; im.referrerPolicy = "no-referrer";
       im.onerror = function () { box.replaceChildren("💊"); };
       box.append(im);
     } else box.append("💊");
@@ -77,7 +134,8 @@
     var setBusy = card ? function (on) { card.classList.toggle("busy", on); }
                        : function (on) { btn.disabled = on; btn.textContent = on ? "جاري الفتح…" : label; };
     setBusy(true);
-    var fallback = function () { opening = false; setBusy(false); closeOpen(null); search(brand(name)); };
+    if (card) { holdSpin(); }
+    var fallback = function () { opening = false; setBusy(false); closeOpen(null); resumeSpin(); search(brand(name)); };
     call("drug-search", { query: name, search_type: "auto" }).then(function (d) {
       var tiers = typeof readTiers === "function" ? readTiers(d) : null;
       var lists = tiers ? tiers : [Array.isArray(d && d.results) ? d.results : []];
@@ -97,6 +155,7 @@
       opening = false; setBusy(false);
       closeOpen(null);
       window.openProductDirect(found, tier);
+      setTimeout(function () { if (document.body.dataset.view === "home") resumeSpin(); }, 1500);
     }).catch(function () { fallback(); });
   }
 
