@@ -20,3 +20,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.translate-label]
 verify_jwt = false
+[functions.drug-price-watch]
+verify_jwt = false
