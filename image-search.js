@@ -6,10 +6,19 @@
 const MAX_SIDE = 2048; // أكبر ضلع للصورة قبل الإرسال (كان 1280): الخط الصغير على العلبة (التركيز) بيفضل مقروء
 const OCR_B64_MAX = 1300000; // OCR.space المجاني بيقبل لحد حوالي 1 ميجا: فوق كده بيتخطّى والقراءة بتتم بـ Gemini بس، فبنضغط الصورة لتحت الحد ده
 let lastShot = { w: 0, h: 0 };
+const RX_B64_MAX = 3300000; // الروشتة بخط صغير/يد: جودة أعلى من صور العلب (دالة read-prescription بتقبل لحد 4 ميجا)
+const RX_SIDES = [[2560, 0.9], [2200, 0.85], [1900, 0.8], [1600, 0.74]];
 ERR.vision_unavailable = "قراءة الصورة مش متاحة دلوقتي. جرّب تاني بعد شوية.";
 ERR.vision_bad_output = "ما قدرناش نقرا الصورة. جرّب صورة أوضح.";
 ERR.invalid_image = "الصورة مش صالحة أو كبيرة قوي. جرّب صورة تانية.";
 ERR.invalid_gtin = "الباركود المقروء من الصورة مش صالح.";
+ERR.rate_limited = ERR.rate_limited || "عدد المحاولات كبير. استنى كام دقيقة وجرّب تاني.";
+ERR.reader_failed = "قراءة الروشتة مش متاحة دلوقتي. جرّب تاني بعد شوية.";
+ERR.image_too_large = "صورة الروشتة كبيرة قوي. جرّب صورة أصغر.";
+ERR.unsupported_image_type = "نوع الصورة مش مدعوم. استخدم JPG أو PNG أو WebP.";
+ERR.image_base64_required = "الصورة مش واصلة صح. جرّب تاني.";
+ERR.save_failed = "القراءة خلصت بس تعذّر حفظها. جرّب تاني.";
+ERR.no_gemini_key_configured = "قراءة الروشتة مش متاحة دلوقتي (مفيش مفتاح مضبوط).";
 
 const box = $("imgbox");
 const fam = el("div"); fam.id = "fam"; fam.setAttribute("aria-live", "polite");
@@ -27,9 +36,21 @@ const video = Object.assign(el("video"), { muted: true, autoplay: true }); video
 const camBox = el("div", "ip-cam off");
 const modes = el("div", "ip-modes");
 const prodMode = el("button", "ip-mode on", "منتج"); prodMode.type = "button"; prodMode.setAttribute("aria-pressed", "true");
-const rxMode = el("button", "ip-mode", "روشتة"); rxMode.type = "button"; rxMode.disabled = true; rxMode.title = "قريباً";
-rxMode.append(el("small", null, "قريباً"));
+const rxMode = el("button", "ip-mode", "روشتة"); rxMode.type = "button"; rxMode.setAttribute("aria-pressed", "false");
 modes.append(prodMode, rxMode);
+// وضع الصورة: "prod" = علبة منتج (drug-image-search)، "rx" = روشتة (read-prescription)
+let mode = "prod", tipEl = null;
+const TIPS = { prod: "", rx: "صوّر الروشتة كاملة من فوق وبإضاءة كويسة، وخلّي كل الأسطر باينة من غير ضل. القراءة آلية وممكن تغلط في اسم أو رقم، فراجع كل سطر مع الصيدلي." };
+const setMode = (m) => {
+  mode = m;
+  prodMode.classList.toggle("on", m === "prod"); rxMode.classList.toggle("on", m === "rx");
+  prodMode.setAttribute("aria-pressed", m === "prod" ? "true" : "false"); rxMode.setAttribute("aria-pressed", m === "rx" ? "true" : "false");
+  if (tipEl && TIPS[m]) tipEl.textContent = TIPS[m];
+  shotBtn.setAttribute("aria-label", m === "rx" ? "صوّر الروشتة واقرأها" : "صوّر وابحث");
+  say("");
+};
+prodMode.addEventListener("click", () => setMode("prod"));
+rxMode.addEventListener("click", () => setMode("rx"));
 const shotBtn = el("button", "ip-shot"); shotBtn.type = "button"; shotBtn.setAttribute("aria-label", "صوّر وابحث"); shotBtn.disabled = true;
 const retryBtn = el("button", "ip-retry", "تشغيل الكاميرا"); retryBtn.type = "button";
 camBox.append(video, el("div", "ip-frame"), modes, retryBtn, shotBtn);
@@ -119,6 +140,8 @@ window.imagePage = () => {
     built = true;
     const c = el("div", "ip-card");
     c.append(camRow, galRow, el("p", "ip-tip", "صوّر العلبة من قدّام وبإضاءة كويسة، وخلّي الاسم والتركيز باينين. «كاميرا التليفون» بتفتح تطبيق الكاميرا الأصلي بأعلى دقة."));
+    tipEl = c.querySelector(".ip-tip");
+    if (tipEl) { TIPS.prod = tipEl.textContent; if (mode === "rx") tipEl.textContent = TIPS.rx; }
     pg.append(camBox, ipMsg, c);
   }
   say("");
@@ -131,7 +154,7 @@ const busy = (v) => { imgBtn.disabled = v; };
 // أي بحث مش جاي من الصورة بيمسح صندوق العائلة
 $("f").addEventListener("submit", () => { if (!window.__keepImg) fam.replaceChildren(); }, true);
 
-async function toJpegBase64(f) {
+async function toJpegBase64(f, cap, ladder) {
   let src, w0, h0;
   try { src = await createImageBitmap(f, { imageOrientation: "from-image" }); w0 = src.width; h0 = src.height; }
   catch {
@@ -143,7 +166,7 @@ async function toJpegBase64(f) {
   const toB64 = (blob) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(new Error("image_read_failed")); fr.readAsDataURL(blob); });
   const cv = document.createElement("canvas"), g = cv.getContext("2d");
   let out = null;
-  for (const [side, q] of [[MAX_SIDE, 0.88], [MAX_SIDE, 0.78], [1700, 0.8], [1400, 0.78], [1280, 0.72]]) {
+  for (const [side, q] of (ladder || [[MAX_SIDE, 0.88], [MAX_SIDE, 0.78], [1700, 0.8], [1400, 0.78], [1280, 0.72]])) {
     const k = Math.min(1, side / Math.max(w0, h0));
     cv.width = Math.round(w0 * k); cv.height = Math.round(h0 * k);
     lastShot = { w: cv.width, h: cv.height };
@@ -151,7 +174,7 @@ async function toJpegBase64(f) {
     const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", q));
     if (!blob) throw new Error("image_encode_failed");
     out = await toB64(blob);
-    if (out.length <= OCR_B64_MAX) break;
+    if (out.length <= (cap || OCR_B64_MAX)) break;
   }
   return out;
 }
@@ -245,6 +268,7 @@ const quiet = () => { $("status").className = ""; };                    // من 
 const imgErr = (txt) => { hideSkeleton(); quiet(); toast("error", txt); }; // الخطأ بيظهر في الخطوة + تنبيه واحد
 async function handle(f) {
   if (!f) return;
+  if (mode === "rx") return handleRx(f);
   if (!/^image\//.test(f.type)) { imgErr("الملف ده مش صورة."); return; }
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
@@ -342,6 +366,86 @@ async function handle(f) {
     const known = ERR[err && err.code];
     imgErr(known || "حصلت مشكلة في قراءة الصورة (" + ((err && (err.code || err.message)) || "unknown") + (gw ? " / " + gw : "") + ").");
   } finally { window.__ff = ffPrev; busy(false); }
+}
+
+// ===== وضع الروشتة: نفس الكاميرا والمعرض، بس الصورة بتتبعت لدالة read-prescription وبتتعرض الأسطر المقروءة مع حالة المطابقة. =====
+const RX_ST = { matched: ["مطابق في السجل", "ok"], uncertain: ["محتاج مراجعة", "warn"], no_match: ["مش لاقيينه في السجل", "bad"] };
+const RX_SC = { exact: "الاسم والتركيز المكتوب مطابقين لمنتج واحد في السجل.", ambiguous: "أكتر من منتج في السجل بنفس الاسم والتركيز. راجع الشكل والحجم.", partial: "التركيز المكتوب موجود في تركيبة أو أكتر من منتج. راجع المنتج الصح.", dose_not_found: "التركيز المكتوب مش موجود في السجل لنفس الاسم. راجع الروشتة.", no_dose: "مفيش تركيز مقروء نقارن بيه، فالمطابقة بالاسم بس." };
+const RX_LEG = { good: "واضح", medium: "متوسط", poor: "ضعيف" };
+(() => { const s = document.createElement("style"); s.textContent = ".rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"; document.head.append(s); })();
+
+function rxCard(it) {
+  const c = el("article", "card rx-item");
+  const h = el("h2", null, it.read_name || "سطر غير مقروء"); h.dir = "auto"; c.append(h);
+  const bits = [["الجرعة", it.dose], ["التكرار", it.frequency], ["المدة", it.duration]].filter((x) => x[1]);
+  if (bits.length) {
+    const ul = el("ul", "ing");
+    bits.forEach(([l, v]) => { const li = el("li"); const sv = el("span", null, v); sv.dir = "auto"; li.append(el("span", null, l), sv); ul.append(li); });
+    c.append(ul);
+  }
+  if (it.notes_ar) c.append(el("div", "meta", "ملاحظة: " + it.notes_ar));
+  const chips = el("div", "chips");
+  const [t, cls] = RX_ST[it.match_status] || RX_ST.no_match;
+  chips.append(el("span", "chip " + cls, t));
+  if (it.unclear) chips.append(el("span", "chip warn", "جزء من السطر مش واضح"));
+  if (typeof it.confidence === "number") chips.append(el("span", "chip", "ثقة القراءة: " + Math.round(it.confidence * 100) + "%"));
+  c.append(chips);
+  const cd = it.candidate;
+  if (cd) {
+    const nm = [cd.name, cd.name_ar].filter(Boolean).join(" — ");
+    if (nm) { const m = el("div", "meta", "أقرب منتج في السجل: " + nm + (cd.scientific_name ? " (" + cd.scientific_name + ")" : "")); m.dir = "auto"; c.append(m); }
+    if (RX_SC[cd.strength_check]) c.append(el("div", "meta", RX_SC[cd.strength_check]));
+  }
+  const q = String(it.read_name || "").trim();
+  if (q.length >= 2) {
+    const b = el("button", "rx-go", "ابحث عن الدواء"); b.type = "button";
+    b.addEventListener("click", () => {
+      $("q").value = q;
+      const radio = document.querySelector('input[name=t][value="brand"]'); if (radio) radio.checked = true;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      $("f").requestSubmit();
+    });
+    c.append(b);
+  }
+  return c;
+}
+
+async function handleRx(f) {
+  if (!/^image\//.test(f.type)) { imgErr("الملف ده مش صورة."); return; }
+  const token = ++polling;
+  clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
+  busy(true); showSkeleton();
+  const st = stepsUI(); st.add("prep"); st.add("read"); st.set("prep", "run", "جاري تجهيز صورة الروشتة…"); box.append(st.w);
+  if (window.showResultsPage) window.showResultsPage("قراءة روشتة");
+  try {
+    const b64 = await toJpegBase64(f, RX_B64_MAX, RX_SIDES);
+    if (token !== polling) return;
+    st.set("prep", "done", "اتجهّزت الصورة");
+    st.lines("prep", [["الأبعاد بعد التصغير", lastShot.w + " × " + lastShot.h + " بكسل"], ["الحجم المبعوت", Math.round(b64.length * 0.75 / 1024) + " كيلوبايت (JPEG)"], ["ملحوظة", "الصورة نفسها مش بتتحفظ. الأسطر المقروءة بتتسجّل لمراجعة الصيدلي."]]);
+    st.set("read", "run", "جاري قراءة الروشتة…");
+    const r = await call("read-prescription", { image_base64: b64, mime_type: "image/jpeg" });
+    if (token !== polling) return;
+    const items = Array.isArray(r.items) ? r.items : [];
+    if (!items.length) {
+      st.set("read", "bad", "مش باين في الصورة أسطر روشتة مقروءة");
+      st.lines("read", [["اللي حصل", "القراءة خلصت بس مفيش أسماء أدوية مقروءة. صوّر الروشتة كاملة وبإضاءة كويسة."]]);
+      imgErr("مفيش أسماء أدوية مقروءة في الصورة. صوّر الروشتة كاملة وبإضاءة كويسة.");
+      return;
+    }
+    const matched = items.filter((x) => x.match_status === "matched").length;
+    st.set("read", "done", "اتقرا " + items.length + " سطر، " + matched + " مطابق في السجل");
+    st.lines("read", [["عدد الأسطر", items.length], ["مطابق في السجل", matched], ["وضوح الخط", RX_LEG[r.overall_legibility] || ""], ["تنبيه", "قراءة آلية وممكن تغلط في حرف أو رقم. كل سطر محتاج مراجعة صيدلي قبل الصرف."]]);
+    const out = $("out"); out.replaceChildren(); hideSkeleton();
+    out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
+    out.append(el("div", "scan-msg warn", "القراءة آلية وممكن تغلط في حرف أو رقم، وكل سطر محتاج مراجعة صيدلي قبل الصرف. قارنها بالروشتة الأصلية."));
+    if (r.overall_legibility === "poor") out.append(el("div", "scan-msg warn", "الخط مش واضح، فالقراءة غالبًا ناقصة أو غلط. جرّب تصوّر الروشتة تاني بإضاءة أحسن."));
+    items.forEach((it) => out.append(rxCard(it)));
+    quiet();
+  } catch (err) {
+    st.fail("حصلت مشكلة في الخطوة دي", [["كود الخطأ", (err && (err.code || err.message)) || "unknown"]]);
+    const known = ERR[err && err.code];
+    imgErr(known || "حصلت مشكلة في قراءة الروشتة (" + ((err && (err.code || err.message)) || "unknown") + ").");
+  } finally { busy(false); }
 }
 
 [camIn, galIn].forEach((inp) => inp.addEventListener("change", () => { const f = inp.files && inp.files[0]; inp.value = ""; handle(f); }));
