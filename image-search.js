@@ -392,7 +392,7 @@ const RX_ST = { matched: ["مطابق في السجل", "ok"], uncertain: ["مح
 const RX_SC = { exact: "الاسم والتركيز المكتوب مطابقين لمنتج واحد في السجل.", ambiguous: "أكتر من منتج في السجل بنفس الاسم والتركيز. راجع الشكل والحجم.", partial: "التركيز المكتوب موجود في تركيبة أو أكتر من منتج. راجع المنتج الصح.", dose_not_found: "التركيز المكتوب مش موجود في السجل لنفس الاسم. راجع الروشتة.", no_dose: "مفيش تركيز مقروء نقارن بيه، فالمطابقة بالاسم بس." };
 const RX_LEG = { good: "واضح", medium: "متوسط", poor: "ضعيف" };
 (() => { const s = document.createElement("style");
-  s.textContent = ".rx-block{margin-bottom:18px}.rx-prods{margin-top:8px;display:grid;gap:10px}.rx-prods .card{margin:0}.rx-auto{margin-top:8px;display:grid;gap:10px}.rx-sug-b{cursor:pointer;font:inherit;border:1px solid var(--line);background:transparent;color:var(--text)}.rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"
+  s.textContent = ".rx-block{margin-bottom:18px;scroll-margin-top:120px}.rx-item{display:block!important;border:1px solid var(--line);border-inline-start:5px solid var(--line);padding:16px 16px 14px}.rx-item.st-ok{border-inline-start-color:var(--ok)}.rx-item.st-warn{border-inline-start-color:var(--warn)}.rx-item.st-bad{border-inline-start-color:var(--bad)}.rx-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}.rx-head h2{margin:0;flex:1;min-width:0}.rx-num{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--accent);color:var(--accent-ink,#fff);font-weight:700;font-size:16px;font-variant-numeric:tabular-nums}.rx-item .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}.rx-item .rx-go{width:100%;height:42px;border-radius:12px;border:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}.rx-cmp{position:sticky;top:calc(var(--top,0px) + 8px);z-index:12;margin:12px 0;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 4px 18px rgba(20,90,160,.18);overflow:hidden}.rx-cmp-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;font-size:13.5px;font-weight:600;color:var(--muted)}.rx-cmp-h button{font:inherit;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:3px 12px;cursor:pointer}.rx-cmp img{display:block;width:100%;max-height:34vh;object-fit:contain;background:var(--bg);cursor:zoom-in}.rx-cmp.min img{display:none}.rx-zoom{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.88);overflow:auto;-webkit-overflow-scrolling:touch;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}.rx-zoom img{display:block;width:100%;height:auto;cursor:zoom-in}.rx-zoom.big img{width:260%;max-width:none;cursor:zoom-out}.rx-zoom-x{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);inset-inline-start:12px;z-index:1001;width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#10264F;font-size:22px;cursor:pointer}.rx-prods{margin-top:8px;display:grid;gap:10px}.rx-prods .card{margin:0}.rx-auto{margin-top:8px;display:grid;gap:10px}.rx-sug-b{cursor:pointer;font:inherit;border:1px solid var(--line);background:transparent;color:var(--text)}.rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"
     + ".qs .scan-btn.rx-pick::before{-webkit-mask-image:var(--ic-rx);mask-image:var(--ic-rx)}"
     + ":root{--ic-rx:url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M14%202H6a2%202%200%200%200-2%202v16a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V8z'/%3E%3Cpath%20d='M14%202v6h6M8%2013h8M8%2017h8M8%209h2'/%3E%3C/svg%3E\")}"
     + ".ip-hint{position:absolute;inset-inline:16px;bottom:100px;z-index:2;padding:7px 12px;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;text-align:center;pointer-events:none}"
@@ -402,9 +402,11 @@ const RX_LEG = { good: "واضح", medium: "متوسط", poor: "ضعيف" };
     + ".ip-card .ip-mode.on{background:var(--accent);color:var(--accent-ink,#fff);border-color:var(--accent)}";
   document.head.append(s); })();
 
-function rxCard(it) {
-  const c = el("article", "card rx-item");
-  const h = el("h2", null, it.read_name || "سطر غير مقروء"); h.dir = "auto"; c.append(h);
+function rxCard(it, n) {
+  const c = el("article", "card rx-item st-" + ((RX_ST[it.match_status] || RX_ST.no_match)[1]));
+  const head = el("div", "rx-head");
+  const num = el("span", "rx-num", String(n || it.line_no || "")); num.setAttribute("aria-label", "سطر رقم " + (n || it.line_no || ""));
+  const h = el("h2", null, it.read_name || "سطر غير مقروء"); h.dir = "auto"; head.append(num, h); c.append(head);
   const bits = [["الجرعة", it.dose], ["التكرار", it.frequency], ["المدة", it.duration]].filter((x) => x[1]);
   if (bits.length) {
     const ul = el("ul", "ing");
@@ -598,6 +600,24 @@ async function fillRxProducts(it, box, token, opt) {
   }
 }
 
+let rxImgUrl = null;
+function rxZoom(url) {
+  const o = el("div", "rx-zoom"), x = el("button", "rx-zoom-x", "×"); x.type = "button"; x.setAttribute("aria-label", "إغلاق");
+  const im = new Image(); im.src = url; im.alt = "صورة الروشتة"; im.addEventListener("click", () => o.classList.toggle("big"));
+  x.addEventListener("click", () => o.remove()); o.append(im); document.body.append(x, o);
+  const close = () => { o.remove(); x.remove(); }; x.addEventListener("click", close);
+}
+function rxCompare(f) { // صورة الروشتة الأصلية للمقارنة. بتتعرض من الجهاز بس ومش بتتبعت ولا بتتحفظ.
+  if (rxImgUrl) URL.revokeObjectURL(rxImgUrl);
+  rxImgUrl = URL.createObjectURL(f);
+  const w = el("div", "rx-cmp"), h = el("div", "rx-cmp-h"), t = el("span", null, "صورة الروشتة الأصلية (اضغط للتكبير)");
+  const b = el("button", null, "إخفاء"); b.type = "button";
+  b.addEventListener("click", () => { const m = w.classList.toggle("min"); b.textContent = m ? "إظهار" : "إخفاء"; });
+  h.append(t, b);
+  const im = new Image(); im.src = rxImgUrl; im.alt = "صورة الروشتة الأصلية"; im.addEventListener("click", () => rxZoom(rxImgUrl));
+  w.append(h, im); return w;
+}
+
 async function handleRx(f) {
   if (!/^image\//.test(f.type)) { imgErr("الملف ده مش صورة."); return; }
   const token = ++polling;
@@ -609,7 +629,7 @@ async function handleRx(f) {
     const b64 = await toJpegBase64(f, RX_B64_MAX, RX_SIDES);
     if (token !== polling) return;
     st.set("prep", "done", "اتجهّزت الصورة");
-    st.lines("prep", [["الأبعاد بعد التصغير", lastShot.w + " × " + lastShot.h + " بكسل"], ["الحجم المبعوت", Math.round(b64.length * 0.75 / 1024) + " كيلوبايت (JPEG)"], ["ملحوظة", "الصورة نفسها مش بتتحفظ. الأسطر المقروءة بتتسجّل لمراجعة الصيدلي."]]);
+    st.lines("prep", [["الأبعاد بعد التصغير", lastShot.w + " × " + lastShot.h + " بكسل"], ["الحجم المبعوت", Math.round(b64.length * 0.75 / 1024) + " كيلوبايت (JPEG)"], ["ملحوظة", "الصورة بتتعرض على جهازك بس للمقارنة، ومش بتتحفظ. الأسطر المقروءة بتتسجّل لمراجعة الصيدلي."]]);
     st.set("read", "run", "جاري قراءة الروشتة…");
     const r = await call("read-prescription", { image_base64: b64, mime_type: "image/jpeg" });
     if (token !== polling) return;
@@ -625,9 +645,10 @@ async function handleRx(f) {
     st.lines("read", [["عدد الأسطر", items.length], ["مطابق في السجل", matched], ["وضوح الخط", RX_LEG[r.overall_legibility] || ""], ["تنبيه", "قراءة آلية وممكن تغلط في حرف أو رقم. كل سطر محتاج مراجعة صيدلي قبل الصرف."]]);
     const out = $("out"); out.replaceChildren(); hideSkeleton();
     out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
+    out.append(rxCompare(f));
     out.append(el("div", "scan-msg warn", "القراءة آلية وممكن تغلط في حرف أو رقم، وكل سطر محتاج مراجعة صيدلي قبل الصرف. قارنها بالروشتة الأصلية."));
     if (r.overall_legibility === "poor") out.append(el("div", "scan-msg warn", "الخط مش واضح، فالقراءة غالبًا ناقصة أو غلط. جرّب تصوّر الروشتة تاني بإضاءة أحسن."));
-    const boxes = items.map((it) => { const w = el("section", "rx-block"), pb = el("div", "rx-prods"); w.append(rxCard(it), pb); out.append(w); return { it, pb }; });
+    const boxes = items.map((it, i) => { const w = el("section", "rx-block"), pb = el("div", "rx-prods"); w.append(rxCard(it, it.line_no || i + 1), pb); out.append(w); return { it, pb }; });
     { let i = 0; const worker = async () => { while (i < boxes.length && token === polling) { const o = boxes[i++]; await fillRxProducts(o.it, o.pb, token); } }; Promise.all([worker(), worker(), worker()]); } // 3 بحث في نفس الوقت
     quiet();
   } catch (err) {
