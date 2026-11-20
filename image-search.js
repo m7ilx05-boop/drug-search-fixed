@@ -392,7 +392,7 @@ const RX_ST = { matched: ["مطابق في السجل", "ok"], uncertain: ["مح
 const RX_SC = { exact: "الاسم والتركيز المكتوب مطابقين لمنتج واحد في السجل.", ambiguous: "أكتر من منتج في السجل بنفس الاسم والتركيز. راجع الشكل والحجم.", partial: "التركيز المكتوب موجود في تركيبة أو أكتر من منتج. راجع المنتج الصح.", dose_not_found: "التركيز المكتوب مش موجود في السجل لنفس الاسم. راجع الروشتة.", no_dose: "مفيش تركيز مقروء نقارن بيه، فالمطابقة بالاسم بس." };
 const RX_LEG = { good: "واضح", medium: "متوسط", poor: "ضعيف" };
 (() => { const s = document.createElement("style");
-  s.textContent = ".rx-block{margin-bottom:18px}.rx-prods{margin-top:8px;display:grid;gap:10px}.rx-prods .card{margin:0}.rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"
+  s.textContent = ".rx-block{margin-bottom:18px}.rx-prods{margin-top:8px;display:grid;gap:10px}.rx-prods .card{margin:0}.rx-sug-b{cursor:pointer;font:inherit;border:1px solid var(--line);background:transparent;color:var(--text)}.rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"
     + ".qs .scan-btn.rx-pick::before{-webkit-mask-image:var(--ic-rx);mask-image:var(--ic-rx)}"
     + ":root{--ic-rx:url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M14%202H6a2%202%200%200%200-2%202v16a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V8z'/%3E%3Cpath%20d='M14%202v6h6M8%2013h8M8%2017h8M8%209h2'/%3E%3C/svg%3E\")}"
     + ".ip-hint{position:absolute;inset-inline:16px;bottom:100px;z-index:2;padding:7px 12px;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;text-align:center;pointer-events:none}"
@@ -453,8 +453,28 @@ const sameAmts = (a, b) => { if (a.length !== b.length) return false; const x = 
 const rxBrand = (n) => String(n || "").replace(RX_AMT, " ").replace(/\b(tabs?|tablets?|caps?|capsules?|syrup|susp(?:ension)?|drops?|cream|gel|oint(?:ment)?|amps?|ampoules?|inj(?:ection)?|sachets?|supp(?:ositories)?|spray|f\.?c\.?|film|coated)\b\.?/gi, " ").replace(/\b\d+\b/g, " ").replace(/(^|\s)[\/+.,]+(?=\s|$)/g, " ").replace(/\s+/g, " ").trim();
 const prodAmtsAll = (p) => { const n = rxAmts(p.product_name); return n.length ? n : prodAmts(p); }; // الاسم الأول (بيشيل لبس العبوات) وبعدين التركيبة المسجّلة
 
-async function fillRxProducts(it, box, token) {
-  const brand = rxBrand(it.read_name);
+// «قصدك؟»: أسماء قريبة من الاسم المقروء (لو القراءة غلطت في حرف أو أكتر). أول مصدر: اقتراحات السجل، وبعدها أسماء بتبدأ بنفس أول 4 حروف.
+async function rxSuggest(brand, d, it, box, token) {
+  let names = (d && Array.isArray(d.suggestions) ? d.suggestions : []).filter((x) => x && x.search_type !== "ingredient").map((x) => String(x.text || "").trim()).filter(Boolean);
+  if (!names.length && brand.replace(/[^a-z]/gi, "").length >= 4) {
+    try {
+      const pre = brand.replace(/[^a-z]/gi, "").slice(0, 4);
+      const r = await call("drug-search", { query: pre, search_type: "brand" });
+      if (token !== polling) return;
+      names = ((r.tiers && r.tiers.official) || r.results || []).map((p) => rxBrand(p.product_name));
+    } catch { /* مفيش اقتراحات */ }
+  }
+  const seen = new Set([brand.toLowerCase()]), uniq = [];
+  names.forEach((n) => { const k = n.toLowerCase(); if (n.length >= 2 && !seen.has(k)) { seen.add(k); uniq.push(n); } });
+  if (!uniq.length) return;
+  const w = el("div", "rx-sug"); w.append(el("p", "sec-note", "قصدك واحد من الأسماء دي؟ (القراءة ممكن تكون غلطت في حرف)"));
+  const row = el("div", "chips");
+  uniq.slice(0, 6).forEach((n) => { const b = el("button", "chip rx-sug-b", n); b.type = "button"; b.dir = "ltr"; b.addEventListener("click", () => fillRxProducts(it, box, token, n)); row.append(b); });
+  w.append(row); box.append(w);
+}
+
+async function fillRxProducts(it, box, token, nameOverride) {
+  const brand = nameOverride || rxBrand(it.read_name);
   if (brand.length < 2) { box.remove(); return; }
   const need = rxAmts(it.dose).length ? rxAmts(it.dose) : rxAmts(it.read_name);
   box.replaceChildren(el("div", "meta", "جاري البحث عن «" + brand + "»…"));
@@ -463,7 +483,7 @@ async function fillRxProducts(it, box, token) {
     if (token !== polling) return;
     const list = (d.tiers && d.tiers.official) || d.results || [];
     box.replaceChildren();
-    if (!list.length) { box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» في السجل.")); return; }
+    if (!list.length) { box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» في السجل.")); await rxSuggest(brand, d, it, box, token); return; }
     if (!need.length) {
       box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فمش قادرين نأكد التركيز. دي أقرب نتايج بالاسم، راجع الصيدلي."));
       list.slice(0, 3).forEach((p) => box.append(card(p, 3)));
@@ -478,6 +498,7 @@ async function fillRxProducts(it, box, token) {
     const closest = list.map((p) => ({ p, g: strengthGap(need, prodAmtsAll(p)) })).filter((o) => isFinite(o.g)).sort((x, y) => x.g - y.g).slice(0, 2);
     box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» بنفس التركيز المكتوب (" + (it.dose || it.read_name) + ")."));
     if (closest.length) { box.append(el("p", "sec-note", "أقرب تركيز متاح — مش نفس التركيز المطلوب:")); closest.forEach((o) => box.append(card(o.p, 3))); }
+    if (!closest.length) await rxSuggest(brand, d, it, box, token);
   } catch (err) {
     box.replaceChildren(el("div", "scan-msg warn", "تعذّر البحث عن «" + brand + "». جرّب زر «ابحث عن الدواء»."));
   }
