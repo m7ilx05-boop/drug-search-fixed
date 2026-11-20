@@ -23,6 +23,31 @@
     return box;
   }
 
+  /* باركود EAN-13 حقيقي كـ SVG (للأكواد 13 رقم). غيره بنعرض أرقامه بس. */
+  var EL = ["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"];
+  var EG = ["0100111","0110011","0011011","0100001","0011101","0111001","0000101","0010001","0001001","0010111"];
+  var ER = ["1110010","1100110","1101100","1000010","1011100","1001110","1010000","1000100","1001000","1110100"];
+  var EP = ["LLLLLL","LLGLGG","LLGGLG","LLGGGL","LGLLGG","LGGLLG","LGGGLL","LGLGLG","LGLGGL","LGGLGL"];
+  function ean13(d) {
+    var bits = "101", par = EP[+d[0]], i;
+    for (i = 0; i < 6; i++) bits += (par[i] === "L" ? EL : EG)[+d[i + 1]];
+    bits += "01010";
+    for (i = 7; i < 13; i++) bits += ER[+d[i]];
+    bits += "101";
+    var path = "", run = -1;
+    for (i = 0; i <= bits.length; i++) {
+      if (bits[i] === "1" && run < 0) run = i;
+      else if (bits[i] !== "1" && run >= 0) { path += "M" + run + " 0h" + (i - run) + "v1h-" + (i - run) + "z"; run = -1; }
+    }
+    return '<svg viewBox="0 0 95 1" preserveAspectRatio="none" aria-hidden="true"><path d="' + path + '" fill="#111"/></svg>';
+  }
+  function bcBox(code, cls) {
+    var digits = String(code).replace(/\D/g, ""), box = el("div", cls);
+    if (digits.length === 13) box.innerHTML = ean13(digits);
+    box.append(el("small", null, code));
+    return box;
+  }
+
   function search(name) {
     var q = document.getElementById("q"), f = document.getElementById("f");
     var auto = document.querySelector('input[name="t"][value="auto"]');
@@ -66,7 +91,7 @@
     if (p.strength) chips.append(el("span", "hc-chip", p.strength));
     var pr = price(p.current_price); if (pr) chips.append(el("span", "hc-chip", pr));
     if (chips.childNodes.length) card.append(chips);
-    if (p.barcode) { var bc = el("div", "hc-bc"); bc.append(el("span", "hc-bc-l", "الباركود"), el("b", null, p.barcode)); card.append(bc); }
+    if (p.barcode) card.append(bcBox(p.barcode, "hc-bc"));
     var go = el("button", "hc-go", "افتح المنتج"); go.type = "button";
     card.append(go);
     ov.append(card); document.body.append(ov); openOv = ov;
@@ -107,6 +132,7 @@
       b.append(picBox(p, "dpic"));
       var nm = el("span", "dname", brand(p.product_name)); nm.dir = "auto";
       b.append(nm);
+      if (p.barcode) b.append(bcBox(p.barcode, "dbc"));
       b.addEventListener("click", function () { openCard(p, b); });
       host.append(b);
     });
