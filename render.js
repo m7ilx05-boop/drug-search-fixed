@@ -365,13 +365,17 @@ function renderAll(d, note) {
   const pending = groupPending(Array.isArray(d.pending_review) ? d.pending_review : []).filter((g) =>
     !approved.some((p) => normKey(p.product_name) === normKey(g.product_name) && (!g.dosage_form || normKey(p.dosage_form) === normKey(g.dosage_form))));
   if (!approved.length && !pending.length) { out.append(el("div", "empty", note || "مفيش منتجات محفوظة لهذا البحث.")); return 0; }
+  // منتجات سعرها ماتحدّثش من 3 سنين أو أكتر (تقدير بس): بتتفصل في قسم لوحدها في آخر النتايج
+  const un = d.possibly_unavailable && typeof d.possibly_unavailable === "object" ? d.possibly_unavailable : {};
+  const t1ok = t1.filter((p) => !p.possibly_unavailable);
+  const t1gone = t1.filter((p) => p.possibly_unavailable);
   const section = (list, tier, title, sub) => {
     if (!list.length) return;
     if (tiers) { out.append(el("h3", "sec", title + " (" + list.length + ")")); if (sub) out.append(el("p", "sec-note", sub)); }
     list.forEach((p) => out.append(card(p, tiers ? tier : undefined)));
   };
   const src = d.source && d.source.name;
-  section(t1, 1, "تم مراجعته", src ? (d.disclaimer || "") : "بيانات من الموقع الرسمي للشركة المصنّعة.");
+  section(t1ok, 1, "تم مراجعته", src ? (d.disclaimer || "") : "بيانات من الموقع الرسمي للشركة المصنّعة.");
   section(tm, 1, "معتمد من المصنع", "بيانات من الموقع الرسمي للشركة المصنّعة.");
   section(t2, 2, "من الصيدليات", "بيانات من صيدليات على الإنترنت مش من المصنع. قارنها بمصدر رسمي.");
   section(t3, 3, "غير مؤكد", "لسه ما اتأكدش من مصدر موثوق.");
@@ -379,6 +383,11 @@ function renderAll(d, note) {
     out.append(el("h3", "sec", "قيد المراجعة (" + pending.length + ")"));
     out.append(el("p", "sec-note", "لقيناها على الإنترنت ولسه ما اتأكدش منها ومش متضافة لقاعدة البيانات. راجع المصدر قبل ما تعتمد عليها."));
     pending.forEach((p) => out.append(pendingCard(p)));
+  }
+  if (t1gone.length) {
+    out.append(el("h3", "sec", (un.label || "منتجات ممكن تكون مش متوفرة في السوق بعد الآن") + " (" + t1gone.length + ")"));
+    out.append(el("p", "sec-note", un.note || "تقدير تقريبي مش تأكيد: سعر المنتج ماتحدّثش من 3 سنين أو أكتر على دليل دواء مصر، وممكن يكون لسه موجود. اسأل الصيدلي قبل ما تعتمد عليه."));
+    t1gone.forEach((p) => out.append(card(p, tiers ? 1 : undefined)));
   }
   return approved.length + pending.length;
 }
