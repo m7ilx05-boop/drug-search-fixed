@@ -141,7 +141,7 @@
       b.setAttribute("aria-label", "افتح " + (p.product_name || ""));
       b.append(picBox(p, "dpic"));
       var cb = chg(p); if (cb) b.append(cb);
-      var nm = el("span", "dname", brand(p.product_name)); nm.dir = "auto";
+      var nm = el("span", "dname"), nt = el("span", null, brand(p.product_name)); nt.dir = "auto"; nm.append(nt);
       b.append(nm);
       b.append(p.barcode ? bcBox(p.barcode, "dbc") : el("div", "dbc empty"));
       b.addEventListener("click", function () { openCard(p, b); });
