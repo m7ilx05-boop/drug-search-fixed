@@ -13,6 +13,14 @@
   function safeUrl(u) { try { var x = new URL(u); return x.protocol === "https:" ? x.href : null; } catch (e) { return null; } }
   function price(v) { return v == null || v === "" || isNaN(Number(v)) ? null : Number(v).toLocaleString("ar-EG") + " ج.م"; }
 
+  /* شارة تغيّر السعر: ▲ زيادة / ▼ نقص بالنسبة */
+  function chg(p) {
+    var v = Number(p.price_change_pct);
+    if (!isFinite(v) || !v) return null;
+    var up = v > 0, b = el("span", "pchg " + (up ? "up" : "dn"), (up ? "▲ " : "▼ ") + Math.abs(v).toLocaleString("ar-EG") + "٪");
+    b.dir = "rtl"; return b;
+  }
+
   function picBox(p, cls) {
     var box = el("div", cls), u = safeUrl(p.image && p.image.url);
     if (u) {
@@ -90,6 +98,8 @@
     if (p.dosage_form) chips.append(el("span", "hc-chip", p.dosage_form));
     if (p.strength) chips.append(el("span", "hc-chip", p.strength));
     var pr = price(p.current_price); if (pr) chips.append(el("span", "hc-chip", pr));
+    var po = price(p.old_price); if (po && p.price_change_pct) chips.append(el("span", "hc-chip", "كان: " + po));
+    var cc = chg(p); if (cc) chips.append(cc);
     if (chips.childNodes.length) card.append(chips);
     if (p.barcode) card.append(bcBox(p.barcode, "hc-bc"));
     var go = el("button", "hc-go", "افتح المنتج"); go.type = "button";
@@ -130,6 +140,7 @@
       b.style.setProperty("--i", i); b.style.setProperty("--q", n);
       b.setAttribute("aria-label", "افتح " + (p.product_name || ""));
       b.append(picBox(p, "dpic"));
+      var cb = chg(p); if (cb) b.append(cb);
       var nm = el("span", "dname", brand(p.product_name)); nm.dir = "auto";
       b.append(nm);
       if (p.barcode) b.append(bcBox(p.barcode, "dbc"));

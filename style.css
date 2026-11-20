@@ -620,3 +620,7 @@ body[data-view=home] #imgbox{display:none}
 .uv-btn .text_button{position:relative;z-index:10;background-image:linear-gradient(to left,#fff 0%,hsla(0 0% 100% / calc(.7 + var(--active,0) * .3)) 120%);-webkit-background-clip:text;background-clip:text;font-size:.95rem;font-weight:600;color:transparent;-webkit-text-fill-color:transparent}
 .uv-btn .shine-text{--sh1:#9f9f9f;--sh2:#fff;--sh3:#868686}
 @media (prefers-reduced-motion:reduce){.uv-btn .dots_border::before{animation:none}}
+
+/* شارة تغيّر السعر على كروت الرئيسية */
+.pchg{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.5;color:#fff}
+.pchg.up{background:#d64545}.pchg.dn{background:#1f9d55}
