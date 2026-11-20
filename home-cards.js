@@ -143,7 +143,7 @@
       var cb = chg(p); if (cb) b.append(cb);
       var nm = el("span", "dname", brand(p.product_name)); nm.dir = "auto";
       b.append(nm);
-      if (p.barcode) b.append(bcBox(p.barcode, "dbc"));
+      b.append(p.barcode ? bcBox(p.barcode, "dbc") : el("div", "dbc empty"));
       b.addEventListener("click", function () { openCard(p, b); });
       host.append(b);
     });
