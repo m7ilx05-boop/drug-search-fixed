@@ -67,14 +67,17 @@
   /* دوس "افتح المنتج": بنجيب بيانات المنتج كاملة بنفس البحث ونفتح صفحته على طول (من غير صفحة النتايج).
      لو ملقيناش المنتج بالظبط أو حصلت مشكلة، بنرجع للبحث القديم عشان المستخدم ميتعطّلش. */
   var opening = false;
-  function openProduct(p, btn) {
+  function openProduct(p, btn, card) {
     if (opening) return;
     var name = p.product_name || "";
     if (typeof window.openProductDirect !== "function") { closeOpen(null); search(brand(name)); return; }
     opening = true;
     var label = btn.textContent;
-    btn.disabled = true; btn.textContent = "جاري الفتح…";
-    var fallback = function () { opening = false; closeOpen(null); search(brand(name)); };
+    // لو الدوس جه من كارت الشريط نعمل حالة "جاري الفتح" على الكارت نفسه، ولو من زرار الكارت المفتوح نغيّر نصه
+    var setBusy = card ? function (on) { card.classList.toggle("busy", on); }
+                       : function (on) { btn.disabled = on; btn.textContent = on ? "جاري الفتح…" : label; };
+    setBusy(true);
+    var fallback = function () { opening = false; setBusy(false); closeOpen(null); search(brand(name)); };
     call("drug-search", { query: name, search_type: "auto" }).then(function (d) {
       var tiers = typeof readTiers === "function" ? readTiers(d) : null;
       var lists = tiers ? tiers : [Array.isArray(d && d.results) ? d.results : []];
@@ -91,10 +94,10 @@
         if (hit.length) { found = hit[0]; tier = tiers ? i + 1 : undefined; }
       }
       if (!found) { fallback(); return; }
-      opening = false;
+      opening = false; setBusy(false);
       closeOpen(null);
       window.openProductDirect(found, tier);
-    }).catch(function () { btn.disabled = false; btn.textContent = label; fallback(); });
+    }).catch(function () { fallback(); });
   }
 
   /* ===== الكارت المفتوح ===== */
@@ -177,7 +180,7 @@
       var nm = el("span", "dname"), nt = el("span", null, brand(p.product_name)); nt.dir = "auto"; nm.append(nt);
       b.append(nm);
       b.append(p.barcode ? bcBox(p.barcode, "dbc") : el("div", "dbc empty"));
-      b.addEventListener("click", function () { openCard(p, b); });
+      b.addEventListener("click", function () { openProduct(p, b, b); });
       host.append(b);
     });
   }
