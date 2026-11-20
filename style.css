@@ -447,7 +447,7 @@ ul.ing li .ing-detail .ing-bl li{display:list-item;padding:0;border:0;margin:0 0
 .ing-page .ing-foot .ing-ul li{font-size:12.5px}
 .ing-foot .ltr{direction:ltr;unicode-bidi:isolate;display:inline;overflow-wrap:anywhere}
 
-/* ===== صفحة البحث بصورة (#/img): كاميرا حية، تصوير بكاميرا التليفون، معرض، والروشتة (قريباً) ===== */
+/* ===== صفحة البحث بصورة (#/img): كاميرا حية، تصوير بكاميرا التليفون، معرض، ووضع الروشتة ===== */
 body[data-view=image] #v-image{display:block}
 body[data-view=image] #imgbox{display:none}
 body[data-view=image] .back{display:inline-flex}

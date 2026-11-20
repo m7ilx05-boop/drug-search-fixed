@@ -28,12 +28,13 @@ const mkInput = (capture) => { const i = el("input"); i.type = "file"; i.accept 
 const camIn = mkInput(true), galIn = mkInput(false);
 const imgBtn = el("button", "scan-btn img-pick", "بحث بصورة"); imgBtn.type = "button";
 // ===== صفحة البحث بالصورة (#/img): الكاميرا الحية بتفتح أول ما تدخل الصفحة (حوالي ¾ الشاشة)، والمعرض تحتها.
-// فوق الكاميرا زرين صغيرين عايمين: منتج (شغّال) / روشتة (قريباً). =====
+// فوق الكاميرا زرين صغيرين عايمين: منتج / روشتة (الاتنين شغّالين). =====
 let built = false, stream = null, track = null, camGen = 0, shooting = false;
 const ipMsg = el("div", "ip-msg"); ipMsg.hidden = true;
 const say = (txt, bad) => { ipMsg.hidden = !txt; ipMsg.textContent = txt || ""; ipMsg.className = "ip-msg" + (bad ? " bad" : ""); };
 const video = Object.assign(el("video"), { muted: true, autoplay: true }); video.setAttribute("playsinline", "");
 const camBox = el("div", "ip-cam off");
+const camHint = el("div", "ip-hint", "صوّر الروشتة كاملة من فوق وبإضاءة كويسة"); camHint.hidden = true;
 const modes = el("div", "ip-modes");
 const prodMode = el("button", "ip-mode on", "منتج"); prodMode.type = "button"; prodMode.setAttribute("aria-pressed", "true");
 const rxMode = el("button", "ip-mode", "روشتة"); rxMode.type = "button"; rxMode.setAttribute("aria-pressed", "false");
@@ -41,8 +42,16 @@ modes.append(prodMode, rxMode);
 // وضع الصورة: "prod" = علبة منتج (drug-image-search)، "rx" = روشتة (read-prescription)
 let mode = "prod", tipEl = null;
 const TIPS = { prod: "", rx: "صوّر الروشتة كاملة من فوق وبإضاءة كويسة، وخلّي كل الأسطر باينة من غير ضل. القراءة آلية وممكن تغلط في اسم أو رقم، فراجع كل سطر مع الصيدلي." };
+const SUB = { prod: "صوّر العلبة أو اختار صورة من المعرض", rx: "صوّر الروشتة كاملة أو اختار صورة من المعرض" };
+const TTL = { prod: "بحث بصورة", rx: "قراءة روشتة" };
+const syncBar = () => { // عنوان الصفحة بيتبع الوضع (منتج / روشتة)
+  const t = $("ab-t"), s = $("ab-s");
+  if (t) t.textContent = TTL[mode]; if (s) s.textContent = SUB[mode];
+};
 const setMode = (m) => {
   mode = m;
+  camBox.classList.toggle("rx", m === "rx"); camHint.hidden = m !== "rx";
+  if (location.hash === "#/img") syncBar();
   prodMode.classList.toggle("on", m === "prod"); rxMode.classList.toggle("on", m === "rx");
   prodMode.setAttribute("aria-pressed", m === "prod" ? "true" : "false"); rxMode.setAttribute("aria-pressed", m === "rx" ? "true" : "false");
   if (tipEl && TIPS[m]) tipEl.textContent = TIPS[m];
@@ -53,7 +62,7 @@ prodMode.addEventListener("click", () => setMode("prod"));
 rxMode.addEventListener("click", () => setMode("rx"));
 const shotBtn = el("button", "ip-shot"); shotBtn.type = "button"; shotBtn.setAttribute("aria-label", "صوّر وابحث"); shotBtn.disabled = true;
 const retryBtn = el("button", "ip-retry", "تشغيل الكاميرا"); retryBtn.type = "button";
-camBox.append(video, el("div", "ip-frame"), modes, retryBtn, shotBtn);
+camBox.append(video, el("div", "ip-frame"), modes, camHint, retryBtn, shotBtn);
 const camRow = el("button", "img-opt photo", "تصوير بكاميرا التليفون (أعلى دقة)"); camRow.type = "button";
 camRow.addEventListener("click", () => { camIn.value = ""; camIn.click(); });
 const galRow = el("button", "img-opt gal", "استيراد صورة من المعرض"); galRow.type = "button";
@@ -136,6 +145,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) stopC
 window.imageLeave = stopCam;
 window.imagePage = () => {
   const pg = $("imgpage");
+  if (window.__imgMode) { const m = window.__imgMode; window.__imgMode = null; setMode(m); } // دخول من زر «قراءة روشتة» أو «بحث بصورة»
   if (!built) {
     built = true;
     const c = el("div", "ip-card");
@@ -145,11 +155,15 @@ window.imagePage = () => {
     pg.append(camBox, ipMsg, c);
   }
   say("");
+  syncBar();
   startCam();
 };
-imgBtn.addEventListener("click", () => { if (window.openImagePage) window.openImagePage(); else location.hash = "#/img"; });
-$("f").append(imgBtn, camIn, galIn);
-const busy = (v) => { imgBtn.disabled = v; };
+const rxBtn = el("button", "scan-btn img-pick rx-pick", "قراءة روشتة"); rxBtn.type = "button";
+const openWith = (m) => { window.__imgMode = m; if (window.openImagePage) window.openImagePage(); else location.hash = "#/img"; };
+imgBtn.addEventListener("click", () => openWith("prod"));
+rxBtn.addEventListener("click", () => openWith("rx"));
+$("f").append(imgBtn, rxBtn, camIn, galIn);
+const busy = (v) => { imgBtn.disabled = v; rxBtn.disabled = v; };
 
 // أي بحث مش جاي من الصورة بيمسح صندوق العائلة
 $("f").addEventListener("submit", () => { if (!window.__keepImg) fam.replaceChildren(); }, true);
@@ -372,7 +386,13 @@ async function handle(f) {
 const RX_ST = { matched: ["مطابق في السجل", "ok"], uncertain: ["محتاج مراجعة", "warn"], no_match: ["مش لاقيينه في السجل", "bad"] };
 const RX_SC = { exact: "الاسم والتركيز المكتوب مطابقين لمنتج واحد في السجل.", ambiguous: "أكتر من منتج في السجل بنفس الاسم والتركيز. راجع الشكل والحجم.", partial: "التركيز المكتوب موجود في تركيبة أو أكتر من منتج. راجع المنتج الصح.", dose_not_found: "التركيز المكتوب مش موجود في السجل لنفس الاسم. راجع الروشتة.", no_dose: "مفيش تركيز مقروء نقارن بيه، فالمطابقة بالاسم بس." };
 const RX_LEG = { good: "واضح", medium: "متوسط", poor: "ضعيف" };
-(() => { const s = document.createElement("style"); s.textContent = ".rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"; document.head.append(s); })();
+(() => { const s = document.createElement("style");
+  s.textContent = ".rx-item h2{overflow-wrap:anywhere}.rx-item .rx-go{margin-top:10px}"
+    + ".qs .scan-btn.rx-pick::before{-webkit-mask-image:var(--ic-rx);mask-image:var(--ic-rx)}"
+    + ":root{--ic-rx:url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M14%202H6a2%202%200%200%200-2%202v16a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V8z'/%3E%3Cpath%20d='M14%202v6h6M8%2013h8M8%2017h8M8%209h2'/%3E%3C/svg%3E\")}"
+    + ".ip-hint{position:absolute;inset-inline:16px;bottom:100px;z-index:2;padding:7px 12px;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;text-align:center;pointer-events:none}"
+    + ".ip-cam.off .ip-hint{display:none}.ip-cam.rx .ip-frame{inset:7% 4% 21%}";
+  document.head.append(s); })();
 
 function rxCard(it) {
   const c = el("article", "card rx-item");
