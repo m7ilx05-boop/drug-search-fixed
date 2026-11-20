@@ -134,6 +134,14 @@
     location.hash = "#/i/" + encodeURIComponent(name);
   };
 
+  // فتح صفحة منتج مباشرة من بياناته (من شريط الرئيسية) من غير ما نعدّي على صفحة النتايج.
+  // الرجوع من الصفحة بيرجّعك للرئيسية.
+  window.openProductDirect = (p, tier) => {
+    const i = ITEMS.push({ kind: "card", p, t: tier }) - 1;
+    navd = true;
+    location.hash = "#/p/" + i;
+  };
+
   // زرار "بحث بصورة" في الرئيسية بيفتح صفحته (#/img)
   window.openImagePage = () => { navd = true; location.hash = "#/img"; };
 

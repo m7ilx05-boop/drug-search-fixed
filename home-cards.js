@@ -64,6 +64,39 @@
     if (f.requestSubmit) f.requestSubmit(); else f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
   }
 
+  /* دوس "افتح المنتج": بنجيب بيانات المنتج كاملة بنفس البحث ونفتح صفحته على طول (من غير صفحة النتايج).
+     لو ملقيناش المنتج بالظبط أو حصلت مشكلة، بنرجع للبحث القديم عشان المستخدم ميتعطّلش. */
+  var opening = false;
+  function openProduct(p, btn) {
+    if (opening) return;
+    var name = p.product_name || "";
+    if (typeof window.openProductDirect !== "function") { closeOpen(null); search(brand(name)); return; }
+    opening = true;
+    var label = btn.textContent;
+    btn.disabled = true; btn.textContent = "جاري الفتح…";
+    var fallback = function () { opening = false; closeOpen(null); search(brand(name)); };
+    call("drug-search", { query: name, search_type: "auto" }).then(function (d) {
+      var tiers = typeof readTiers === "function" ? readTiers(d) : null;
+      var lists = tiers ? tiers : [Array.isArray(d && d.results) ? d.results : []];
+      var key = normKey(name), found = null, tier;
+      for (var i = 0; i < lists.length && !found; i++) {
+        var list = lists[i] || [];
+        var hit = list.filter(function (x) { return x && normKey(x.product_name) === key; });
+        if (hit.length > 1) {
+          var best = hit.filter(function (x) {
+            return (!p.manufacturer || x.manufacturer === p.manufacturer) && (!p.strength || String(x.strength || x.strength_summary || "") === String(p.strength));
+          });
+          if (best.length) hit = best;
+        }
+        if (hit.length) { found = hit[0]; tier = tiers ? i + 1 : undefined; }
+      }
+      if (!found) { fallback(); return; }
+      opening = false;
+      closeOpen(null);
+      window.openProductDirect(found, tier);
+    }).catch(function () { btn.disabled = false; btn.textContent = label; fallback(); });
+  }
+
   /* ===== الكارت المفتوح ===== */
   var openOv = null;
   function closeOpen(fromRect) {
@@ -109,7 +142,7 @@
     var close = function () { closeOpen(from); };
     x.addEventListener("click", close);
     ov.addEventListener("click", function (e) { if (e.target === ov) close(); });
-    go.addEventListener("click", function () { var n = brand(p.product_name); closeOpen(null); search(n); });
+    go.addEventListener("click", function () { openProduct(p, go); });
     document.addEventListener("keydown", function esc(e) {
       if (!openOv) { document.removeEventListener("keydown", esc); return; }
       if (e.key === "Escape") { document.removeEventListener("keydown", esc); close(); }
