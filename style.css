@@ -697,3 +697,6 @@ body[data-view=home] #imgbox{display:none}
 .rx-band .rx-edit input{border-radius:999px;padding:8px 14px}
 .rx-band .rx-edit-go{border-radius:999px;background:#6ec0ff;color:#0a2540}
 .rx-band .rx-edit-x{border-radius:999px;color:#bfe0ff;border-color:rgba(110,185,255,.5)}
+
+.rx-band h2.rx-tap{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rx-band h2.rx-tap:active{filter:brightness(1.08)}

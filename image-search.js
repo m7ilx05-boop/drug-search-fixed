@@ -730,10 +730,9 @@ function rxCompare(f) { // صورة الروشتة الأصلية للمقارن
 function rxEditName(band, it, pb, token) {
   const h = band.querySelector("h2"), st = band.querySelector(".rx-st");
   if (!h || !st) return;
-  const pen = el("button", "rx-pen", "✎"); pen.type = "button"; pen.setAttribute("aria-label", "عدّل الاسم المقروء");
-  st.after(pen);
+  h.classList.add("rx-tap"); h.tabIndex = 0; h.setAttribute("role", "button"); h.setAttribute("aria-label", "اضغط لتعديل اسم الدواء");
   let busy = false;
-  pen.addEventListener("click", () => {
+  const open = () => {
     if (band.querySelector(".rx-edit")) return;
     const f = el("form", "rx-edit");
     const inp = el("input"); inp.type = "text"; inp.value = h.textContent; inp.maxLength = 100; inp.dir = "auto";
@@ -741,7 +740,7 @@ function rxEditName(band, it, pb, token) {
     const go = el("button", "rx-edit-go", "ابحث بالاسم الجديد"); go.type = "submit";
     const x = el("button", "rx-edit-x", "إلغاء"); x.type = "button";
     f.append(inp, go, x);
-    const close = () => { f.remove(); h.hidden = false; pen.hidden = false; st.hidden = false; };
+    const close = () => { f.remove(); h.hidden = false; st.hidden = false; };
     x.addEventListener("click", close);
     f.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -752,9 +751,11 @@ function rxEditName(band, it, pb, token) {
       if (nv !== h.textContent) { h.textContent = nv; st.textContent = "تعديل يدوي"; st.title = "تعديل يدوي"; st.setAttribute("aria-label", "تعديل يدوي"); st.className = "rx-st warn"; }
       try { await fillRxProducts(Object.assign({}, it, { read_name: nv, unclear: false }), pb, token); } finally { busy = false; }
     });
-    h.hidden = true; pen.hidden = true; st.hidden = true;
+    h.hidden = true; st.hidden = true;
     h.after(f); inp.focus(); inp.select();
-  });
+  };
+  h.addEventListener("click", open);
+  h.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
 }
 
 // ===== المرحلة التانية للروشتة: rx-resolve (نفس الصورة + الأسطر المقروءة). لو وقعت أو اتأخرت بنرجع للنتيجة القديمة زي ما هي =====
