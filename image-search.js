@@ -776,6 +776,14 @@ async function rxResolve(b64, items) {
 function rxDisplay(item, r) {
   if (r && r.status === "matched") return { state: "matched", brand: r.matched_brand, product_id: r.product_id, note: null, excluded: r.excluded || [] };
   if (r && r.status === "matched_brand") return { state: "brand_only", brand: r.matched_brand, product_id: null, note: "البراند مؤكد من الصورة والتركيز للصيدلي", excluded: r.excluded || [] };
+  if (r && r.status === "choices" && Array.isArray(r.choices) && r.choices.length) {
+    // الاسم المقروء بيطابق براند واحد حرفيًا، وتركيزه مطابق أو مش مكتوب، والصورة اتفحصت مرتين ومتوافقة: ده هو، والباقي أسماء قريبة بس
+    const nb = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""), rb = nb(rxBrand(item.read_name));
+    const same = rb.length >= 3 && !hasWild(item.read_name) && !(r.want && r.want.assumed) ? r.choices.filter((c) => nb(c.brand) === rb) : [];
+    if (same.length === 1 && same[0].vision === "both_compatible" && (same[0].strength_check === "exact" || same[0].strength_check === "none_written")) {
+      return { state: "brand_only", brand: same[0].brand, product_id: null, note: same[0].strength_check === "exact" ? "الاسم المكتوب مطابق تمامًا للبراند ده، والتركيز مطابق. راجع الصيدلي." : "الاسم المكتوب مطابق تمامًا للبراند ده، والتركيز مش مكتوب. راجع الصيدلي.", excluded: r.excluded || [], others: r.choices.filter((c) => c !== same[0]) };
+    }
+  }
   if (r && r.status === "choices" && Array.isArray(r.choices) && r.choices.length) return { state: "choices", options: r.choices, excluded: r.excluded || [], note: (r.notes || [])[0] ?? null };
   const old = item.selected_product ?? item.candidate ?? null;
   return { state: old ? "legacy" : "none", excluded: (r && r.excluded) || [], note: ((r && r.notes) || [])[0] ?? null };
@@ -793,7 +801,7 @@ function rxExcluded(list) {
 // اختيارات البراند: المنتجات بتتحمّل لما الصيدلي يختار، مش بنخمّن
 function rxChoices(it, d, box, token) {
   const w = el("div", "rx-choices");
-  w.append(el("p", "sec-note", "الاسم مش مؤكد: اختار البراند الصح" + (d.note ? " — " + d.note : "")));
+  w.append(el("p", "sec-note", d.title || ("الاسم مش مؤكد: اختار البراند الصح" + (d.note ? " — " + d.note : ""))));
   const prod = el("div", "rx-chosen"); const btns = [];
   d.options.forEach((c) => {
     const b = el("button", "rx-choice"); b.type = "button";
@@ -850,6 +858,7 @@ async function handleRx(f) {
       if (d.note && d.state !== "choices") det.append(el("p", "sec-note", d.note));
       if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
       if (d.state === "choices") det.open = true;
+      if (d.others && d.others.length) { const dd = el("details", "rx-excl"); dd.append(el("summary", null, "أسماء قريبة تانية (" + d.others.length + ")")); rxChoices(it, { options: d.others, excluded: [], title: "لو الاسم المقروء غلط، اختار البراند الصح:" }, dd, token); det.append(dd); }
       const band = rxBand(it, n); w.append(band, pb, det); out.append(w); rxEditName(band, it, pb, token);
       let run;
       if (d.state === "matched" || d.state === "brand_only") run = () => fillRxProducts(it, pb, token, { name: d.brand });

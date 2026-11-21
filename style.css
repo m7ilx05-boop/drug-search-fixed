@@ -700,3 +700,9 @@ body[data-view=home] #imgbox{display:none}
 
 .rx-band h2.rx-tap{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rx-band h2.rx-tap:active{filter:brightness(1.08)}
+
+/* اختيارات البراند: خلفية معتمة تناسب الثيم، والكلام ياخد لون الصفحة */
+.rx-choice{background:rgba(127,127,127,.12);border:1px solid rgba(127,127,127,.35);color:inherit}
+.rx-choice strong{color:inherit}
+.rx-choice small{color:var(--muted,inherit);opacity:.85}
+.rx-choice.on{background:color-mix(in srgb,var(--accent) 18%,transparent)}
