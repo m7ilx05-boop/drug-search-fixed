@@ -712,4 +712,4 @@ body .scan-msg.warn,body .scan-msg.bad{display:flex;align-items:center;gap:6px;w
 body .scan-msg.bad{background:color-mix(in srgb,var(--bad) 8%,transparent)}
 body .scan-msg.warn::before,body .scan-msg.bad::before{content:"";flex:none;width:5px;height:5px;border-radius:50%;background:var(--warn)}
 body .scan-msg.bad::before{background:var(--bad)}
-body .scan-msg.rx-note{margin:10px auto 14px}
+body .scan-msg.rx-note{margin:4px 2px 10px}

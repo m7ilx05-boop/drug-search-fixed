@@ -114,7 +114,7 @@
       if (r) r.checked = true;
       $("f").requestSubmit();
     });
-    sheet.append(full, el("div", "meta", "اسأل الصيدلي أو الدكتور قبل ما تستبدل الدواء."));
+    sheet.append(full, el("div", "meta", "راجع الجرعة والشكل الدوائي قبل البديل."));
     return [hero, sheet];
   }
 

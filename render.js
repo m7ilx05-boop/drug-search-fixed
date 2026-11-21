@@ -386,7 +386,7 @@ function renderAll(d, note) {
   }
   if (t1gone.length) {
     out.append(el("h3", "sec", (un.label || "منتجات ممكن تكون مش متوفرة في السوق بعد الآن") + " (" + t1gone.length + ")"));
-    out.append(el("p", "sec-note", un.note || "تقدير تقريبي مش تأكيد: سعر المنتج ماتحدّثش من 3 سنين أو أكتر على دليل دواء مصر، وممكن يكون لسه موجود. اسأل الصيدلي قبل ما تعتمد عليه."));
+    out.append(el("p", "sec-note", un.note || "تقدير تقريبي مش تأكيد: سعر المنتج ماتحدّثش من 3 سنين أو أكتر على دليل دواء مصر، وممكن يكون لسه موجود. راجع السعر الحالي قبل ما تعتمد عليه."));
     t1gone.forEach((p) => out.append(card(p, tiers ? 1 : undefined)));
   }
   return approved.length + pending.length;

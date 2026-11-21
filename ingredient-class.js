@@ -246,7 +246,7 @@ function ingredientBody(it, key) {
   });
   // 3) الحد الأقصى اليومي (المتراجع فقط)
   if (doses.length) {
-    frag.append(el("h3", "pd-h", "الحد الأقصى اليومي (راجعه صيدلي)"));
+    frag.append(el("h3", "pd-h", "الحد الأقصى اليومي (راجعه قبل الصرف)"));
     const AG = { adult: "بالغ", child: "أطفال", elderly: "كبار السن" };
     const ul = el("ul", "ing-ul");
     doses.forEach((d) => {
@@ -272,7 +272,7 @@ function ingredientBody(it, key) {
   if (rxEl) addSrc("الاستخدامات والموانع: RxClass (MED-RT)");
   uniq([ref && ref.source_title, ...doses.map((d) => d.source_title)]).forEach((t) => addSrc("مرجع مراجَع: " + t));
   foot.append(sl);
-  const notes = ["ده تصنيف ومعلومات عامة على مستوى المادة الفعّالة، مش لمنتج معيّن في السوق المصري، ومش بديل لرأي الصيدلي أو الطبيب. راجع نشرة المنتج قبل الاعتماد عليه."];
+  const notes = ["ده تصنيف ومعلومات عامة على مستوى المادة الفعّالة، مش لمنتج معيّن في السوق المصري، ومش بديل لنشرة المنتج. راجع النشرة قبل الاعتماد عليه."];
   if (rx && Array.isArray(rx.contraindications) && rx.contraindications.length) notes.push("موانع RxClass على مستوى المادة وما اتراجعتش بواسطة صيدلي، وبعضها ممكن يخص منتجات مركّبة.");
   if (chSec) notes.push("دواعي الاستعمال من ChEMBL محتفظ فيها بالمرحلة 3 فأعلى، وهي مش نص نشرة دواء ولا نص أصلي من FDA.");
   if (secs.some((s) => (s.source || "openfda") === "openfda") || rxEl) notes.push("الترجمة العربية (لو اتعملت) اتعملت آليًا بالذكاء الاصطناعي واتراجعت آليًا بموديل تاني، ومفيش مراجعة بشرية، فممكن فيها أخطاء. المرجع هو النص الأصلي بالإنجليزي.");

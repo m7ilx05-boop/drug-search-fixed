@@ -46,7 +46,7 @@ prodMode2.type = "button"; rxMode2.type = "button"; prodMode2.setAttribute("aria
 modes2.append(prodMode2, rxMode2);
 // وضع الصورة: "prod" = علبة منتج (drug-image-search)، "rx" = روشتة (read-prescription)
 let mode = "prod", tipEl = null;
-const TIPS = { prod: "", rx: "صوّر الروشتة كاملة من فوق وبإضاءة كويسة، وخلّي كل الأسطر باينة من غير ضل. القراءة آلية وممكن تغلط في اسم أو رقم، فراجع كل سطر مع الصيدلي." };
+const TIPS = { prod: "", rx: "صوّر الروشتة كاملة من فوق وبإضاءة كويسة، وخلّي كل الأسطر باينة من غير ضل. القراءة آلية وممكن تغلط في اسم أو رقم، فاقرأ وراجع الجرعة والشكل الدوائي قبل الصرف." };
 const SUB = { prod: "صوّر العلبة أو اختار صورة من المعرض", rx: "صوّر الروشتة كاملة أو اختار صورة من المعرض" };
 const TTL = { prod: "بحث بصورة", rx: "قراءة روشتة" };
 const syncBar = () => { // عنوان الصفحة بيتبع الوضع (منتج / روشتة)
@@ -584,7 +584,7 @@ async function rxSuggest(brand, d, it, box, token, auto) {
   w.append(row); box.append(w);
   if (!auto && top.s >= RX_AUTO_MIN && (!wild || uniq.length === 1)) {
     const sub = el("div", "rx-auto");
-    sub.append(el("div", "scan-msg warn", "تخمين: «" + top.n + "» (تشابه " + Math.round(top.s * 100) + "٪). راجعه مع الصيدلي."));
+    sub.append(el("div", "scan-msg warn", "تخمين: «" + top.n + "» (تشابه " + Math.round(top.s * 100) + "٪). راجع الجرعة والشكل الدوائي قبل الصرف."));
     const pb = el("div", "rx-prods"); sub.append(pb); box.append(sub);
     await fillRxProducts(it, pb, token, { name: top.n, sci: top.sci, auto: true });
   }
@@ -623,7 +623,7 @@ async function fillRxProducts(it, box, token, opt) {
       box.replaceChildren(el("p", "sec-note", "فيه حرف مش واضح في «" + brand + "» (الـ _). بنطابق الحروف الواضحة مع كل أدوية الدليل من غير ما نفترض الحرف الناقص."));
       const ok = await rxSuggest(brand, null, it, box, token, false);
       if (token !== polling) return;
-      if (!ok) box.append(el("div", "scan-msg warn", "مفيش اسم بيطابق الحروف الواضحة. راجع الصيدلي."));
+      if (!ok) box.append(el("div", "scan-msg warn", "مفيش اسم بيطابق الحروف الواضحة. اقرأ الروشتة بنفسك."));
     } catch { box.replaceChildren(el("div", "scan-msg warn", "تعذّرت المطابقة، جرّب تاني.")); }
     return;
   }
@@ -657,7 +657,7 @@ async function fillRxProducts(it, box, token, opt) {
       const pref = list.filter(formOk), seen = new Set();
       const shown = (pref.length ? pref : list).filter((p) => { const k = normKey(p.product_name) + "|" + rxStrengthOf(p); if (seen.has(k)) return false; seen.add(k); return true; })
         .sort((x, y) => rxStrengthNum(x) - rxStrengthNum(y)).slice(0, 12);
-      box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فعرضنا كل التركيزات المتاحة" + (wantForm && !pref.length ? " (ومفيش منها بالشكل المكتوب)" : "") + (shown.length > 1 ? " — اسحب يمين وشمال" : "") + ". راجع الصيدلي."));
+      box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فعرضنا كل التركيزات المتاحة" + (wantForm && !pref.length ? " (ومفيش منها بالشكل المكتوب)" : "") + (shown.length > 1 ? " — اسحب يمين وشمال" : "") + ". راجع الجرعة قبل الصرف."));
       box.append(rxRow(shown, 3));
       return;
     }
@@ -899,7 +899,7 @@ function rxDisplay(item, r) {
     const nb = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""), rb = nb(rxBrand(item.read_name));
     const same = rb.length >= 3 && !hasWild(item.read_name) && !(r.want && r.want.assumed) ? r.choices.filter((c) => nb(c.brand) === rb) : [];
     if (same.length === 1 && same[0].vision === "both_compatible" && (same[0].strength_check === "exact" || same[0].strength_check === "none_written")) {
-      return { state: "brand_only", brand: same[0].brand, product_id: null, note: same[0].strength_check === "exact" ? "الاسم المكتوب مطابق تمامًا للبراند ده، والتركيز مطابق. راجع الصيدلي." : "الاسم المكتوب مطابق تمامًا للبراند ده، والتركيز مش مكتوب. راجع الصيدلي.", excluded: r.excluded || [], others: r.choices.filter((c) => c !== same[0]) };
+      return { state: "brand_only", brand: same[0].brand, product_id: null, note: same[0].strength_check === "exact" ? "الاسم المكتوب مطابق تمامًا للبراند ده، والتركيز مطابق. راجع الشكل الدوائي قبل الصرف." : "الاسم المكتوب مطابق تمامًا للبراند ده، والتركيز مش مكتوب. راجع الجرعة والشكل الدوائي قبل الصرف.", excluded: r.excluded || [], others: r.choices.filter((c) => c !== same[0]) };
     }
   }
   if (r && r.status === "choices" && Array.isArray(r.choices) && r.choices.length) return { state: "choices", options: r.choices, excluded: r.excluded || [], note: (r.notes || [])[0] ?? null };
@@ -944,7 +944,7 @@ async function handleRx(f) {
     const b64 = await toJpegBase64(f, RX_B64_MAX, RX_SIDES);
     if (token !== polling) return;
     st.set("prep", "done", "اتجهّزت الصورة");
-    st.lines("prep", [["الأبعاد بعد التصغير", lastShot.w + " × " + lastShot.h + " بكسل"], ["الحجم المبعوت", Math.round(b64.length * 0.75 / 1024) + " كيلوبايت (JPEG)"], ["ملحوظة", "الصورة بتتعرض على جهازك بس للمقارنة، ومش بتتحفظ. الأسطر المقروءة بتتسجّل لمراجعة الصيدلي."]]);
+    st.lines("prep", [["الأبعاد بعد التصغير", lastShot.w + " × " + lastShot.h + " بكسل"], ["الحجم المبعوت", Math.round(b64.length * 0.75 / 1024) + " كيلوبايت (JPEG)"], ["ملحوظة", "الصورة بتتعرض على جهازك بس للمقارنة، ومش بتتحفظ. الأسطر المقروءة بتتسجّل للمراجعة."]]);
     st.set("read", "run", "جاري قراءة الروشتة…");
     const r = await call("read-prescription", { image_base64: b64, mime_type: "image/jpeg" });
     if (token !== polling) return;
@@ -957,7 +957,7 @@ async function handleRx(f) {
     }
     const matched = items.filter((x) => x.match_status === "matched").length;
     st.set("read", "done", "اتقرا " + items.length + " سطر، " + matched + " مطابق في السجل");
-    st.lines("read", [["عدد الأسطر", items.length], ["مطابق في السجل", matched], ["وضوح الخط", RX_LEG[r.overall_legibility] || ""], ["تنبيه", "قراءة آلية وممكن تغلط في حرف أو رقم. كل سطر محتاج مراجعة صيدلي قبل الصرف."]]);
+    st.lines("read", [["عدد الأسطر", items.length], ["مطابق في السجل", matched], ["وضوح الخط", RX_LEG[r.overall_legibility] || ""], ["تنبيه", "قراءة آلية وممكن تغلط في حرف أو رقم. اقرأ وراجع الجرعة والشكل الدوائي في كل سطر قبل الصرف."]]);
     st.set("resolve", "run", "جاري مطابقة الأسماء مع السجل…");
     const rs = await rxResolve(b64, items);
     if (token !== polling) return;
@@ -968,7 +968,6 @@ async function handleRx(f) {
     rxSetImage(f);
     if (!items.some((it) => Array.isArray(it.name_box) && it.name_box.length === 4)) { const ob = el("button", "rx-go", "فتح الروشتة الأصلية"); ob.type = "button"; ob.addEventListener("click", () => rxViewer(null)); out.append(ob); } // لو مفيش قصاصات، زر واحد يفتح الصورة
     const pages = el("div", "rx-pages"); out.append(pages);
-    out.append(el("div", "scan-msg warn rx-note", "القراءة آلية، راجع كل سطر مع الصيدلي." + (r.overall_legibility === "poor" ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : "")));
     const boxes = items.map((it, i) => {
       const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
       const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
@@ -978,7 +977,7 @@ async function handleRx(f) {
       if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
       if (d.state === "choices") det.open = true;
       if (d.others && d.others.length) { const dd = el("details", "rx-excl"); dd.append(el("summary", null, "أسماء قريبة تانية (" + d.others.length + ")")); rxChoices(it, { options: d.others, excluded: [], title: "لو الاسم المقروء غلط، اختار البراند الصح:" }, dd, token); det.append(dd); }
-      const band = rxBand(it, n), crop = rxCrop(it); w.append(band); if (crop) w.append(crop); w.append(pb, det); pages.append(w); rxEditName(band, it, pb, token);
+      const band = rxBand(it, n), crop = rxCrop(it); w.append(band); if (crop) w.append(crop); w.append(el("div", "scan-msg warn rx-note", "اقرأ وراجع الجرعة والشكل الدوائي قبل الصرف." + (r.overall_legibility === "poor" ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : "")); w.append(pb, det); pages.append(w); rxEditName(band, it, pb, token);
       let run;
       if (d.state === "matched" || d.state === "brand_only") run = () => fillRxProducts(it, pb, token, { name: d.brand });
       else if (d.state === "choices") run = async () => { rxChoices(it, d, pb, token); };
