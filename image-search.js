@@ -436,8 +436,8 @@ function rxCard(it, n) {
   if (it.notes_ar) c.append(el("div", "meta", "ملاحظة: " + it.notes_ar));
   const chips = el("div", "chips");
   const [t, cls] = RX_ST[it.match_status] || RX_ST.no_match;
-  if (!String(it.read_name || "").includes("*")) chips.append(el("span", "chip " + cls, t));
-  if (it.unclear) chips.append(el("span", "chip warn", String(it.read_name || "").includes("*") ? "فيه حرف مش واضح (*)" : "جزء من السطر مش واضح"));
+  if (!hasWild(it.read_name)) chips.append(el("span", "chip " + cls, t));
+  if (it.unclear) chips.append(el("span", "chip warn", hasWild(it.read_name) ? "فيه حرف مش واضح (_)" : "جزء من السطر مش واضح"));
   if (typeof it.confidence === "number") chips.append(el("span", "chip", "ثقة القراءة: " + Math.round(it.confidence * 100) + "%"));
   c.append(chips);
   const cd = it.candidate;
@@ -447,7 +447,7 @@ function rxCard(it, n) {
     if (RX_SC[cd.strength_check]) c.append(el("div", "meta", RX_SC[cd.strength_check]));
   }
   const q = String(it.read_name || "").trim();
-  if (q.length >= 2 && !q.includes("*")) {
+  if (q.length >= 2 && !hasWild(q)) {
     const b = el("button", "rx-go", "ابحث عن الدواء"); b.type = "button";
     b.addEventListener("click", () => {
       $("q").value = q;
@@ -461,6 +461,8 @@ function rxCard(it, n) {
 }
 
 // ===== منتجات فعلية لكل دواء في الروشتة: بحث بالاسم + مطابقة التركيز (مطابق تمامًا فقط، وإلا أقرب تركيز بتنبيه واضح) =====
+// حرف مش واضح في اسم الدواء: _ (والـ * القديمة بتتعامل زيها)
+const hasWild = (t) => /[*_]/.test(String(t || ""));
 const RX_AMT = /(\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)*)\s*(mg|mcg|µg|μg|ug|gm|g|iu|ml|%)(?![a-z])/gi;
 function rxAmts(text) { // أرقام التركيز اللي وراها وحدة بس (عدد الأقراص في العبوة مش بيتحسب)، الكتلة بتتحوّل لـ mg
   const out = []; if (!text) return out;
@@ -490,7 +492,7 @@ const prodAmtsAll = (p) => { const n = rxAmts(p.product_name); return n.length ?
 // لو أقرب اسم تشابهه عالي (75٪ فأكتر) بنعرض منتجاته تلقائيًا بتنبيه إنه تخمين. غير كده بنعرض الأسماء للاختيار بس.
 const RX_AUTO_MIN = 0.75;
 async function rxSuggest(brand, d, it, box, token, auto) {
-  const wild = brand.includes("*"); // * = حرف واحد مش واضح: بنطابق باقي الحروف بالظبط من غير ما نجبر حرف
+  const wild = hasWild(brand); // _ = حرف واحد مش واضح: بنطابق الحروف الواضحة بس من غير ما نفترض حرف
   let cands = [];
   try {
     const f = await call("drug-name-fuzzy", { name: brand });
@@ -513,7 +515,7 @@ async function rxSuggest(brand, d, it, box, token, auto) {
   if (!uniq.length) return false;
   const top = uniq[0];
   const w = el("div", "rx-sug");
-  w.append(el("p", "sec-note", wild ? "أسماء بتطابق الحروف الواضحة في «" + brand + "» (الـ * = حرف مش واضح):" : "قصدك واحد من الأسماء دي؟ (القراءة ممكن تكون غلطت في حرف)"));
+  w.append(el("p", "sec-note", wild ? "أسماء بتطابق الحروف الواضحة في «" + brand + "» (الـ _ = حرف مش واضح):" : "قصدك واحد من الأسماء دي؟ (القراءة ممكن تكون غلطت في حرف)"));
   const row = el("div", "chips");
   uniq.slice(0, 6).forEach((c) => {
     const b = el("button", "chip rx-sug-b", c.n + (c.s ? " · " + Math.round(c.s * 100) + "٪" : "")); b.type = "button"; b.dir = "ltr";
@@ -557,9 +559,9 @@ async function fillRxProducts(it, box, token, opt) {
   const nd = rxNeed(it), need = nd.amts, wantForm = rxForm((it.dose || "") + " " + (it.read_name || ""));
   const formOk = (p) => { const pf = rxForm((p.product_name || "") + " " + (p.dosage_form || "")); return !wantForm || !pf || pf === wantForm; };
   box.replaceChildren(el("div", "meta", "جاري البحث عن «" + brand + "»…"));
-  if (brand.includes("*")) { // اسم فيه حرف مش واضح: مفيش بحث بالاسم الناقص، بنطابق الحروف الباقية بس
+  if (hasWild(brand)) { // اسم فيه حرف مش واضح: مفيش بحث بالاسم الناقص، بنطابق الحروف الباقية بس
     try {
-      box.replaceChildren(el("p", "sec-note", "فيه حرف مش واضح في «" + brand + "» (الـ *). بنطابق باقي الحروف مع جدول الأدوية من غير ما نفترض الحرف الناقص."));
+      box.replaceChildren(el("p", "sec-note", "فيه حرف مش واضح في «" + brand + "» (الـ _). بنطابق الحروف الواضحة مع كل أدوية الدليل من غير ما نفترض الحرف الناقص."));
       const ok = await rxSuggest(brand, null, it, box, token, false);
       if (token !== polling) return;
       if (!ok) box.append(el("div", "scan-msg warn", "ما لقيناش اسم بيطابق الحروف الواضحة في «" + brand + "». راجع الروشتة مع الصيدلي."));
