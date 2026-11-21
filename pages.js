@@ -138,6 +138,7 @@
   // الرجوع من الصفحة بيرجّعك للرئيسية.
   window.openProductDirect = (p, tier) => {
     const i = ITEMS.push({ kind: "card", p, t: tier }) - 1;
+    if (document.body.dataset.view === "results") listY = window.scrollY; // الرجوع يرجّعك لنفس مكانك في النتايج
     navd = true;
     location.hash = "#/p/" + i;
   };

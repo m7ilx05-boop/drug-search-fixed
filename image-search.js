@@ -421,12 +421,51 @@ function rxCrop(it) { // الاسم المكتوب بخط اليد مقصوص م
   im.src = rxImgUrl;
   return wrap;
 }
+// ===== شكل نتيجة الروشتة: شريط أزرق بالرقم واسم الدواء، وتحته صف منتجات بالعرض (اسحب يمين وشمال لو فيه أكتر من تركيز) =====
+function rxBand(it, n) {
+  const w = el("div", "rx-band");
+  const num = el("span", "rx-num", String(n || it.line_no || "")); num.setAttribute("aria-label", "دواء رقم " + (n || it.line_no || ""));
+  const h = el("h2", null, it.read_name || "سطر غير مقروء"); h.dir = "auto";
+  const [t, cls] = RX_ST[it.match_status] || RX_ST.no_match;
+  const st = el("span", "rx-st " + cls, it.unclear || hasWild(it.read_name) ? "راجع الاسم" : t);
+  w.append(num, h, st);
+  return w;
+}
+const rxStrengthOf = (p) => {
+  const ings = p.product_ingredients || [];
+  if (ings.length && ings.every((pi) => pi.strength_value != null)) return ings.map(fmtStrength).join(" + ");
+  return String(p.strength || "").trim();
+};
+const rxStrengthNum = (p) => { const m = rxStrengthOf(p).match(/\d+(?:[.,]\d+)?/); return m ? parseFloat(m[0].replace(",", ".")) : Infinity; };
+function rxTile(p, tier) {
+  const t = el("button", "rx-tile" + (tier === 3 ? " rx-near" : "")); t.type = "button";
+  const pic = el("div", "rx-pic");
+  const u = (() => { try { const x = new URL(p.image && p.image.url); return x.protocol === "https:" ? x.href : null; } catch { return null; } })();
+  if (p.image && p.image.has_image && u) {
+    const im = el("img"); im.src = u; im.alt = p.product_name || ""; im.loading = "lazy"; im.referrerPolicy = "no-referrer";
+    im.onerror = () => { pic.replaceChildren("💊"); };
+    pic.append(im);
+  } else pic.append("💊");
+  const st = rxStrengthOf(p);
+  if (st) { const b = el("span", "rx-str", st); b.dir = "ltr"; pic.append(b); }
+  const nm = el("div", "rx-nm", p.product_name || p.arabic_name || "منتج"); nm.dir = "auto";
+  t.append(pic, nm);
+  const sub = [p.dosage_form, p.pack_size && "العبوة: " + p.pack_size].filter(Boolean).join(" · ");
+  if (sub) t.append(el("div", "rx-sub", sub));
+  const cur = p.current_price != null ? p.current_price : p.price;
+  if (cur != null) t.append(el("div", "rx-pr", Number(cur).toLocaleString("ar-EG") + " ج.م"));
+  if (tier === 3) t.append(el("div", "rx-warn", "مش نفس التركيز/الشكل المكتوب"));
+  t.addEventListener("click", () => { if (window.openProductDirect) window.openProductDirect(p, tier); });
+  return t;
+}
+function rxRow(list, tier) {
+  const row = el("div", "rx-row" + (list.length === 1 ? " one" : ""));
+  list.forEach((p) => row.append(rxTile(p, tier)));
+  return row;
+}
 function rxCard(it, n) {
   const c = el("article", "card rx-item st-" + ((RX_ST[it.match_status] || RX_ST.no_match)[1]));
   const crop = rxCrop(it); if (crop) c.append(crop);
-  const head = el("div", "rx-head");
-  const num = el("span", "rx-num", String(n || it.line_no || "")); num.setAttribute("aria-label", "سطر رقم " + (n || it.line_no || ""));
-  const h = el("h2", null, it.read_name || "سطر غير مقروء"); h.dir = "auto"; head.append(num, h); c.append(head);
   const bits = [["الجرعة", it.dose], ["الطريقة", it.route], ["التكرار", it.frequency], ["المدة", it.duration]].filter((x) => x[1]);
   if (bits.length) {
     const ul = el("ul", "ing");
@@ -602,9 +641,11 @@ async function fillRxProducts(it, box, token, opt) {
       await rxSuggest(brand, d, it, box, token, opt.auto); return;
     }
     if (!need.length) {
-      const pref = list.filter(formOk), shown = (pref.length ? pref : list).slice(0, 3);
-      box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فمش قادرين نأكد التركيز. دي أقرب نتايج بالاسم" + (wantForm && !pref.length ? " (ومفيش منها بالشكل المكتوب)" : "") + "، راجع الصيدلي."));
-      shown.forEach((p) => box.append(card(p, 3)));
+      const pref = list.filter(formOk), seen = new Set();
+      const shown = (pref.length ? pref : list).filter((p) => { const k = normKey(p.product_name) + "|" + rxStrengthOf(p); if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((x, y) => rxStrengthNum(x) - rxStrengthNum(y)).slice(0, 12);
+      box.append(el("p", "sec-note", "التركيز مش مكتوب في الروشتة، فعرضنا كل التركيزات المتاحة" + (wantForm && !pref.length ? " (ومفيش منها بالشكل المكتوب)" : "") + (shown.length > 1 ? " — اسحب يمين وشمال" : "") + ". راجع الصيدلي."));
+      box.append(rxRow(shown, 3));
       return;
     }
     const sameS = list.filter((p) => sameAmts(need, prodAmtsAll(p)));
@@ -612,17 +653,17 @@ async function fillRxProducts(it, box, token, opt) {
     if (nd.assumed) box.append(el("p", "sec-note", "الجرعة مكتوبة «" + it.dose + "» من غير وحدة، فافترضنا إن الرقم بالـ mg."));
     if (exact.length) {
       box.append(el("p", "sec-note", "نفس الاسم والتركيز المكتوب (" + need.map((a) => a.v).join(" + ") + (nd.assumed ? " mg" : "") + (wantForm ? " والشكل" : "") + ") — " + exact.length + " منتج."));
-      exact.slice(0, 5).forEach((p) => box.append(card(p, 1)));
+      box.append(rxRow(exact.slice(0, 8), 1));
       return;
     }
     if (otherForm.length) {
       box.append(el("div", "scan-msg warn", "لقينا «" + brand + "» بنفس التركيز لكن بشكل دوائي مختلف عن المكتوب (" + (it.dose || it.read_name) + "). مش نفس المنتج غالبًا:"));
-      otherForm.slice(0, 3).forEach((p) => box.append(card(p, 3)));
+      box.append(rxRow(otherForm.slice(0, 6), 3));
       return;
     }
     const closest = list.map((p) => ({ p, g: strengthGap(need, prodAmtsAll(p)) })).filter((o) => isFinite(o.g)).sort((x, y) => x.g - y.g).slice(0, 2);
     box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» بنفس التركيز المكتوب (" + need.map((a) => a.v).join(" + ") + (nd.assumed ? " mg" : "") + ")."));
-    if (closest.length) { box.append(el("p", "sec-note", "أقرب تركيز متاح — مش نفس التركيز المطلوب:")); closest.forEach((o) => box.append(card(o.p, 3))); }
+    if (closest.length) { box.append(el("p", "sec-note", "أقرب تركيز متاح — مش نفس التركيز المطلوب:")); box.append(rxRow(closest.map((o) => o.p), 3)); }
     if (!closest.length) await rxSuggest(brand, d, it, box, token, opt.auto);
   } catch (err) {
     box.replaceChildren(el("div", "scan-msg warn", "تعذّر البحث عن «" + brand + "». جرّب زر «ابحث عن الدواء»."));
@@ -707,7 +748,12 @@ async function handleRx(f) {
     out.append(rxCompare(f));
     out.append(el("div", "scan-msg warn", "القراءة آلية وممكن تغلط في حرف أو رقم، وكل سطر محتاج مراجعة صيدلي قبل الصرف. قارنها بالروشتة الأصلية."));
     if (r.overall_legibility === "poor") out.append(el("div", "scan-msg warn", "الخط مش واضح، فالقراءة غالبًا ناقصة أو غلط. جرّب تصوّر الروشتة تاني بإضاءة أحسن."));
-    const boxes = items.map((it, i) => { const w = el("section", "rx-block"), pb = el("div", "rx-prods"); w.append(rxCard(it, it.line_no || i + 1), pb); out.append(w); return { it, pb }; });
+    const boxes = items.map((it, i) => {
+      const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
+      const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
+      det.open = !!it.unclear || it.match_status !== "matched" || hasWild(it.read_name); // لو فيه حاجة محتاجة مراجعة تظهر مفتوحة
+      w.append(rxBand(it, n), pb, det); out.append(w); return { it, pb };
+    });
     { let i = 0; const worker = async () => { while (i < boxes.length && token === polling) { const o = boxes[i++]; await fillRxProducts(o.it, o.pb, token); } }; Promise.all([worker(), worker(), worker()]); } // 3 بحث في نفس الوقت
     quiet();
   } catch (err) {
