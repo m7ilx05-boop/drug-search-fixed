@@ -406,9 +406,8 @@ function rxCrop(it) { // الاسم المكتوب بخط اليد مقصوص م
   const b = it && it.name_box;
   if (!Array.isArray(b) || b.length !== 4 || !rxImgUrl || b.some((x) => !Number.isFinite(Number(x)))) return null;
   const wrap = el("div", "rx-crop"), cv = document.createElement("canvas");
-  const cap = el("div", "rx-crop-h"), hint = el("b"); // عنوان صغير + تلميح إن القصاصة بتفتح الروشتة
-  hint.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>'; hint.append("عرض الروشتة كاملة");
-  cap.append(el("span", null, "المكتوب في الروشتة"), hint);
+  const cap = el("div", "rx-crop-h"); // أيقونة تكبير صغيرة في الركن بس
+  cap.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
   wrap.className += " tap"; wrap.tabIndex = 0; wrap.setAttribute("role", "button"); wrap.setAttribute("aria-label", "افتح الروشتة كاملة مع تحديد مكان الاسم");
   const open = () => rxViewer(b);
   wrap.addEventListener("click", open); wrap.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
@@ -721,58 +720,38 @@ function rxLens(im, url) { // عدسة مكبّرة: اضغط مطولًا عل�
 }
 (function () { const s = document.createElement("style");
   s.textContent = ".rx-block[hidden]{display:none!important}"
-    + ".rx-note{font-size:13px;line-height:1.7;padding:10px 14px;border-radius:14px;margin:6px 0 14px}"
-    // شريط التنقل: سهمين ناعمين وبينهم العدّاد ونقط صغيرة
-    + ".rx-pg{margin:6px 0 14px}.rx-nav{display:flex;align-items:center;gap:12px}"
-    + ".rx-arr{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--accent);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;box-shadow:0 2px 8px rgba(20,90,160,.08);transition:transform .12s,opacity .2s;-webkit-tap-highlight-color:transparent}"
-    + ".rx-arr svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}.rx-arr:active:not(:disabled){transform:scale(.93)}.rx-arr:disabled{opacity:.3;box-shadow:none;cursor:default}"
-    + ".rx-mid{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}.rx-cnt{font-size:14px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}.rx-cnt b{color:var(--ink);font-size:15px}"
-    + ".rx-dots{display:flex;flex-wrap:wrap;justify-content:center;gap:0}"
-    + ".rx-dot{position:relative;width:24px;height:22px;padding:0;border:0;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}"
-    + ".rx-dot::before{content:\"\";position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:99px;background:var(--dc);opacity:.45;transition:width .2s,margin .2s,opacity .2s}"
-    + ".rx-dot.ok{--dc:var(--ok)}.rx-dot.warn{--dc:#D9A21B}.rx-dot.bad{--dc:var(--bad)}"
-    + ".rx-dot.on::before{width:20px;margin-left:-10px;opacity:1}"
-    + ".rx-pg.low{margin:14px 0 4px}.rx-pg.low .rx-arr{width:40px;height:40px}";
+    + ".scan-msg.warn.rx-note{background:none;border:0;padding:0;margin:0 0 4px;font-size:13px;line-height:1.7;color:var(--muted)}"
+    // سطر تنقل واحد: سهم، عدّاد، سهم
+    + ".rx-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 2px}"
+    + ".rx-arr{flex:none;width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:var(--accent);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}"
+    + ".rx-arr svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}.rx-arr:active:not(:disabled){background:var(--soft)}.rx-arr:disabled{opacity:.22;cursor:default}"
+    + ".rx-cnt{min-width:64px;text-align:center;font-size:15px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}"
+    // اسم الدواء: نص عادي بدل الكبسولة
+    + ".rx-pages .rx-band{direction:rtl;display:flex;align-items:center;justify-content:flex-start;gap:10px;width:auto;max-width:100%;margin:6px 0 10px;padding:0;border:0;border-radius:0;background:none;box-shadow:none}"
+    + ".rx-pages .rx-band .rx-num{margin:0;padding:3px 10px;border-radius:999px;background:var(--soft);color:var(--soft-ink);font-size:13px;font-weight:700;box-shadow:none}"
+    + ".rx-pages .rx-band h2{flex:0 1 auto;min-width:0;margin:0;padding:0;border-radius:0;background:none;color:var(--ink);font-size:20px;font-weight:700;line-height:1.35;text-align:start}"
+    + ".rx-pages .rx-band .rx-st{margin:0;box-shadow:none}"
+    + ".rx-pages .rx-band .rx-pen{margin:0;border:1px solid var(--line);background:transparent;color:var(--muted)}"
+    + ".rx-pages .rx-band .rx-edit{flex:1;min-width:0}.rx-pages .rx-band .rx-edit input{border:1px solid var(--line);background:var(--surface);color:var(--ink)}"
+    + ".rx-pages .rx-band .rx-edit-go{background:var(--accent);color:#fff}.rx-pages .rx-band .rx-edit-x{background:transparent;color:var(--accent);border-color:var(--line)}";
   document.head.append(s); })();
-function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: أسهم، عدّاد، نقط للقفز، وسحب يمين وشمال
+function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: سهم، عدّاد، سهم. وسحب يمين وشمال
   const n = blocks.length; let cur = 0;
   if (n < 2) return;
-  const cls = (it) => (RX_ST[it.match_status] || RX_ST.no_match)[1];
-  const ICO = { prev: "M9 6l6 6-6 6", next: "M15 6l-6 6 6 6" };
-  const arrow = (kind, label) => { const b = el("button", "rx-arr"); b.type = "button"; b.setAttribute("aria-label", label); b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + ICO[kind] + '"/></svg>'; return b; };
-  const mk = (withDots) => {
-    const wrap = el("div", "rx-pg" + (withDots ? "" : " low")), nav = el("div", "rx-nav");
-    const prev = arrow("prev", "السابق"), next = arrow("next", "التالي"), mid = el("div", "rx-mid"), cnt = el("span", "rx-cnt");
-    prev.addEventListener("click", () => go(cur - 1)); next.addEventListener("click", () => go(cur + 1));
-    mid.append(cnt);
-    let dots = [];
-    if (withDots) {
-      const row = el("div", "rx-dots");
-      dots = items.map((it, k) => { const d = el("button", "rx-dot " + cls(it)); d.type = "button"; d.setAttribute("aria-label", "الدواء رقم " + (k + 1) + ": " + (it.read_name || "")); d.addEventListener("click", () => go(k)); row.append(d); return d; });
-      mid.append(row);
-    }
-    nav.append(prev, mid, next); // الواجهة RTL: السابق على اليمين والتالي على الشمال
-    wrap.append(nav);
-    return { wrap, prev, next, cnt, dots };
-  };
-  const top = mk(true), bot = mk(false);
-  const sync = () => {
-    blocks.forEach((b, k) => { b.hidden = k !== cur; });
-    [top, bot].forEach((p) => {
-      p.prev.disabled = cur === 0; p.next.disabled = cur === n - 1;
-      p.cnt.replaceChildren("دواء ", el("b", null, String(cur + 1)), " من " + n);
-      p.dots.forEach((d, k) => { d.classList.toggle("on", k === cur); if (k === cur) d.setAttribute("aria-current", "true"); else d.removeAttribute("aria-current"); });
-    });
-  };
+  const arrow = (d, label) => { const b = el("button", "rx-arr"); b.type = "button"; b.setAttribute("aria-label", label); b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + d + '"/></svg>'; return b; };
+  const prev = arrow("M9 6l6 6-6 6", "السابق"), next = arrow("M15 6l-6 6 6 6", "التالي"), cnt = el("span", "rx-cnt"), nav = el("div", "rx-nav");
+  nav.append(prev, cnt, next); // RTL: السابق على اليمين والتالي على الشمال
+  const sync = () => { blocks.forEach((b, k) => { b.hidden = k !== cur; }); prev.disabled = cur === 0; next.disabled = cur === n - 1; cnt.textContent = (cur + 1) + " من " + n; };
   function go(k) {
     k = Math.max(0, Math.min(n - 1, k)); if (k === cur) return;
     cur = k; sync();
-    const r = top.wrap.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.5) top.wrap.scrollIntoView({ block: "start", behavior: "smooth" });
+    const r = nav.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.5) nav.scrollIntoView({ block: "start", behavior: "smooth" });
   }
-  pages.prepend(top.wrap); pages.append(bot.wrap); sync();
-  // سحب: ناحية الشمال = التالي، ناحية اليمين = السابق (RTL). مش بنعمل سحب جوه صف المنتجات الأفقي
+  prev.addEventListener("click", () => go(cur - 1)); next.addEventListener("click", () => go(cur + 1));
+  pages.prepend(nav); sync();
+  // سحب: ناحية الشمال = التالي، ناحية اليمين = السابق. مش بنسحب جوه صف المنتجات الأفقي
   let sx = 0, sy = 0, ok = false;
-  pages.addEventListener("touchstart", (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; ok = e.touches.length === 1 && !e.target.closest(".rx-row,.rx-dots,input,textarea,[contenteditable]"); }, { passive: true });
+  pages.addEventListener("touchstart", (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; ok = e.touches.length === 1 && !e.target.closest(".rx-row,input,textarea,[contenteditable]"); }, { passive: true });
   pages.addEventListener("touchend", (e) => {
     if (!ok) return; ok = false;
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
@@ -784,11 +763,11 @@ function rxSetImage(f) { // صورة الروشتة الأصلية بتتحفظ 
   rxImgUrl = URL.createObjectURL(f);
 }
 (function () { const s = document.createElement("style");
-  s.textContent = ".rx-crop{margin:12px 0 14px;padding:10px 10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 2px 10px rgba(20,90,160,.06)}"
-    + ".rx-crop.tap{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}.rx-crop.tap:active{transform:scale(.99)}"
-    + ".rx-crop-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 8px;font-size:12.5px;color:var(--muted)}"
-    + ".rx-crop-h b{display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--accent);white-space:nowrap}.rx-crop-h svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}"
-    + ".rx-crop canvas{border:0;border-radius:12px;background:#fbfaf6;max-height:150px}"
+  s.textContent = ".rx-crop{position:relative;margin:4px 0 12px;padding:0;background:none;border:0;box-shadow:none}"
+    + ".rx-crop.tap{cursor:pointer;-webkit-tap-highlight-color:transparent}.rx-crop.tap:active canvas{opacity:.85}"
+    + ".rx-crop-h{position:absolute;top:8px;inset-inline-start:8px;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.9);color:var(--accent);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.15);pointer-events:none}"
+    + ".rx-crop-h svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}"
+    + ".rx-crop canvas{border:1px solid var(--line);border-radius:14px;background:#fbfaf6;max-height:150px}"
     + ".rx-view{position:fixed;inset:0;z-index:900;overscroll-behavior:contain;touch-action:none;display:flex;flex-direction:column;background:#0e131a}"
     + ".rx-view-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px;color:#fff}"
     + ".rx-view-h div{min-width:0;line-height:1.5}.rx-view-h strong{display:block;font-size:16px;font-weight:700}.rx-view-h small{display:block;font-size:12.5px;color:rgba(255,255,255,.62)}"
@@ -966,7 +945,7 @@ async function handleRx(f) {
     const out = $("out"); out.replaceChildren(); hideSkeleton();
     out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
     rxSetImage(f);
-    out.append(el("div", "scan-msg warn rx-note", "القراءة آلية وممكن تغلط في حرف أو رقم، فراجع كل سطر مع الصيدلي قبل الصرف. اضغط على القصاصة عشان تشوف الاسم في الروشتة الأصلية."));
+    out.append(el("div", "scan-msg warn rx-note", "القراءة آلية وممكن تغلط، فراجع كل سطر مع الصيدلي. اضغط على القصاصة لفتح الروشتة."));
     if (r.overall_legibility === "poor") out.append(el("div", "scan-msg warn", "الخط مش واضح، فالقراءة غالبًا ناقصة أو غلط. جرّب تصوّر الروشتة تاني بإضاءة أحسن."));
     if (!items.some((it) => Array.isArray(it.name_box) && it.name_box.length === 4)) { const ob = el("button", "rx-go", "فتح الروشتة الأصلية"); ob.type = "button"; ob.addEventListener("click", () => rxViewer(null)); out.append(ob); } // لو مفيش قصاصات، زر واحد يفتح الصورة
     const pages = el("div", "rx-pages"); out.append(pages);
