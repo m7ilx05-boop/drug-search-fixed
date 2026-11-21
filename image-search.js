@@ -473,7 +473,6 @@ function rxRow(list, tier) {
 }
 function rxCard(it, n) {
   const c = el("article", "card rx-item st-" + ((RX_ST[it.match_status] || RX_ST.no_match)[1]));
-  const crop = rxCrop(it); if (crop) c.append(crop);
   const bits = [["الجرعة", it.dose], ["الطريقة", it.route], ["التكرار", it.frequency], ["المدة", it.duration]].filter((x) => x[1]);
   if (bits.length) {
     const ul = el("ul", "ing");
@@ -859,7 +858,7 @@ async function handleRx(f) {
       if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
       if (d.state === "choices") det.open = true;
       if (d.others && d.others.length) { const dd = el("details", "rx-excl"); dd.append(el("summary", null, "أسماء قريبة تانية (" + d.others.length + ")")); rxChoices(it, { options: d.others, excluded: [], title: "لو الاسم المقروء غلط، اختار البراند الصح:" }, dd, token); det.append(dd); }
-      const band = rxBand(it, n); w.append(band, pb, det); out.append(w); rxEditName(band, it, pb, token);
+      const band = rxBand(it, n), crop = rxCrop(it); w.append(band); if (crop) w.append(crop); w.append(pb, det); out.append(w); rxEditName(band, it, pb, token);
       let run;
       if (d.state === "matched" || d.state === "brand_only") run = () => fillRxProducts(it, pb, token, { name: d.brand });
       else if (d.state === "choices") run = async () => { rxChoices(it, d, pb, token); };
