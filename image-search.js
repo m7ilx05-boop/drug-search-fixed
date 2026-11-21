@@ -726,6 +726,37 @@ function rxCompare(f) { // صورة الروشتة الأصلية للمقارن
   w.append(h, im); return w;
 }
 
+// تعديل الاسم اللي الذكاء الصناعي قراه (غلطة حرف مثلًا): قلم في الشريط الأزرق، وبعد التعديل بيتبحث بالاسم الجديد
+function rxEditName(band, it, pb, token) {
+  const h = band.querySelector("h2"), st = band.querySelector(".rx-st");
+  if (!h || !st) return;
+  const pen = el("button", "rx-pen", "✎"); pen.type = "button"; pen.setAttribute("aria-label", "عدّل الاسم المقروء");
+  st.before(pen);
+  let busy = false;
+  pen.addEventListener("click", () => {
+    if (band.querySelector(".rx-edit")) return;
+    const f = el("form", "rx-edit");
+    const inp = el("input"); inp.type = "text"; inp.value = h.textContent; inp.maxLength = 100; inp.dir = "auto";
+    inp.setAttribute("autocomplete", "off"); inp.setAttribute("autocapitalize", "off"); inp.setAttribute("autocorrect", "off"); inp.setAttribute("spellcheck", "false"); inp.setAttribute("enterkeyhint", "search"); inp.setAttribute("aria-label", "اسم الدواء");
+    const go = el("button", "rx-edit-go", "ابحث بالاسم الجديد"); go.type = "submit";
+    const x = el("button", "rx-edit-x", "إلغاء"); x.type = "button";
+    f.append(inp, go, x);
+    const close = () => { f.remove(); h.hidden = false; pen.hidden = false; st.hidden = false; };
+    x.addEventListener("click", close);
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (busy) return;
+      const nv = inp.value.trim().replace(/\s+/g, " ");
+      if (nv.length < 2) { inp.focus(); return; }
+      busy = true; close();
+      if (nv !== h.textContent) { h.textContent = nv; st.textContent = "تعديل يدوي"; st.className = "rx-st warn"; }
+      try { await fillRxProducts(Object.assign({}, it, { read_name: nv, unclear: false }), pb, token); } finally { busy = false; }
+    });
+    h.hidden = true; pen.hidden = true; st.hidden = true;
+    h.after(f); inp.focus(); inp.select();
+  });
+}
+
 // ===== المرحلة التانية للروشتة: rx-resolve (نفس الصورة + الأسطر المقروءة). لو وقعت أو اتأخرت بنرجع للنتيجة القديمة زي ما هي =====
 const RX_RESOLVE_MS = 60000;
 async function rxResolve(b64, items) {
@@ -818,7 +849,7 @@ async function handleRx(f) {
       if (d.note && d.state !== "choices") det.append(el("p", "sec-note", d.note));
       if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
       if (d.state === "choices") det.open = true;
-      w.append(rxBand(it, n), pb, det); out.append(w);
+      const band = rxBand(it, n); w.append(band, pb, det); out.append(w); rxEditName(band, it, pb, token);
       let run;
       if (d.state === "matched" || d.state === "brand_only") run = () => fillRxProducts(it, pb, token, { name: d.brand });
       else if (d.state === "choices") run = async () => { rxChoices(it, d, pb, token); };

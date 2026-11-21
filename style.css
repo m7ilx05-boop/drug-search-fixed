@@ -667,3 +667,10 @@ body[data-view=home] #imgbox{display:none}
 .rx-chosen{margin-top:6px}
 .rx-excl{margin-top:6px}
 .rx-excl>summary{cursor:pointer;font-size:13.5px;color:var(--muted);padding:6px 2px}
+
+/* تعديل الاسم المقروء في الشريط الأزرق */
+.rx-band .rx-pen{flex:none;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.2);color:inherit;font-size:16px;line-height:1;cursor:pointer;padding:0}
+.rx-band .rx-edit{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.rx-band .rx-edit input{flex:1 1 100%;min-width:0;box-sizing:border-box;padding:9px 12px;border-radius:12px;border:0;font:inherit;font-size:16px;color:#111;background:#fff}
+.rx-band .rx-edit-go{flex:1;padding:9px 12px;border-radius:12px;border:0;background:#fff;color:var(--accent);font:inherit;font-weight:700;cursor:pointer}
+.rx-band .rx-edit-x{padding:9px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.55);background:transparent;color:inherit;font:inherit;cursor:pointer}
