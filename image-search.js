@@ -760,7 +760,7 @@ function rxLens(im, url) { // عدسة مكبّرة: اضغط مطولًا عل�
     + ".rx-dots{display:flex;flex-wrap:wrap;justify-content:center;gap:0}"
     + ".rx-dot{position:relative;width:24px;height:22px;padding:0;border:0;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}"
     + ".rx-dot::before{content:\"\";position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:99px;background:var(--dc);opacity:.45;transition:width .2s,margin .2s,opacity .2s}"
-    + ".rx-dot.ok{--dc:var(--ok)}.rx-dot.warn{--dc:#D9A21B}.rx-dot.bad{--dc:var(--bad)}"
+    + ".rx-dot.ok{--dc:var(--ok)}.rx-dot.warn{--dc:var(--accent)}.rx-dot.bad{--dc:var(--bad)}"
     + ".rx-dot.on::before{width:20px;margin-left:-10px;opacity:1}"
     + ".rx-pg.low{margin:14px 0 4px}.rx-pg.low .rx-arr{width:40px;height:40px}";
   document.head.append(s); })();
@@ -775,7 +775,6 @@ function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: أ
     const wrap = el("div", "rx-pg" + (withDots ? "" : " low")), nav = el("div", "rx-nav");
     const prev = arrow("prev", "السابق"), next = arrow("next", "التالي"), mid = el("div", "rx-mid"), cnt = el("span", "rx-cnt");
     prev.addEventListener("click", () => go(cur - 1)); next.addEventListener("click", () => go(cur + 1));
-    mid.append(cnt);
     let dots = [];
     if (withDots) {
       const row = el("div", "rx-dots");
@@ -793,7 +792,6 @@ function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: أ
     pages.classList.toggle("at-first", cur === 0); pages.classList.toggle("at-last", cur === n - 1);
     [top, bot].forEach((p) => {
       p.prev.disabled = cur === 0; p.next.disabled = cur === n - 1;
-      p.cnt.replaceChildren("دواء ", el("b", null, String(cur + 1)), " من " + n);
       p.dots.forEach((d, k) => { d.classList.toggle("on", k === cur); if (k === cur) d.setAttribute("aria-current", "true"); else d.removeAttribute("aria-current"); });
     });
   };
