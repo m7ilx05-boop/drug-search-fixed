@@ -717,6 +717,57 @@ function rxLens(im, url) { // عدسة مكبّرة: اضغط مطولًا عل�
   im.addEventListener("touchmove", (e) => { if (active) e.preventDefault(); }, { passive: false }); // ما يتسكرلش الصفحة وانت بتحرّك العدسة
   im.addEventListener("contextmenu", (e) => e.preventDefault());
 }
+(function () { const s = document.createElement("style");
+  s.textContent = ".rx-block[hidden]{display:none!important}.rx-pager{display:flex;align-items:center;gap:8px;margin:10px 0;scroll-margin-top:120px}"
+    + ".rx-pg-b{flex:none;height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}.rx-pg-b:disabled{opacity:.35;cursor:default}"
+    + ".rx-pg-c{flex:1;min-width:0;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}"
+    + ".rx-dots{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;margin:0 0 2px;scrollbar-width:none}.rx-dots::-webkit-scrollbar{display:none}"
+    + ".rx-dot{flex:none;min-width:48px;height:34px;padding:0 10px;border-radius:999px;border:2px solid var(--line);background:transparent;color:var(--text);font:inherit;font-size:13px;font-weight:600;cursor:pointer}"
+    + ".rx-dot.ok{border-color:var(--ok)}.rx-dot.warn{border-color:var(--warn)}.rx-dot.bad{border-color:var(--bad)}.rx-dot.on{background:var(--accent);color:var(--accent-ink,#fff);border-color:var(--accent)}";
+  document.head.append(s); })();
+function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: أزرار السابق/التالي وسحب يمين وشمال وأرقام للقفز
+  const n = blocks.length; let cur = 0;
+  if (n < 2) return;
+  const cls = (it) => (RX_ST[it.match_status] || RX_ST.no_match)[1];
+  const mk = (withDots) => {
+    const wrap = el("div", "rx-pg"), bar = el("div", "rx-pager");
+    const prev = el("button", "rx-pg-b", "→ السابق"), next = el("button", "rx-pg-b", "التالي ←"), mid = el("span", "rx-pg-c");
+    prev.type = next.type = "button"; prev.addEventListener("click", () => go(cur - 1)); next.addEventListener("click", () => go(cur + 1));
+    bar.append(prev, mid, next); // الواجهة RTL: السابق على اليمين والتالي على الشمال
+    let dots = [];
+    if (withDots) {
+      const row = el("div", "rx-dots");
+      dots = items.map((it, k) => { const d = el("button", "rx-dot " + cls(it), "Rx" + (it.line_no || k + 1)); d.type = "button"; d.setAttribute("aria-label", "الدواء رقم " + (k + 1) + ": " + (it.read_name || "")); d.addEventListener("click", () => go(k)); row.append(d); return d; });
+      wrap.append(row);
+    }
+    wrap.append(bar);
+    return { wrap, bar, prev, next, mid, dots };
+  };
+  const top = mk(true), bot = mk(false);
+  const sync = () => {
+    blocks.forEach((b, k) => { b.hidden = k !== cur; });
+    [top, bot].forEach((p) => {
+      p.prev.disabled = cur === 0; p.next.disabled = cur === n - 1;
+      p.mid.textContent = "دواء " + (cur + 1) + " من " + n; p.mid.dir = "auto";
+      p.dots.forEach((d, k) => { d.classList.toggle("on", k === cur); if (k === cur) d.setAttribute("aria-current", "true"); else d.removeAttribute("aria-current"); });
+    });
+    const on = top.dots[cur]; if (on && on.scrollIntoView) on.scrollIntoView({ inline: "center", block: "nearest" });
+  };
+  function go(k, noScroll) {
+    k = Math.max(0, Math.min(n - 1, k)); if (k === cur) return;
+    cur = k; sync();
+    if (!noScroll) top.bar.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+  pages.prepend(top.wrap); pages.append(bot.wrap); sync();
+  // سحب: ناحية الشمال = التالي، ناحية اليمين = السابق (RTL). مش بنعمل سحب جوه صف المنتجات الأفقي
+  let sx = 0, sy = 0, ok = false;
+  pages.addEventListener("touchstart", (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; ok = e.touches.length === 1 && !e.target.closest(".rx-row,.rx-dots,input,textarea,[contenteditable]"); }, { passive: true });
+  pages.addEventListener("touchend", (e) => {
+    if (!ok) return; ok = false;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.6) go(dx < 0 ? cur + 1 : cur - 1);
+  }, { passive: true });
+}
 function rxSetImage(f) { // صورة الروشتة الأصلية بتتحفظ في الذاكرة بس (على جهازك) وبتتفتح لما تضغط على قصاصة اسم.
   if (rxImgUrl) URL.revokeObjectURL(rxImgUrl);
   rxImgUrl = URL.createObjectURL(f);
@@ -902,6 +953,7 @@ async function handleRx(f) {
     out.append(el("div", "scan-msg warn", "القراءة آلية وممكن تغلط في حرف أو رقم، وكل سطر محتاج مراجعة صيدلي قبل الصرف. اضغط على القصاصة تحت كل اسم عشان تشوفه في الروشتة الأصلية."));
     if (r.overall_legibility === "poor") out.append(el("div", "scan-msg warn", "الخط مش واضح، فالقراءة غالبًا ناقصة أو غلط. جرّب تصوّر الروشتة تاني بإضاءة أحسن."));
     if (!items.some((it) => Array.isArray(it.name_box) && it.name_box.length === 4)) { const ob = el("button", "rx-go", "فتح الروشتة الأصلية"); ob.type = "button"; ob.addEventListener("click", () => rxViewer(null)); out.append(ob); } // لو مفيش قصاصات، زر واحد يفتح الصورة
+    const pages = el("div", "rx-pages"); out.append(pages);
     const boxes = items.map((it, i) => {
       const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
       const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
@@ -911,13 +963,14 @@ async function handleRx(f) {
       if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
       if (d.state === "choices") det.open = true;
       if (d.others && d.others.length) { const dd = el("details", "rx-excl"); dd.append(el("summary", null, "أسماء قريبة تانية (" + d.others.length + ")")); rxChoices(it, { options: d.others, excluded: [], title: "لو الاسم المقروء غلط، اختار البراند الصح:" }, dd, token); det.append(dd); }
-      const band = rxBand(it, n), crop = rxCrop(it); w.append(band); if (crop) w.append(crop); w.append(pb, det); out.append(w); rxEditName(band, it, pb, token);
+      const band = rxBand(it, n), crop = rxCrop(it); w.append(band); if (crop) w.append(crop); w.append(pb, det); pages.append(w); rxEditName(band, it, pb, token);
       let run;
       if (d.state === "matched" || d.state === "brand_only") run = () => fillRxProducts(it, pb, token, { name: d.brand });
       else if (d.state === "choices") run = async () => { rxChoices(it, d, pb, token); };
       else run = () => fillRxProducts(it, pb, token);
-      return { it, pb, run };
+      return { it, pb, run, w };
     });
+    rxPager(pages, boxes.map((o) => o.w), items);
     { let i = 0; const worker = async () => { while (i < boxes.length && token === polling) { const o = boxes[i++]; await o.run(); } }; Promise.all([worker(), worker(), worker()]); } // 3 بحث في نفس الوقت
     quiet();
   } catch (err) {
