@@ -971,7 +971,7 @@ async function handleRx(f) {
     const boxes = items.map((it, i) => {
       const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
       const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
-      det.open = !!it.unclear || it.match_status !== "matched" || hasWild(it.read_name); // لو فيه حاجة محتاجة مراجعة تظهر مفتوحة
+      det.open = true; // لو فيه حاجة محتاجة مراجعة تظهر مفتوحة
       const d = rxDisplay(it, rs.map.get(it.line_no || i + 1) || null);
       if (d.note && d.state !== "choices") det.append(el("p", "sec-note", d.note));
       if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
