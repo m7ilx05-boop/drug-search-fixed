@@ -631,3 +631,4 @@ body[data-view=home] #imgbox{display:none}
 /* شارة تغيّر السعر على كروت الرئيسية */
 .pchg{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.5;color:#fff}
 .pchg.up{background:#d64545}.pchg.dn{background:#1f9d55}
+.ip-retry-rx{display:block;margin:10px auto;padding:10px 22px;border-radius:12px;border:0;font:inherit;font-weight:700;cursor:pointer}

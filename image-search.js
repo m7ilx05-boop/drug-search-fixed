@@ -703,8 +703,14 @@ async function handleRx(f) {
     quiet();
   } catch (err) {
     st.fail("حصلت مشكلة في الخطوة دي", [["كود الخطأ", (err && (err.code || err.message)) || "unknown"]]);
+    const code = (err && (err.code || err.message)) || "unknown";
     const known = ERR[err && err.code];
-    imgErr(known || "حصلت مشكلة في قراءة الروشتة (" + ((err && (err.code || err.message)) || "unknown") + ").");
+    imgErr(known || "ما قدرناش نقرا الروشتة دلوقتي (" + code + "). الصورة لسه موجودة، اضغط «حاول تاني».");
+    if (token === polling) { // زر يعيد القراءة بنفس الصورة من غير ما تصوّر تاني
+      const rb = el("button", "ip-retry-rx", "حاول تاني"); rb.type = "button";
+      rb.addEventListener("click", () => handleRx(f));
+      const o = $("out"); o.replaceChildren(el("div", "scan-msg warn", "فشلت قراءة الروشتة (" + code + "). تقدر تعيد المحاولة بنفس الصورة."), rb);
+    }
   } finally { busy(false); }
 }
 
