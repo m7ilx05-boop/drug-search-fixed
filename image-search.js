@@ -406,7 +406,11 @@ function rxCrop(it) { // الاسم المكتوب بخط اليد مقصوص م
   const b = it && it.name_box;
   if (!Array.isArray(b) || b.length !== 4 || !rxImgUrl || b.some((x) => !Number.isFinite(Number(x)))) return null;
   const wrap = el("div", "rx-crop"), cv = document.createElement("canvas");
-  wrap.append(el("small", null, "المكتوب بخط اليد في الروشتة"), cv);
+  const cap = el("small", null, "المكتوب بخط اليد في الروشتة · "); cap.append(el("b", null, "اضغط لفتح الروشتة كاملة"));
+  wrap.className += " tap"; wrap.tabIndex = 0; wrap.setAttribute("role", "button"); wrap.setAttribute("aria-label", "افتح الروشتة كاملة مع تحديد مكان الاسم");
+  const open = () => rxViewer(b);
+  wrap.addEventListener("click", open); wrap.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+  wrap.append(cap, cv);
   const im = new Image();
   im.onload = () => {
     const nw = im.naturalWidth, nh = im.naturalHeight; if (!nw || !nh) { wrap.remove(); return; }
@@ -713,16 +717,52 @@ function rxLens(im, url) { // عدسة مكبّرة: اضغط مطولًا عل�
   im.addEventListener("touchmove", (e) => { if (active) e.preventDefault(); }, { passive: false }); // ما يتسكرلش الصفحة وانت بتحرّك العدسة
   im.addEventListener("contextmenu", (e) => e.preventDefault());
 }
-function rxCompare(f) { // صورة الروشتة الأصلية للمقارنة. بتتعرض من الجهاز بس ومش بتتبعت ولا بتتحفظ.
+function rxSetImage(f) { // صورة الروشتة الأصلية بتتحفظ في الذاكرة بس (على جهازك) وبتتفتح لما تضغط على قصاصة اسم.
   if (rxImgUrl) URL.revokeObjectURL(rxImgUrl);
   rxImgUrl = URL.createObjectURL(f);
-  const w = el("div", "rx-cmp"), h = el("div", "rx-cmp-h"), t = el("span", null, "صورة الروشتة الأصلية · اضغط مطولًا على أي مكان للتكبير");
-  const b = el("button", null, "إخفاء"); b.type = "button";
-  b.addEventListener("click", () => { const m = w.classList.toggle("min"); b.textContent = m ? "إظهار" : "إخفاء"; });
-  h.append(t, b);
-  const im = new Image(); im.src = rxImgUrl; im.alt = "صورة الروشتة الأصلية"; im.draggable = false;
-  rxLens(im, rxImgUrl);
-  w.append(h, im); return w;
+}
+(function () { const s = document.createElement("style");
+  s.textContent = ".rx-crop.tap{cursor:pointer;-webkit-tap-highlight-color:transparent}.rx-crop.tap canvas{border-color:var(--accent)}.rx-crop.tap small b{color:var(--accent);font-weight:600}"
+    + ".rx-view{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;background:rgba(0,0,0,.92)}"
+    + ".rx-view-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;color:#fff;font-size:13.5px;font-weight:600}"
+    + ".rx-view-h button{flex:none;font:inherit;font-size:14px;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;border-radius:999px;padding:6px 16px;cursor:pointer}"
+    + ".rx-view-sc{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;padding:0 8px calc(12px + env(safe-area-inset-bottom,0px))}"
+    + ".rx-view-st{position:relative;width:100%;max-width:900px;margin:0 auto;background:#fff;line-height:0}"
+    + ".rx-view-st img{display:block;width:100%;height:auto;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-user-drag:none}"
+    + ".rx-mark{position:absolute;box-sizing:border-box;border:3px solid #e11d1d;border-radius:6px;background:rgba(225,29,29,.12);box-shadow:0 0 0 2px rgba(255,255,255,.85);pointer-events:none}";
+  document.head.append(s); })();
+function rxViewer(b) { // الروشتة كاملة، والجزء اللي اتقرا منه الاسم متحدد بمربع أحمر.
+  if (!rxImgUrl) return;
+  const ov = el("div", "rx-view"), bar = el("div", "rx-view-h");
+  const hasBox = Array.isArray(b) && b.length === 4 && b.every((x) => Number.isFinite(Number(x)));
+  const t = el("span", null, hasBox ? "الروشتة الكاملة · المربع الأحمر هو مكان الاسم · اضغط مطولًا للتكبير" : "الروشتة الكاملة · اضغط مطولًا على أي مكان للتكبير");
+  const x = el("button", null, "إغلاق"); x.type = "button";
+  bar.append(t, x);
+  const sc = el("div", "rx-view-sc"), st = el("div", "rx-view-st");
+  const im = new Image(); im.alt = "صورة الروشتة الأصلية"; im.draggable = false;
+  st.append(im);
+  let mark = null;
+  if (hasBox) {
+    let [y0, x0, y1, x1] = b.map(Number);
+    const px = 6, py = 4; // هامش صغير حوالين الاسم
+    x0 = Math.max(0, x0 - px); x1 = Math.min(1000, x1 + px); y0 = Math.max(0, y0 - py); y1 = Math.min(1000, y1 + py);
+    mark = el("div", "rx-mark");
+    mark.style.left = x0 / 10 + "%"; mark.style.top = y0 / 10 + "%"; mark.style.width = (x1 - x0) / 10 + "%"; mark.style.height = (y1 - y0) / 10 + "%";
+    st.append(mark);
+  }
+  sc.append(st); ov.append(bar, sc);
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  function close() { document.removeEventListener("keydown", onKey); document.querySelectorAll(".rx-lens").forEach((n) => n.remove()); document.body.style.overflow = prevOv; ov.remove(); }
+  const prevOv = document.body.style.overflow;
+  x.addEventListener("click", close); document.addEventListener("keydown", onKey);
+  im.onload = () => { // نوصّل للمربع في نص الشاشة
+    if (!mark) return;
+    const r = mark.getBoundingClientRect(), c = sc.getBoundingClientRect();
+    sc.scrollTop += r.top - c.top - (c.height - r.height) / 2;
+    sc.scrollLeft += r.left - c.left - (c.width - r.width) / 2;
+  };
+  document.body.style.overflow = "hidden"; document.body.append(ov);
+  im.src = rxImgUrl; rxLens(im, rxImgUrl);
 }
 
 // تعديل الاسم اللي الذكاء الصناعي قراه (غلطة حرف مثلًا): قلم في الشريط الأزرق، وبعد التعديل بيتبحث بالاسم الجديد
@@ -846,9 +886,10 @@ async function handleRx(f) {
     else st.set("resolve", "done", "اتطابقت الأسماء" + (rs.ms ? " (" + Math.round(rs.ms / 1000) + " ث)" : ""));
     const out = $("out"); out.replaceChildren(); hideSkeleton();
     out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
-    out.append(rxCompare(f));
-    out.append(el("div", "scan-msg warn", "القراءة آلية وممكن تغلط في حرف أو رقم، وكل سطر محتاج مراجعة صيدلي قبل الصرف. قارنها بالروشتة الأصلية."));
+    rxSetImage(f);
+    out.append(el("div", "scan-msg warn", "القراءة آلية وممكن تغلط في حرف أو رقم، وكل سطر محتاج مراجعة صيدلي قبل الصرف. اضغط على القصاصة تحت كل اسم عشان تشوفه في الروشتة الأصلية."));
     if (r.overall_legibility === "poor") out.append(el("div", "scan-msg warn", "الخط مش واضح، فالقراءة غالبًا ناقصة أو غلط. جرّب تصوّر الروشتة تاني بإضاءة أحسن."));
+    if (!items.some((it) => Array.isArray(it.name_box) && it.name_box.length === 4)) { const ob = el("button", "rx-go", "فتح الروشتة الأصلية"); ob.type = "button"; ob.addEventListener("click", () => rxViewer(null)); out.append(ob); } // لو مفيش قصاصات، زر واحد يفتح الصورة
     const boxes = items.map((it, i) => {
       const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
       const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
