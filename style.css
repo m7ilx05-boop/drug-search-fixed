@@ -708,14 +708,19 @@ body[data-view=home] #imgbox{display:none}
 .rx-head .rx-band .rx-edit{min-width:0}
 .rx-head .rx-harr{width:38px;height:38px}
 .rx-pages:not(.multi) .rx-harr{display:none}
-/* بيانات الروشتة (تخصص الدكتور، المريض، السن…) */
-.rx-info{margin:6px 0 14px;padding:10px 14px 12px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
-.rx-info-t{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--muted)}
-.rx-info-g{margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
-.rx-info-i{min-width:0}.rx-info-i.wide{grid-column:1/-1}
-.rx-info-i dt{font-size:11.5px;color:var(--muted);line-height:1.4}
-.rx-info-i dd{margin:0;font-size:14.5px;font-weight:600;line-height:1.45;overflow-wrap:anywhere}
-.rx-info-n{margin:8px 0 0;font-size:11px;color:var(--muted)}
+/* بطاقة بيانات الروشتة: التخصص، العمر، التشخيص */
+.rx-info{position:relative;margin:8px 0 16px;padding:6px 14px 10px;border-radius:20px;overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 7%,var(--surface)),var(--surface));box-shadow:0 6px 18px rgba(20,90,160,.10)}
+.rx-info::before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 45%,#7fd0ff))}
+.rx-info-r{display:flex;align-items:center;gap:12px;padding:11px 0}
+.rx-info-r+.rx-info-r{border-top:1px dashed color-mix(in srgb,var(--accent) 22%,var(--line))}
+.rx-info-r:first-child{margin-top:4px}
+.rx-info-ic{flex:none;width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 62%,#000));color:#fff;box-shadow:0 3px 8px rgba(20,90,160,.25)}
+.rx-info-ic svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.rx-info-tx{flex:1;min-width:0}
+.rx-info-tx small{display:block;font-size:11.5px;color:var(--muted);line-height:1.4}
+.rx-info-tx strong{display:block;font-size:16.5px;font-weight:700;line-height:1.4;overflow-wrap:anywhere}
+.rx-info-chip{flex:none;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+.rx-info-n{margin:2px 0 0;font-size:10.5px;color:var(--muted);text-align:center}
 .rx-pages.at-first .rx-hprev,.rx-pages.at-last .rx-hnext{opacity:.3;box-shadow:none;pointer-events:none}
 
 /* اختيارات البراند: خلفية معتمة تناسب الثيم، والكلام ياخد لون الصفحة */

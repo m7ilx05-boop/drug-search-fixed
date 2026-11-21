@@ -1041,17 +1041,32 @@ function rxRedo(w, it, n, token, poor) {
   return wrap;
 }
 
-// كارت بيانات الروشتة: تخصص الدكتور وبيانات المريض زي ما هي مكتوبة (من دالة read-prescription-header، مش بتتحفظ في أي مكان)
+// بطاقة بيانات الروشتة: تخصص الدكتور وعمر المريض والتشخيص زي ما هي مكتوبة (من دالة read-prescription-header، من غير أسماء ومش بتتحفظ في أي مكان)
 const RX_GEN = { male: "ذكر", female: "أنثى" };
+const RX_ICON = {
+  steth: "M5 3v5a4 4 0 0 0 8 0V3M9 12v3a5 5 0 0 0 10 0v-1M19 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4",
+  user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
+  clip: "M9 4h6v3H9zM7 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1M8 12h8M8 16h5",
+};
 function rxInfoCard(h) {
-  const rows = [["التخصص", h.doctor_specialty], ["الدكتور", h.doctor_name], ["المريض", h.patient_name], ["السن", h.patient_age], ["النوع", RX_GEN[h.patient_gender]], ["الوزن", h.patient_weight], ["التشخيص", h.diagnosis], ["التاريخ", h.date]].filter((r) => r[1]);
+  const extra = [RX_GEN[h.patient_gender], h.patient_weight].filter(Boolean);
+  const rows = [];
+  if (h.doctor_specialty) rows.push(["steth", "تخصص الدكتور", h.doctor_specialty, []]);
+  if (h.patient_age) rows.push(["user", "عمر المريض", h.patient_age, extra]);
+  else if (extra.length) rows.push(["user", "المريض", extra.join(" · "), []]);
+  if (h.diagnosis) rows.push(["clip", "التشخيص", h.diagnosis, []]);
   if (!rows.length) return null;
-  const c = el("section", "rx-info"), g = el("dl", "rx-info-g");
-  rows.forEach(([l, v]) => {
-    const d = el("div", "rx-info-i" + (l === "التشخيص" ? " wide" : "")), dd = el("dd", null, v); dd.dir = "auto";
-    d.append(el("dt", null, l), dd); g.append(d);
+  const c = el("section", "rx-info");
+  rows.forEach(([ic, label, val, chips]) => {
+    const r = el("div", "rx-info-r"), b = el("span", "rx-info-ic"), t = el("div", "rx-info-tx"), v = el("strong", null, val);
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + RX_ICON[ic] + '"/></svg>';
+    v.dir = "auto";
+    t.append(el("small", null, label), v);
+    r.append(b, t);
+    chips.forEach((x) => { const ch = el("span", "rx-info-chip", x); ch.dir = "auto"; r.append(ch); });
+    c.append(r);
   });
-  c.append(el("div", "rx-info-t", "بيانات الروشتة"), g, el("p", "rx-info-n", "مقروءة آليًا من الورقة وممكن تغلط، راجعها. مش بتتحفظ."));
+  c.append(el("p", "rx-info-n", "مقروءة آليًا من الورقة وممكن تغلط، راجعها. مش بتتحفظ."));
   return c;
 }
 async function handleRx(f) {
