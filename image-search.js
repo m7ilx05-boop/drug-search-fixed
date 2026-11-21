@@ -933,6 +933,81 @@ function rxChoices(it, d, box, token) {
   const ex = rxExcluded(d.excluded); if (ex) box.append(ex);
 }
 
+// ===== سطر واحد في الروشتة: بيتبني (وبيتعاد بناؤه لو ضغطت «النتيجة مش صح؟») جوه الـ section بتاعه =====
+function rxLine(w, it, n, rsItem, token, poor) {
+  const pb = el("div", "rx-prods");
+  const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
+  det.open = false; // مقفولة دايمًا لحد ما تضغط عليها
+  const d = rxDisplay(it, rsItem || null);
+  if (d.note && d.state !== "choices") det.append(el("p", "sec-note" + (/والتركيز مطابق/.test(d.note) ? " ok" : ""), d.note));
+  if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
+  if (d.others && d.others.length) { const dd = el("details", "rx-excl"); dd.append(el("summary", null, "أسماء قريبة تانية (" + d.others.length + ")")); rxChoices(it, { options: d.others, excluded: [], title: "لو الاسم المقروء غلط، اختار البراند الصح:" }, dd, token); det.append(dd); }
+  const band = rxBand(it, n), crop = rxCrop(it); const src = el("div", "rx-src"); if (crop) src.append(crop);
+  src.append(det, el("div", "scan-msg warn rx-note", "اقرأ وراجع الجرعة والشكل الدوائي قبل الصرف." + (poor ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : "")));
+  src.append(pb);
+  if (Array.isArray(it.name_box) && it.name_box.length === 4 && rxImgUrl) src.append(rxRedo(w, it, n, token, poor));
+  w.replaceChildren(band, src);
+  rxEditName(band, it, pb, token);
+  if (d.state === "matched" || d.state === "brand_only") return () => fillRxProducts(it, pb, token, { name: d.brand });
+  if (d.state === "choices") return async () => { rxChoices(it, d, pb, token); };
+  return () => fillRxProducts(it, pb, token);
+}
+// السطر ده بس من الروشتة الأصلية (على جهازك) بصورة أوضح، بعرض الصفحة كلها عشان الجرعة والشكل يطلعوا مع الاسم
+function rxLineB64(it) {
+  return new Promise((res) => {
+    const b = it && it.name_box;
+    if (!Array.isArray(b) || b.length !== 4 || !rxImgUrl || b.some((x) => !Number.isFinite(Number(x)))) return res(null);
+    const im = new Image();
+    im.onload = () => {
+      const nw = im.naturalWidth, nh = im.naturalHeight; if (!nw || !nh) return res(null);
+      let [y0, , y1] = b.map(Number);
+      const py = Math.max(20, (y1 - y0) * 0.9);
+      y0 = Math.max(0, y0 - py); y1 = Math.min(1000, y1 + py);
+      const sy = (y0 / 1000) * nh, sh = Math.max(16, ((y1 - y0) / 1000) * nh);
+      const k = Math.min(1, 1800 / nw), cv = document.createElement("canvas");
+      cv.width = Math.round(nw * k); cv.height = Math.round(sh * k);
+      cv.getContext("2d").drawImage(im, 0, sy, nw, sh, 0, 0, cv.width, cv.height);
+      try { res(cv.toDataURL("image/jpeg", 0.9).split(",")[1] || null); } catch { res(null); }
+    };
+    im.onerror = () => res(null); im.src = rxImgUrl;
+  });
+}
+// زر «النتيجة مش صح؟ أعد البحث»: يقص السطر ده بس، يقراه تاني، يطابقه مع الداتا بيز (rx-resolve بيفحص الخط مقابل أسماء المرشحين) ويعرض النتيجة الجديدة
+function rxRedo(w, it, n, token, poor) {
+  const wrap = el("div", "rx-redo-wrap"), b = el("button", "rx-redo", "النتيجة مش صح؟ أعد البحث"), msg = el("div", "rx-redo-msg");
+  b.type = "button"; wrap.append(b, msg);
+  const fail = (text) => { msg.replaceChildren(el("div", "scan-msg warn", text)); b.disabled = false; b.textContent = "النتيجة مش صح؟ أعد البحث"; };
+  b.addEventListener("click", async () => {
+    if (b.disabled) return;
+    b.disabled = true; msg.replaceChildren();
+    try {
+      b.textContent = "جاري قص السطر…";
+      const b64 = await rxLineB64(it);
+      if (!b64) return fail("ما قدرناش نقص السطر من الروشتة.");
+      b.textContent = "جاري إعادة قراءة السطر…";
+      const r = await call("read-prescription", { image_base64: b64, mime_type: "image/jpeg" });
+      if (token !== polling) return;
+      const list = (Array.isArray(r.items) ? r.items : []).filter((x) => x && x.read_name);
+      if (!list.length) return fail("ما قدرناش نقرا السطر ده تاني. جرّب تعدّل الاسم بإيدك.");
+      const mid = (x) => (Array.isArray(x.name_box) && x.name_box.length === 4 ? Math.abs((Number(x.name_box[0]) + Number(x.name_box[2])) / 2 - 500) : 9999);
+      const ni = list.slice().sort((a, c) => mid(a) - mid(c))[0]; // أقرب سطر لنص القصاصة
+      const nit = Object.assign({}, it, ni, { line_no: it.line_no, name_box: it.name_box });
+      b.textContent = "جاري المقارنة بالداتا بيز…";
+      const key = it.line_no || n;
+      const rs = await rxResolve(b64, [Object.assign({}, nit, { line_no: key, name_box: null })]);
+      if (token !== polling) return;
+      const run = rxLine(w, nit, n, rs.map.get(key) || null, token, poor);
+      const same = String(nit.read_name).trim().toLowerCase() === String(it.read_name || "").trim().toLowerCase();
+      const note = el("p", "sec-note" + (same ? " ok" : ""), (same ? "القراءة التانية طلعت نفس الاسم." : "القراءة اتغيّرت من «" + it.read_name + "» لـ «" + nit.read_name + "».") + (rs.error ? " المقارنة بالداتا بيز ما اشتغلتش." : ""));
+      const srcEl = w.querySelector(".rx-src"); if (srcEl) srcEl.insertBefore(note, srcEl.querySelector(".rx-prods"));
+      await run();
+    } catch (e) {
+      fail(ERR[e && e.code] || "ما قدرناش نعيد البحث دلوقتي (" + ((e && (e.code || e.message)) || "unknown") + "). جرّب تاني.");
+    }
+  });
+  return wrap;
+}
+
 async function handleRx(f) {
   if (!/^image\//.test(f.type)) { imgErr("الملف ده مش صورة."); return; }
   const token = ++polling;
@@ -969,20 +1044,10 @@ async function handleRx(f) {
     if (!items.some((it) => Array.isArray(it.name_box) && it.name_box.length === 4)) { const ob = el("button", "rx-go", "فتح الروشتة الأصلية"); ob.type = "button"; ob.addEventListener("click", () => rxViewer(null)); out.append(ob); } // لو مفيش قصاصات، زر واحد يفتح الصورة
     const pages = el("div", "rx-pages"); out.append(pages);
     const boxes = items.map((it, i) => {
-      const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
-      const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
-      det.open = false; // مقفولة دايمًا لحد ما تضغط عليها
-      const d = rxDisplay(it, rs.map.get(it.line_no || i + 1) || null);
-      if (d.note && d.state !== "choices") det.append(el("p", "sec-note" + (/والتركيز مطابق/.test(d.note) ? " ok" : ""), d.note));
-      if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
-      
-      if (d.others && d.others.length) { const dd = el("details", "rx-excl"); dd.append(el("summary", null, "أسماء قريبة تانية (" + d.others.length + ")")); rxChoices(it, { options: d.others, excluded: [], title: "لو الاسم المقروء غلط، اختار البراند الصح:" }, dd, token); det.append(dd); }
-      const band = rxBand(it, n), crop = rxCrop(it); const src = el("div", "rx-src"); if (crop) src.append(crop); src.append(det, el("div", "scan-msg warn rx-note", "اقرأ وراجع الجرعة والشكل الدوائي قبل الصرف." + (r.overall_legibility === "poor" ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : ""))); src.append(pb); w.append(band, src); pages.append(w); rxEditName(band, it, pb, token);
-      let run;
-      if (d.state === "matched" || d.state === "brand_only") run = () => fillRxProducts(it, pb, token, { name: d.brand });
-      else if (d.state === "choices") run = async () => { rxChoices(it, d, pb, token); };
-      else run = () => fillRxProducts(it, pb, token);
-      return { it, pb, run, w };
+      const n = it.line_no || i + 1, w = el("section", "rx-block");
+      const run = rxLine(w, it, n, rs.map.get(it.line_no || i + 1) || null, token, r.overall_legibility === "poor");
+      pages.append(w);
+      return { it, run, w };
     });
     rxPager(pages, boxes.map((o) => o.w), items);
     { let i = 0; const worker = async () => { while (i < boxes.length && token === polling) { const o = boxes[i++]; await o.run(); } }; Promise.all([worker(), worker(), worker()]); } // 3 بحث في نفس الوقت
