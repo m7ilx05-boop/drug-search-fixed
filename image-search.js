@@ -723,10 +723,10 @@ function rxSetImage(f) { // صورة الروشتة الأصلية بتتحفظ 
 }
 (function () { const s = document.createElement("style");
   s.textContent = ".rx-crop.tap{cursor:pointer;-webkit-tap-highlight-color:transparent}.rx-crop.tap canvas{border-color:var(--accent)}.rx-crop.tap small b{color:var(--accent);font-weight:600}"
-    + ".rx-view{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;background:rgba(0,0,0,.92)}"
+    + ".rx-view{position:fixed;inset:0;z-index:900;overscroll-behavior:contain;touch-action:none;display:flex;flex-direction:column;background:rgba(0,0,0,.92)}"
     + ".rx-view-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;color:#fff;font-size:13.5px;font-weight:600}"
     + ".rx-view-h button{flex:none;font:inherit;font-size:14px;border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;border-radius:999px;padding:6px 16px;cursor:pointer}"
-    + ".rx-view-sc{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;padding:0 8px calc(12px + env(safe-area-inset-bottom,0px))}"
+    + ".rx-view-sc{flex:1;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;padding:0 8px calc(12px + env(safe-area-inset-bottom,0px))}"
     + ".rx-view-st{position:relative;width:100%;max-width:900px;margin:0 auto;background:#fff;line-height:0}"
     + ".rx-view-st img{display:block;width:100%;height:auto;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-user-drag:none}"
     + ".rx-mark{position:absolute;box-sizing:border-box;border:3px solid #e11d1d;border-radius:6px;background:rgba(225,29,29,.12);box-shadow:0 0 0 2px rgba(255,255,255,.85);pointer-events:none}";
@@ -751,17 +751,29 @@ function rxViewer(b) { // الروشتة كاملة، والجزء اللي ات
     st.append(mark);
   }
   sc.append(st); ov.append(bar, sc);
-  const onKey = (e) => { if (e.key === "Escape") close(); };
-  function close() { document.removeEventListener("keydown", onKey); document.querySelectorAll(".rx-lens").forEach((n) => n.remove()); document.body.style.overflow = prevOv; ov.remove(); }
-  const prevOv = document.body.style.overflow;
-  x.addEventListener("click", close); document.addEventListener("keydown", onKey);
+  // الرجوع (زر الموبايل أو المتصفح) بيقفل الصورة بس ويفضل في النتايج: بنسجّل خطوة في السجل بنفس الرابط (من غير ما الراوتر يتحرك)
+  const bs = document.body.style, y0 = window.scrollY, prev = { pos: bs.position, top: bs.top, w: bs.width, ov: bs.overflow };
+  let closed = false;
+  const onKey = (e) => { if (e.key === "Escape") close(false); };
+  const onPop = () => close(true);
+  function close(fromPop) {
+    if (closed) return; closed = true;
+    document.removeEventListener("keydown", onKey); window.removeEventListener("popstate", onPop);
+    document.querySelectorAll(".rx-lens").forEach((n) => n.remove());
+    bs.position = prev.pos; bs.top = prev.top; bs.width = prev.w; bs.overflow = prev.ov; // نرجّع القائمة مكانها بالظبط
+    ov.remove(); window.scrollTo(0, y0);
+    if (!fromPop) history.back(); // قفل بالزر: نشيل الخطوة اللي سجّلناها
+  }
+  bar.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+  x.addEventListener("click", () => close(false)); document.addEventListener("keydown", onKey);
+  history.pushState({ rxv: 1 }, "", location.href); window.addEventListener("popstate", onPop);
   im.onload = () => { // نوصّل للمربع في نص الشاشة
     if (!mark) return;
     const r = mark.getBoundingClientRect(), c = sc.getBoundingClientRect();
     sc.scrollTop += r.top - c.top - (c.height - r.height) / 2;
     sc.scrollLeft += r.left - c.left - (c.width - r.width) / 2;
   };
-  document.body.style.overflow = "hidden"; document.body.append(ov);
+  bs.position = "fixed"; bs.top = -y0 + "px"; bs.width = "100%"; bs.overflow = "hidden"; document.body.append(ov); // القائمة اللي ورا ما تتحركش
   im.src = rxImgUrl; rxLens(im, rxImgUrl);
 }
 
