@@ -427,7 +427,7 @@ function rxCard(it, n) {
   const head = el("div", "rx-head");
   const num = el("span", "rx-num", String(n || it.line_no || "")); num.setAttribute("aria-label", "سطر رقم " + (n || it.line_no || ""));
   const h = el("h2", null, it.read_name || "سطر غير مقروء"); h.dir = "auto"; head.append(num, h); c.append(head);
-  const bits = [["الجرعة", it.dose], ["التكرار", it.frequency], ["المدة", it.duration]].filter((x) => x[1]);
+  const bits = [["الجرعة", it.dose], ["الطريقة", it.route], ["التكرار", it.frequency], ["المدة", it.duration]].filter((x) => x[1]);
   if (bits.length) {
     const ul = el("ul", "ing");
     bits.forEach(([l, v]) => { const li = el("li"); const sv = el("span", null, v); sv.dir = "auto"; li.append(el("span", null, l), sv); ul.append(li); });
@@ -486,6 +486,13 @@ function rxNeed(it) {
 // مجموعة الشكل الدوائي: صلب (أقراص/كبسول) / سائل / حقن / موضعي. لو المكتوب والمنتج في مجموعتين مختلفتين نعتبره شكل مختلف.
 const RX_FORMS = [["inj", /\b(amps?|ampoules?|vials?|inj(?:ection)?)\b|امبول|أمبول|حقن/i], ["liquid", /\b(syrup|susp(?:ension)?|drops?|solution)\b|شراب|معلق|قطر/i], ["topical", /\b(cream|gel|oint(?:ment)?|lotion)\b|كريم|جل|مرهم/i], ["solid", /\b(tabs?|tablets?|caps?|capsules?)\b|قرص|اقراص|أقراص|كبسول/i]];
 const rxForm = (t) => { for (const [k, r] of RX_FORMS) if (r.test(String(t || ""))) return k; return null; };
+// طريقة الإعطاء المكتوبة في الروشتة (بتتقرا زي ما هي، مش بتتخمّن): وريد/عضل/تحت الجلد/محلول وريدي = حقن، وفم/oral = أقراص أو كبسول أو سائل
+const rxRoute = (t) => {
+  const s = String(t || "").trim(); if (!s) return null;
+  if (/(?<![a-z])(i\.?v|i\.?m|s\.?c|inj(?:ection)?|inf(?:usion)?|drip|intravenous|intramuscular|subcutaneous)(?![a-z])|وريد|عضل|حقن|تحت الجلد/i.test(s)) return "inj";
+  if (/(?<![a-z])(oral|p\.?o|per os|by mouth)(?![a-z])|بالفم|فم/i.test(s)) return "oral";
+  return null;
+};
 const prodAmtsAll = (p) => { const n = rxAmts(p.product_name); return n.length ? n : prodAmts(p); }; // الاسم الأول (بيشيل لبس العبوات) وبعدين التركيبة المسجّلة
 
 // «قصدك؟»: أقرب أسماء حقيقية من جدول الأدوية المصرية (دالة drug-name-fuzzy)، وبعدها اقتراحات السجل، وبعدها أسماء بتبدأ بنفس أول 4 حروف.
@@ -556,8 +563,8 @@ async function fillRxProducts(it, box, token, opt) {
   opt = opt || {};
   const brand = opt.name || rxBrand(it.read_name);
   if (brand.length < 2) { box.remove(); return; }
-  const nd = rxNeed(it), need = nd.amts, wantForm = rxForm((it.dose || "") + " " + (it.read_name || ""));
-  const formOk = (p) => { const pf = rxForm((p.product_name || "") + " " + (p.dosage_form || "")); return !wantForm || !pf || pf === wantForm; };
+  const nd = rxNeed(it), need = nd.amts, wantForm = rxForm((it.dose || "") + " " + (it.read_name || "") + " " + (it.read_form || "")) || rxRoute(it.route);
+  const formOk = (p) => { const pf = rxForm((p.product_name || "") + " " + (p.dosage_form || "")); return !wantForm || !pf || (wantForm === "oral" ? (pf === "solid" || pf === "liquid") : pf === wantForm); };
   box.replaceChildren(el("div", "meta", "جاري البحث عن «" + brand + "»…"));
   if (hasWild(brand)) { // اسم فيه حرف مش واضح: مفيش بحث بالاسم الناقص، بنطابق الحروف الباقية بس
     try {
