@@ -475,7 +475,25 @@ function rxTile(p, tier) {
 function rxRow(list, tier) {
   const row = el("div", "rx-row" + (list.length === 1 ? " one" : ""));
   list.forEach((p) => row.append(rxTile(p, tier)));
-  return row;
+  if (list.length < 2) return row;
+  // شريط تحت الكارت: بيبيّن إن فيه منتجات تانية وإنت واقف على أنهي واحد
+  const wrap = el("div", "rx-rowwrap"), strip = el("div", "rx-strip"), bars = el("div", "rx-bars"), lab = el("span", "rx-lab");
+  const segs = list.map((_, i) => {
+    const s = el("button", "rx-seg"); s.type = "button"; s.setAttribute("aria-label", "منتج " + (i + 1));
+    s.addEventListener("click", () => row.children[i].scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" }));
+    bars.append(s); return s;
+  });
+  const nf = (x) => Number(x).toLocaleString("ar-EG");
+  let cur = -1;
+  const set = (i) => { cur = i; segs.forEach((s, k) => s.classList.toggle("on", k === i)); lab.textContent = nf(i + 1) + " من " + nf(list.length) + " · اسحب لمنتجات تانية"; };
+  row.addEventListener("scroll", () => {
+    const t = row.firstElementChild, w = t ? t.offsetWidth + 14 : 0; if (!w) return;
+    const i = Math.max(0, Math.min(list.length - 1, Math.round(Math.abs(row.scrollLeft) / w)));
+    if (i !== cur) set(i);
+  }, { passive: true });
+  set(0);
+  strip.append(bars, lab); wrap.append(row, strip);
+  return wrap;
 }
 function rxCard(it, n) {
   const c = el("article", "card rx-item st-" + ((RX_ST[it.match_status] || RX_ST.no_match)[1]));
