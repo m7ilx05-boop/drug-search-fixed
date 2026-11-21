@@ -450,16 +450,18 @@ function rxTile(p, tier) {
   const nm = el("div", "rx-nm", p.product_name || p.arabic_name || "منتج"); nm.dir = "auto";
   body.append(nm);
   const sub = [p.dosage_form, p.pack_size && "العبوة: " + p.pack_size].filter(Boolean).join(" · ");
-  if (sub) body.append(el("div", "rx-sub", sub));
   const st = rxStrengthOf(p), cur = p.current_price != null ? p.current_price : p.price;
-  if (st || cur != null) {
-    const line = el("div", "rx-line");
-    if (st) { const b = el("span", "rx-str", st); b.dir = "ltr"; line.append(b); }
-    if (cur != null) line.append(el("span", "rx-pr", Number(cur).toLocaleString("ar-EG") + " ج.م"));
-    body.append(line);
+  if (sub || st) {
+    const meta = el("div", "rx-meta");
+    if (sub) meta.append(el("span", "rx-sub", sub));
+    if (st) { const b = el("span", "rx-str", st); b.dir = "ltr"; meta.append(b); }
+    body.append(meta);
   }
+  const foot = el("div", "rx-foot");
+  if (cur != null) foot.append(el("span", "rx-pr", Number(cur).toLocaleString("ar-EG") + " ج.م"));
+  foot.append(el("span", "rx-open", "افتح صفحة المنتج ←"));
+  body.append(foot);
   if (tier === 3) { body.append(el("div", "rx-warn", "مش نفس التركيز/الشكل المكتوب")); t.title = "مش نفس التركيز/الشكل المكتوب"; }
-  body.append(el("div", "rx-open", "افتح صفحة المنتج ←"));
   t.append(pic, body);
   t.addEventListener("click", () => { if (window.openProductDirect) window.openProductDirect(p, tier); });
   return t;
