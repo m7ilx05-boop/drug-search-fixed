@@ -700,6 +700,15 @@ body[data-view=home] #imgbox{display:none}
 
 .rx-band h2.rx-tap{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rx-band h2.rx-tap:active{filter:brightness(1.08)}
+/* مربع الـ Rx بحجم ثابت على عرض السطر: الاسم سطر واحد والزيادة بـ …، والسابق (شمال) والتالي (يمين) على نفس الخط */
+.rx-head{direction:ltr;display:flex;align-items:center;gap:8px;margin:6px 0}
+.rx-head .rx-band{flex:1 1 0;min-width:0;width:auto;max-width:none;margin:0;height:50px;box-sizing:border-box;justify-content:flex-start}
+.rx-head .rx-band h2{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;padding:8px 12px 8px 26px}
+.rx-head .rx-band:has(.rx-edit){height:auto;min-height:50px;border-radius:26px}
+.rx-head .rx-band .rx-edit{min-width:0}
+.rx-head .rx-harr{width:38px;height:38px}
+.rx-pages:not(.multi) .rx-harr{display:none}
+.rx-pages.at-first .rx-hprev,.rx-pages.at-last .rx-hnext{opacity:.3;box-shadow:none;pointer-events:none}
 
 /* اختيارات البراند: خلفية معتمة تناسب الثيم، والكلام ياخد لون الصفحة */
 .rx-choice{background:rgba(127,127,127,.12);border:1px solid rgba(127,127,127,.35);color:inherit}

@@ -437,6 +437,18 @@ function rxBand(it, n) {
   w.append(num, h, st);
   return w;
 }
+// أسهم التنقل: السابق "<" على الشمال، والتالي ">" على اليمين
+const RX_ICO = { prev: "M15 6l-6 6 6 6", next: "M9 6l6 6-6 6" };
+const rxArrow = (kind, label, extra) => { const b = el("button", "rx-arr" + (extra ? " " + extra : "")); b.type = "button"; b.setAttribute("aria-label", label); b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + RX_ICO[kind] + '"/></svg>'; return b; };
+// الشريط بحجم ثابت على السطر، وعلى نفس الخط: السابق على الشمال والتالي على اليمين (الأسهم بتظهر بس لو فيه أكتر من Rx، والتنقل بيتم في rxPager)
+function rxHead(band) {
+  const head = el("div", "rx-head");
+  const go = (d) => () => head.dispatchEvent(new CustomEvent("rxgo", { bubbles: true, detail: d }));
+  const prev = rxArrow("prev", "الدواء السابق", "rx-harr rx-hprev"), next = rxArrow("next", "الدواء التالي", "rx-harr rx-hnext");
+  prev.addEventListener("click", go(-1)); next.addEventListener("click", go(1));
+  head.append(prev, band, next);
+  return head;
+}
 const rxStrengthOf = (p) => {
   const ings = p.product_ingredients || [];
   if (ings.length && ings.every((pi) => pi.strength_value != null)) return ings.map(fmtStrength).join(" + ");
@@ -752,12 +764,13 @@ function rxLens(im, url) { // عدسة مكبّرة: اضغط مطولًا عل�
     + ".rx-dot.on::before{width:20px;margin-left:-10px;opacity:1}"
     + ".rx-pg.low{margin:14px 0 4px}.rx-pg.low .rx-arr{width:40px;height:40px}";
   document.head.append(s); })();
-function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: أسهم، عدّاد، نقط للقفز، وسحب يمين وشمال
+function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: أسهم (جنب الشريط وتحت)، عدّاد، نقط للقفز، وسحب يمين وشمال
   const n = blocks.length; let cur = 0;
   if (n < 2) return;
+  pages.classList.add("multi");
+  pages.addEventListener("rxgo", (e) => go(cur + (e.detail || 0))); // أسهم الشريط (rxHead) بتبعت الحدث ده
   const cls = (it) => (RX_ST[it.match_status] || RX_ST.no_match)[1];
-  const ICO = { prev: "M9 6l6 6-6 6", next: "M15 6l-6 6 6 6" };
-  const arrow = (kind, label) => { const b = el("button", "rx-arr"); b.type = "button"; b.setAttribute("aria-label", label); b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + ICO[kind] + '"/></svg>'; return b; };
+  const arrow = rxArrow;
   const mk = (withDots) => {
     const wrap = el("div", "rx-pg" + (withDots ? "" : " low")), nav = el("div", "rx-nav");
     const prev = arrow("prev", "السابق"), next = arrow("next", "التالي"), mid = el("div", "rx-mid"), cnt = el("span", "rx-cnt");
@@ -769,13 +782,15 @@ function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: أ
       dots = items.map((it, k) => { const d = el("button", "rx-dot " + cls(it)); d.type = "button"; d.setAttribute("aria-label", "الدواء رقم " + (k + 1) + ": " + (it.read_name || "")); d.addEventListener("click", () => go(k)); row.append(d); return d; });
       mid.append(row);
     }
-    nav.append(prev, mid, next); // الواجهة RTL: السابق على اليمين والتالي على الشمال
+    // الواجهة RTL: أول عنصر على اليمين، يعني التالي يمين والسابق شمال. الأسهم اللي فوق في الشريط نفسه، فالعدّاد والنقط بس هنا
+    if (withDots) nav.append(mid); else nav.append(next, mid, prev);
     wrap.append(nav);
     return { wrap, prev, next, cnt, dots };
   };
   const top = mk(true), bot = mk(false);
   const sync = () => {
     blocks.forEach((b, k) => { b.hidden = k !== cur; });
+    pages.classList.toggle("at-first", cur === 0); pages.classList.toggle("at-last", cur === n - 1);
     [top, bot].forEach((p) => {
       p.prev.disabled = cur === 0; p.next.disabled = cur === n - 1;
       p.cnt.replaceChildren("دواء ", el("b", null, String(cur + 1)), " من " + n);
@@ -788,7 +803,7 @@ function rxPager(pages, blocks, items) { // كل Rx في صفحة لوحده: أ
     const r = top.wrap.getBoundingClientRect(); if (r.top < 0 || r.top > window.innerHeight * 0.5) top.wrap.scrollIntoView({ block: "start", behavior: "smooth" });
   }
   pages.prepend(top.wrap); pages.append(bot.wrap); sync();
-  // سحب: ناحية الشمال = التالي، ناحية اليمين = السابق (RTL). مش بنعمل سحب جوه صف المنتجات الأفقي
+  // سحب: ناحية الشمال = التالي، ناحية اليمين = السابق (زي الكاروسيل: المحتوى بيتحرك شمال وبيجيلك اللي على اليمين). مش بنعمل سحب جوه صف المنتجات الأفقي
   let sx = 0, sy = 0, ok = false;
   pages.addEventListener("touchstart", (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; ok = e.touches.length === 1 && !e.target.closest(".rx-row,.rx-dots,input,textarea,[contenteditable]"); }, { passive: true });
   pages.addEventListener("touchend", (e) => {
@@ -964,7 +979,7 @@ function rxLine(w, it, n, rsItem, token, poor) {
   src.append(det, el("div", "scan-msg warn rx-note", "اقرأ وراجع الجرعة والشكل الدوائي قبل الصرف." + (poor ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : "")));
   src.append(pb);
   if (Array.isArray(it.name_box) && it.name_box.length === 4 && rxImgUrl) src.append(rxRedo(w, it, n, token, poor));
-  w.replaceChildren(band, src);
+  w.replaceChildren(rxHead(band), src);
   rxEditName(band, it, pb, token);
   if (d.state === "matched" || d.state === "brand_only") return () => fillRxProducts(it, pb, token, { name: d.brand });
   if (d.state === "choices") return async () => { rxChoices(it, d, pb, token); };
