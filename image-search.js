@@ -424,7 +424,7 @@ function rxCrop(it) { // الاسم المكتوب بخط اليد مقصوص م
 // ===== شكل نتيجة الروشتة: شريط أزرق بالرقم واسم الدواء، وتحته صف منتجات بالعرض (اسحب يمين وشمال لو فيه أكتر من تركيز) =====
 function rxBand(it, n) {
   const w = el("div", "rx-band");
-  const num = el("span", "rx-num", String(n || it.line_no || "")); num.setAttribute("aria-label", "دواء رقم " + (n || it.line_no || ""));
+  const num = el("span", "rx-num", "Rx" + (n || it.line_no || "")); num.setAttribute("aria-label", "دواء رقم " + (n || it.line_no || ""));
   const h = el("h2", null, it.read_name || "سطر غير مقروء"); h.dir = "auto";
   const [t, cls] = RX_ST[it.match_status] || RX_ST.no_match;
   const st = el("span", "rx-st " + cls, it.unclear || hasWild(it.read_name) ? "راجع الاسم" : t);
@@ -731,7 +731,7 @@ function rxEditName(band, it, pb, token) {
   const h = band.querySelector("h2"), st = band.querySelector(".rx-st");
   if (!h || !st) return;
   const pen = el("button", "rx-pen", "✎"); pen.type = "button"; pen.setAttribute("aria-label", "عدّل الاسم المقروء");
-  st.before(pen);
+  st.after(pen);
   let busy = false;
   pen.addEventListener("click", () => {
     if (band.querySelector(".rx-edit")) return;

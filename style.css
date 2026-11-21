@@ -674,3 +674,13 @@ body[data-view=home] #imgbox{display:none}
 .rx-band .rx-edit input{flex:1 1 100%;min-width:0;box-sizing:border-box;padding:9px 12px;border-radius:12px;border:0;font:inherit;font-size:16px;color:#111;background:#fff}
 .rx-band .rx-edit-go{flex:1;padding:9px 12px;border-radius:12px;border:0;background:#fff;color:var(--accent);font:inherit;font-weight:700;cursor:pointer}
 .rx-band .rx-edit-x{padding:9px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.55);background:transparent;color:inherit;font:inherit;cursor:pointer}
+
+/* شريط الدواء أصغر: يناسب الواجهة، وزر التعديل صغير جنب حالة المطابقة */
+.rx-band{gap:8px;border-radius:14px;padding:7px 10px;box-shadow:0 3px 8px rgba(20,90,160,.18)}
+.rx-band .rx-num{width:auto;min-width:0;height:auto;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;line-height:1.4}
+.rx-band h2{font-size:15.5px;line-height:1.25}
+.rx-band .rx-st{font-size:11.5px;padding:2px 8px}
+.rx-band .rx-pen{width:26px;height:26px;font-size:14px}
+.rx-band .rx-edit input{padding:7px 10px;font-size:15px}
+.rx-band .rx-edit-go,.rx-band .rx-edit-x{padding:7px 10px;font-size:14px}
+.rx-band .rx-num{display:inline-flex;align-items:center;justify-content:center;flex:none;white-space:nowrap}
