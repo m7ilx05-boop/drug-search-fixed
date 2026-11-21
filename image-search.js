@@ -427,7 +427,7 @@ function rxBand(it, n) {
   const num = el("span", "rx-num", "Rx" + (n || it.line_no || "")); num.setAttribute("aria-label", "دواء رقم " + (n || it.line_no || ""));
   const h = el("h2", null, it.read_name || "سطر غير مقروء"); h.dir = "auto";
   const [t, cls] = RX_ST[it.match_status] || RX_ST.no_match;
-  const st = el("span", "rx-st " + cls, it.unclear || hasWild(it.read_name) ? "راجع الاسم" : t);
+  const st = el("span", "rx-st " + cls, it.unclear || hasWild(it.read_name) ? "راجع الاسم" : t); st.title = st.textContent; st.setAttribute("aria-label", st.textContent);
   w.append(num, h, st);
   return w;
 }
@@ -749,7 +749,7 @@ function rxEditName(band, it, pb, token) {
       const nv = inp.value.trim().replace(/\s+/g, " ");
       if (nv.length < 2) { inp.focus(); return; }
       busy = true; close();
-      if (nv !== h.textContent) { h.textContent = nv; st.textContent = "تعديل يدوي"; st.className = "rx-st warn"; }
+      if (nv !== h.textContent) { h.textContent = nv; st.textContent = "تعديل يدوي"; st.title = "تعديل يدوي"; st.setAttribute("aria-label", "تعديل يدوي"); st.className = "rx-st warn"; }
       try { await fillRxProducts(Object.assign({}, it, { read_name: nv, unclear: false }), pb, token); } finally { busy = false; }
     });
     h.hidden = true; pen.hidden = true; st.hidden = true;

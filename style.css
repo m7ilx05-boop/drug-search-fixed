@@ -684,3 +684,16 @@ body[data-view=home] #imgbox{display:none}
 .rx-band .rx-edit input{padding:7px 10px;font-size:15px}
 .rx-band .rx-edit-go,.rx-band .rx-edit-x{padding:7px 10px;font-size:14px}
 .rx-band .rx-num{display:inline-flex;align-items:center;justify-content:center;flex:none;white-space:nowrap}
+
+/* شكل الشريط: كبسولة صغيرة في النص، الرقم (فاتح) على الشمال والاسم (أزرق) جنبه، ونقطة الحالة وقلم التعديل على الطرف */
+.rx-band{direction:ltr;display:flex;align-items:center;justify-content:center;gap:0;width:fit-content;max-width:100%;margin:6px auto;padding:6px;border-radius:999px;background:rgba(110,185,255,.07);border:1px solid rgba(110,185,255,.28);box-shadow:0 0 0 3px rgba(110,185,255,.06),0 4px 14px rgba(0,0,0,.25);color:#0a2540}
+.rx-band .rx-num{position:relative;z-index:1;margin-right:-18px;padding:8px 18px;border-radius:999px;background:linear-gradient(180deg,#e3f2ff,#bfe0ff);color:#0a2540;font-size:17px;font-weight:800;box-shadow:none}
+.rx-band h2{flex:0 1 auto;margin:0;padding:8px 22px 8px 30px;border-radius:999px;background:linear-gradient(180deg,#6ec0ff,#4aa8f5);color:#0a2540;font-size:17px;font-weight:800;line-height:1.25;text-align:center}
+.rx-band .rx-st{flex:none;width:10px;height:10px;padding:0;margin-left:10px;border:0;border-radius:50%;font-size:0;line-height:0;overflow:hidden;background:#3ccf7e;box-shadow:0 0 0 3px rgba(255,255,255,.08)}
+.rx-band .rx-st.warn{background:#f5b800;color:inherit}
+.rx-band .rx-st.bad{background:#ff6b6b;color:inherit}
+.rx-band .rx-pen{width:28px;height:28px;margin-left:8px;border:1px solid rgba(110,185,255,.45);background:rgba(110,185,255,.14);color:#bfe0ff;font-size:14px}
+.rx-band .rx-edit{direction:rtl;min-width:min(78vw,340px);gap:6px}
+.rx-band .rx-edit input{border-radius:999px;padding:8px 14px}
+.rx-band .rx-edit-go{border-radius:999px;background:#6ec0ff;color:#0a2540}
+.rx-band .rx-edit-x{border-radius:999px;color:#bfe0ff;border-color:rgba(110,185,255,.5)}
