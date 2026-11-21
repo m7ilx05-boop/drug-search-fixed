@@ -792,3 +792,7 @@ body .sec-note.ok::before{background:#16A34A;opacity:1}
 .rx-picked[hidden]{display:none}
 .rx-picked strong{color:var(--ink);font-weight:700}
 .rx-rechoose{margin-inline-start:auto;padding:2px 4px;border:0;background:none;color:var(--accent);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+/* نتيجة الروشتة: الصف الأفقي كان بيوسّع عمود الـ grid أكتر من كارت الروشتة (المنتج والملاحظة بيطلعوا برا الكارت). العمود ياخد عرض الكارت بس والسحب جوه الصف */
+.rx-prods,.rx-auto{grid-template-columns:minmax(0,1fr)}
+.rx-prods>*,.rx-auto>*,.rx-rowwrap,.rx-strip{min-width:0;max-width:100%}
