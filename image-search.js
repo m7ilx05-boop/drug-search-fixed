@@ -458,7 +458,7 @@ function rxTile(p, tier) {
     if (cur != null) line.append(el("span", "rx-pr", Number(cur).toLocaleString("ar-EG") + " ج.م"));
     body.append(line);
   }
-  if (tier === 3) body.append(el("div", "rx-warn", "مش نفس التركيز/الشكل المكتوب"));
+  if (tier === 3) { body.append(el("div", "rx-warn", "مش نفس التركيز/الشكل المكتوب")); t.title = "مش نفس التركيز/الشكل المكتوب"; }
   body.append(el("div", "rx-open", "افتح صفحة المنتج ←"));
   t.append(pic, body);
   t.addEventListener("click", () => { if (window.openProductDirect) window.openProductDirect(p, tier); });
