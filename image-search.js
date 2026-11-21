@@ -356,7 +356,7 @@ async function handle(f) {
     const unv = list.filter((p) => un.has(p.dwaprices_id));
     if (exact.length) {
       out.append(el("h3", "sec", "نفس المنتج اللي في الصورة (" + exact.length + ")"));
-      out.append(el("p", "sec-note", "نفس الاسم" + (m.strength_checked ? " والتركيز (" + (m.required_strength || []).join(" + ") + ")" : "") + " والشكل الدوائي."));
+      out.append(el("p", "sec-note ok", "نفس الاسم" + (m.strength_checked ? " والتركيز (" + (m.required_strength || []).join(" + ") + ")" : "") + " والشكل الدوائي."));
       exact.forEach((p) => out.append(card(p, 1)));
     } else {
       out.append(el("div", "scan-msg warn", "مفيش نفس التركيز والشكل في السجل."));
@@ -665,7 +665,7 @@ async function fillRxProducts(it, box, token, opt) {
     const exact = sameS.filter(formOk), otherForm = sameS.filter((p) => !formOk(p));
     if (nd.assumed) box.append(el("p", "sec-note", "الجرعة مكتوبة «" + it.dose + "» من غير وحدة، فافترضنا إن الرقم بالـ mg."));
     if (exact.length) {
-      box.append(el("p", "sec-note", "نفس الاسم والتركيز المكتوب (" + need.map((a) => a.v).join(" + ") + (nd.assumed ? " mg" : "") + (wantForm ? " والشكل" : "") + ") — " + exact.length + " منتج."));
+      box.append(el("p", "sec-note ok", "نفس الاسم والتركيز المكتوب (" + need.map((a) => a.v).join(" + ") + (nd.assumed ? " mg" : "") + (wantForm ? " والشكل" : "") + ") — " + exact.length + " منتج."));
       box.append(rxRow(exact.slice(0, 8), 1));
       return;
     }
@@ -971,11 +971,11 @@ async function handleRx(f) {
     const boxes = items.map((it, i) => {
       const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
       const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
-      det.open = true; // لو فيه حاجة محتاجة مراجعة تظهر مفتوحة
+      det.open = false; // مقفولة دايمًا لحد ما تضغط عليها
       const d = rxDisplay(it, rs.map.get(it.line_no || i + 1) || null);
-      if (d.note && d.state !== "choices") det.append(el("p", "sec-note", d.note));
+      if (d.note && d.state !== "choices") det.append(el("p", "sec-note" + (/والتركيز مطابق/.test(d.note) ? " ok" : ""), d.note));
       if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
-      if (d.state === "choices") det.open = true;
+      
       if (d.others && d.others.length) { const dd = el("details", "rx-excl"); dd.append(el("summary", null, "أسماء قريبة تانية (" + d.others.length + ")")); rxChoices(it, { options: d.others, excluded: [], title: "لو الاسم المقروء غلط، اختار البراند الصح:" }, dd, token); det.append(dd); }
       const band = rxBand(it, n), crop = rxCrop(it); const src = el("div", "rx-src"); if (crop) src.append(crop); src.append(det, el("div", "scan-msg warn rx-note", "اقرأ وراجع الجرعة والشكل الدوائي قبل الصرف." + (r.overall_legibility === "poor" ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : ""))); src.append(pb); w.append(band, src); pages.append(w); rxEditName(band, it, pb, token);
       let run;
