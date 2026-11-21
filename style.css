@@ -287,7 +287,7 @@ body[data-view=home] form{margin-top:-52px}
 @media (prefers-reduced-motion:reduce){.skel{animation:none}}
 
 /* ===== التنبيهات: بتطلع من فوق الشاشة (شكل مقتبس من Uiverse / Cybercom682) ===== */
-#toasts{position:fixed;z-index:1000;bottom:calc(var(--bot) + 14px);inset-inline:12px;display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none}
+#toasts{position:fixed;z-index:100;top:calc(var(--top) + 12px);inset-inline:12px;display:flex;justify-content:center;pointer-events:none}
 .toast{--tb:#22C55E;--tbg:#DCFCE7;--tbh:#BBF7D0;--tt:#14532D;--ti:#16A34A;pointer-events:auto;display:flex;align-items:center;gap:8px;width:100%;max-width:420px;padding:10px 12px;border-radius:12px;border-inline-start:4px solid var(--tb);background:var(--tbg);color:var(--tt);font-size:13px;font-weight:600;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.18);cursor:pointer;transition:background .3s,transform .3s;animation:toastIn .3s ease-out}
 .toast.info{--tb:#3B82F6;--tbg:#DBEAFE;--tbh:#BFDBFE;--tt:#1E3A8A;--ti:#2563EB}
 .toast.warn{--tb:#EAB308;--tbg:#FEF9C3;--tbh:#FEF08A;--tt:#713F12;--ti:#CA8A04}
@@ -303,14 +303,8 @@ body[data-view=home] form{margin-top:-52px}
 .toast-ic svg{width:20px;height:20px}
 .toast.out{animation:toastOut .25s ease-in forwards}
 @media (hover:hover){.toast:hover{background:var(--tbh);transform:scale(1.05)}}
-/* حجم صغير جدًا */
-.toast{max-width:300px;width:auto;padding:5px 9px;gap:6px;border-radius:10px;border-inline-start-width:3px;font-size:11.5px;font-weight:500;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.16)}
-.toast-ic,.toast-ic svg{width:13px;height:13px}
-@media (hover:hover){.toast:hover{transform:none}}
-#status.error{display:none!important}
-.rx-warn{display:none}
-@keyframes toastIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
-@keyframes toastOut{to{opacity:0;transform:translateY(20px)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(-24px)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-24px)}}
 @media (prefers-reduced-motion:reduce){.toast,.toast.out{animation:none}}
 
 /* ===== الكارت: مقفول = صورة كبيرة + الاسم. مفتوح = الاسم فوق + الصورة + التفاصيل تحت ===== */
