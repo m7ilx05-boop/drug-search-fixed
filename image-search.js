@@ -1072,7 +1072,8 @@ async function handleRx(f) {
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
   busy(true); showSkeleton();
-  const st = stepsUI(); st.add("prep"); st.add("read"); st.add("resolve"); st.set("prep", "run", "جاري تجهيز صورة الروشتة…"); box.append(st.w);
+  const st = stepsUI(); st.add("prep"); st.add("read"); st.add("resolve"); st.set("prep", "run", "جاري تجهيز صورة الروشتة…"); const scan = window.RxScan ? window.RxScan.start(f) : null; if (scan) box.append(scan.el);
+  box.append(st.w);
   if (window.showResultsPage) window.showResultsPage("قراءة روشتة");
   try {
     const b64 = await toJpegBase64(f, RX_B64_MAX, RX_SIDES);
@@ -1086,7 +1087,7 @@ async function handleRx(f) {
     if (token !== polling) return;
     const items = Array.isArray(r.items) ? r.items : [];
     if (!items.length) {
-      st.set("read", "bad", "مش باين في الصورة أسطر روشتة مقروءة");
+      if (scan) scan.stop(); st.set("read", "bad", "مش باين في الصورة أسطر روشتة مقروءة");
       st.lines("read", [["اللي حصل", "القراءة خلصت بس مفيش أسماء أدوية مقروءة. صوّر الروشتة كاملة وبإضاءة كويسة."]]);
       imgErr("مفيش أسماء أدوية مقروءة في الصورة. صوّر الروشتة كاملة وبإضاءة كويسة.");
       return;
@@ -1118,6 +1119,7 @@ async function handleRx(f) {
     { let i = 0; const worker = async () => { while (i < boxes.length && token === polling) { const o = boxes[i++]; await o.run(); } }; Promise.all([worker(), worker(), worker()]); } // 3 بحث في نفس الوقت
     quiet();
   } catch (err) {
+    if (scan) scan.stop();
     st.fail("حصلت مشكلة في الخطوة دي", [["كود الخطأ", (err && (err.code || err.message)) || "unknown"]]);
     const code = (err && (err.code || err.message)) || "unknown";
     const known = ERR[err && err.code];
