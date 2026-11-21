@@ -446,15 +446,21 @@ function rxTile(p, tier) {
     im.onerror = () => { pic.replaceChildren("💊"); };
     pic.append(im);
   } else pic.append("💊");
-  const st = rxStrengthOf(p);
-  if (st) { const b = el("span", "rx-str", st); b.dir = "ltr"; pic.append(b); }
+  const body = el("div", "rx-body");
   const nm = el("div", "rx-nm", p.product_name || p.arabic_name || "منتج"); nm.dir = "auto";
-  t.append(pic, nm);
+  body.append(nm);
   const sub = [p.dosage_form, p.pack_size && "العبوة: " + p.pack_size].filter(Boolean).join(" · ");
-  if (sub) t.append(el("div", "rx-sub", sub));
-  const cur = p.current_price != null ? p.current_price : p.price;
-  if (cur != null) t.append(el("div", "rx-pr", Number(cur).toLocaleString("ar-EG") + " ج.م"));
-  if (tier === 3) t.append(el("div", "rx-warn", "مش نفس التركيز/الشكل المكتوب"));
+  if (sub) body.append(el("div", "rx-sub", sub));
+  const st = rxStrengthOf(p), cur = p.current_price != null ? p.current_price : p.price;
+  if (st || cur != null) {
+    const line = el("div", "rx-line");
+    if (st) { const b = el("span", "rx-str", st); b.dir = "ltr"; line.append(b); }
+    if (cur != null) line.append(el("span", "rx-pr", Number(cur).toLocaleString("ar-EG") + " ج.م"));
+    body.append(line);
+  }
+  if (tier === 3) body.append(el("div", "rx-warn", "مش نفس التركيز/الشكل المكتوب"));
+  body.append(el("div", "rx-open", "افتح صفحة المنتج ←"));
+  t.append(pic, body);
   t.addEventListener("click", () => { if (window.openProductDirect) window.openProductDirect(p, tier); });
   return t;
 }
