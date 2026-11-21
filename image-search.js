@@ -977,7 +977,7 @@ async function handleRx(f) {
       if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
       if (d.state === "choices") det.open = true;
       if (d.others && d.others.length) { const dd = el("details", "rx-excl"); dd.append(el("summary", null, "أسماء قريبة تانية (" + d.others.length + ")")); rxChoices(it, { options: d.others, excluded: [], title: "لو الاسم المقروء غلط، اختار البراند الصح:" }, dd, token); det.append(dd); }
-      const band = rxBand(it, n), crop = rxCrop(it); const src = el("div", "rx-src"); if (crop) src.append(crop); src.append(det, el("div", "scan-msg warn rx-note", "اقرأ وراجع الجرعة والشكل الدوائي قبل الصرف." + (r.overall_legibility === "poor" ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : ""))); w.append(band, src, pb); pages.append(w); rxEditName(band, it, pb, token);
+      const band = rxBand(it, n), crop = rxCrop(it); const src = el("div", "rx-src"); if (crop) src.append(crop); src.append(det, el("div", "scan-msg warn rx-note", "اقرأ وراجع الجرعة والشكل الدوائي قبل الصرف." + (r.overall_legibility === "poor" ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : ""))); src.append(pb); w.append(band, src); pages.append(w); rxEditName(band, it, pb, token);
       let run;
       if (d.state === "matched" || d.state === "brand_only") run = () => fillRxProducts(it, pb, token, { name: d.brand });
       else if (d.state === "choices") run = async () => { rxChoices(it, d, pb, token); };
