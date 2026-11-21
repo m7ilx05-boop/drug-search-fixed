@@ -657,3 +657,13 @@ body[data-view=home] #imgbox{display:none}
 .rx-more{margin-top:6px}
 .rx-more>summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--accent);padding:8px 2px}
 .rx-more .rx-item{margin-top:6px}
+
+/* rx-resolve: اختيارات البراند والأسماء المستبعدة */
+.rx-choices{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.rx-choice{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:start;padding:10px 14px;border-radius:14px;border:1px solid var(--line,rgba(0,0,0,.12));background:var(--card,#fff);color:inherit;font:inherit;cursor:pointer}
+.rx-choice strong{font-size:16px}
+.rx-choice small{font-size:12.5px;color:var(--muted)}
+.rx-choice.on{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 30%,transparent)}
+.rx-chosen{margin-top:6px}
+.rx-excl{margin-top:6px}
+.rx-excl>summary{cursor:pointer;font-size:13.5px;color:var(--muted);padding:6px 2px}

@@ -726,12 +726,61 @@ function rxCompare(f) { // صورة الروشتة الأصلية للمقارن
   w.append(h, im); return w;
 }
 
+// ===== المرحلة التانية للروشتة: rx-resolve (نفس الصورة + الأسطر المقروءة). لو وقعت أو اتأخرت بنرجع للنتيجة القديمة زي ما هي =====
+const RX_RESOLVE_MS = 60000;
+async function rxResolve(b64, items) {
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), RX_RESOLVE_MS);
+  try {
+    const r = await fetch(BASE + "/rx-resolve", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + ANON, apikey: ANON },
+      body: JSON.stringify({ image_base64: b64, mime_type: "image/jpeg", items }), signal: ac.signal,
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j) return { map: new Map(), error: (j && j.error) || "http_" + r.status, ms: null };
+    return { map: new Map((j.items || []).map((x) => [x.line_no, x])), error: null, ms: j.ms ?? null };
+  } catch (e) { return { map: new Map(), error: (e && e.name) || "error", ms: null }; } finally { clearTimeout(tm); }
+}
+// الحالة المعروضة لسطر واحد: matched / brand_only / choices / legacy / none
+function rxDisplay(item, r) {
+  if (r && r.status === "matched") return { state: "matched", brand: r.matched_brand, product_id: r.product_id, note: null, excluded: r.excluded || [] };
+  if (r && r.status === "matched_brand") return { state: "brand_only", brand: r.matched_brand, product_id: null, note: "البراند مؤكد من الصورة والتركيز للصيدلي", excluded: r.excluded || [] };
+  if (r && r.status === "choices" && Array.isArray(r.choices) && r.choices.length) return { state: "choices", options: r.choices, excluded: r.excluded || [], note: (r.notes || [])[0] ?? null };
+  const old = item.selected_product ?? item.candidate ?? null;
+  return { state: old ? "legacy" : "none", excluded: (r && r.excluded) || [], note: ((r && r.notes) || [])[0] ?? null };
+}
+const RX_STRC = { exact: "التركيز مطابق", partial: "التركيز جزئي", unknown: "التركيز مش مسجّل", none_written: "التركيز مش مكتوب", absent: "" };
+const RX_VIS = { both_compatible: "الصورة متوافقة", one_read: "الصورة اتقرت مرة واحدة", not_checked: "الصورة ما اتفحصتش" };
+const RX_STAGE = { form: "الشكل", strength: "التركيز", vision: "الصورة" };
+function rxExcluded(list) {
+  if (!list || !list.length) return null;
+  const d = el("details", "rx-excl"); d.append(el("summary", null, "اتستبعد " + list.length + " اسم"));
+  const ul = el("ul", "ing");
+  list.forEach((x) => { const li = el("li"); const b = el("span", null, x.brand); b.dir = "auto"; li.append(b, el("span", null, (RX_STAGE[x.stage] ? RX_STAGE[x.stage] + ": " : "") + (x.reason || ""))); ul.append(li); });
+  d.append(ul); return d;
+}
+// اختيارات البراند: المنتجات بتتحمّل لما الصيدلي يختار، مش بنخمّن
+function rxChoices(it, d, box, token) {
+  const w = el("div", "rx-choices");
+  w.append(el("p", "sec-note", "الاسم مش مؤكد: اختار البراند الصح" + (d.note ? " — " + d.note : "")));
+  const prod = el("div", "rx-chosen"); const btns = [];
+  d.options.forEach((c) => {
+    const b = el("button", "rx-choice"); b.type = "button";
+    const n = el("strong", null, c.brand); n.dir = "auto";
+    const sub = [RX_STRC[c.strength_check], RX_VIS[c.vision]].filter(Boolean).join(" · ");
+    b.append(n); if (sub) b.append(el("small", null, sub));
+    b.addEventListener("click", () => { btns.forEach((x) => x.classList.remove("on")); b.classList.add("on"); fillRxProducts(it, prod, token, { name: c.brand }); });
+    btns.push(b); w.append(b);
+  });
+  box.append(w, prod);
+  const ex = rxExcluded(d.excluded); if (ex) box.append(ex);
+}
+
 async function handleRx(f) {
   if (!/^image\//.test(f.type)) { imgErr("الملف ده مش صورة."); return; }
   const token = ++polling;
   clearMore(); box.replaceChildren(); fam.replaceChildren(); $("out").replaceChildren();
   busy(true); showSkeleton();
-  const st = stepsUI(); st.add("prep"); st.add("read"); st.set("prep", "run", "جاري تجهيز صورة الروشتة…"); box.append(st.w);
+  const st = stepsUI(); st.add("prep"); st.add("read"); st.add("resolve"); st.set("prep", "run", "جاري تجهيز صورة الروشتة…"); box.append(st.w);
   if (window.showResultsPage) window.showResultsPage("قراءة روشتة");
   try {
     const b64 = await toJpegBase64(f, RX_B64_MAX, RX_SIDES);
@@ -751,6 +800,11 @@ async function handleRx(f) {
     const matched = items.filter((x) => x.match_status === "matched").length;
     st.set("read", "done", "اتقرا " + items.length + " سطر، " + matched + " مطابق في السجل");
     st.lines("read", [["عدد الأسطر", items.length], ["مطابق في السجل", matched], ["وضوح الخط", RX_LEG[r.overall_legibility] || ""], ["تنبيه", "قراءة آلية وممكن تغلط في حرف أو رقم. كل سطر محتاج مراجعة صيدلي قبل الصرف."]]);
+    st.set("resolve", "run", "جاري مطابقة الأسماء مع السجل…");
+    const rs = await rxResolve(b64, items);
+    if (token !== polling) return;
+    if (rs.error) { st.set("resolve", "bad", "المطابقة التانية ما اشتغلتش، فعرضنا القراءة العادية"); st.lines("resolve", [["السبب", rs.error]]); }
+    else st.set("resolve", "done", "اتطابقت الأسماء" + (rs.ms ? " (" + Math.round(rs.ms / 1000) + " ث)" : ""));
     const out = $("out"); out.replaceChildren(); hideSkeleton();
     out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
     out.append(rxCompare(f));
@@ -760,9 +814,18 @@ async function handleRx(f) {
       const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
       const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
       det.open = !!it.unclear || it.match_status !== "matched" || hasWild(it.read_name); // لو فيه حاجة محتاجة مراجعة تظهر مفتوحة
-      w.append(rxBand(it, n), pb, det); out.append(w); return { it, pb };
+      const d = rxDisplay(it, rs.map.get(it.line_no || i + 1) || null);
+      if (d.note && d.state !== "choices") det.append(el("p", "sec-note", d.note));
+      if (d.state !== "choices") { const ex = rxExcluded(d.excluded); if (ex) det.append(ex); }
+      if (d.state === "choices") det.open = true;
+      w.append(rxBand(it, n), pb, det); out.append(w);
+      let run;
+      if (d.state === "matched" || d.state === "brand_only") run = () => fillRxProducts(it, pb, token, { name: d.brand });
+      else if (d.state === "choices") run = async () => { rxChoices(it, d, pb, token); };
+      else run = () => fillRxProducts(it, pb, token);
+      return { it, pb, run };
     });
-    { let i = 0; const worker = async () => { while (i < boxes.length && token === polling) { const o = boxes[i++]; await fillRxProducts(o.it, o.pb, token); } }; Promise.all([worker(), worker(), worker()]); } // 3 بحث في نفس الوقت
+    { let i = 0; const worker = async () => { while (i < boxes.length && token === polling) { const o = boxes[i++]; await o.run(); } }; Promise.all([worker(), worker(), worker()]); } // 3 بحث في نفس الوقت
     quiet();
   } catch (err) {
     st.fail("حصلت مشكلة في الخطوة دي", [["كود الخطأ", (err && (err.code || err.message)) || "unknown"]]);
