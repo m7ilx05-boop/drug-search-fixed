@@ -322,7 +322,7 @@ async function handle(f) {
           st.set("bc", "done", "اتعرف على المنتج من الباركود"); st.lines("bc", [["الباركود", (r.gtins || []).join("، ")], ["عدد المنتجات اللي لقيناها", d.found]]);
           const out = $("out");
           out.replaceChildren(el("h3", "sec", "نفس المنتج اللي في الصورة (" + d.found + ")"));
-          if (d.ambiguous) out.append(el("div", "scan-msg warn", "الباركود ده مسجّل لأكتر من منتج في المصدر. راجع الاسم والحجم على العبوة."));
+          if (d.ambiguous) out.append(el("div", "scan-msg warn", "الباركود لأكتر من منتج، راجع العبوة."));
           (d.results || []).forEach((p) => out.append(card(p, 1)));
           quiet();
           return;
@@ -345,7 +345,7 @@ async function handle(f) {
 
     if (!Array.isArray(m.exact_ids)) {
       st.set("match", "bad", "ما قدرناش نتحقق من التركيز والشكل"); st.lines("match", [["اللي حصل", "التحقق من التركيز والشكل ماتمّش، فالنتايج ممكن تكون لمنتجات مشابهة. قارنها بالعلبة."]]);
-      out.append(el("div", "scan-msg warn", "ما قدرناش نتحقق من التركيز والشكل، فالنتايج دي ممكن تكون لمنتجات مشابهة. قارنها بالعلبة."));
+      out.append(el("div", "scan-msg warn", "التركيز والشكل ما اتأكدوش، قارن بالعلبة."));
       list.forEach((p) => out.append(card(p, 1)));
       quiet();
       return;
@@ -359,7 +359,7 @@ async function handle(f) {
       out.append(el("p", "sec-note", "نفس الاسم" + (m.strength_checked ? " والتركيز (" + (m.required_strength || []).join(" + ") + ")" : "") + " والشكل الدوائي."));
       exact.forEach((p) => out.append(card(p, 1)));
     } else {
-      out.append(el("div", "scan-msg warn", "ما لقيناش في السجل نفس المنتج بنفس التركيز والشكل."));
+      out.append(el("div", "scan-msg warn", "مفيش نفس التركيز والشكل في السجل."));
       // أقرب تركيز في الأول
       const req = reqAmts(m, x);
       closest = list.filter((p) => !ex.has(p.dwaprices_id) && !un.has(p.dwaprices_id))
@@ -467,7 +467,7 @@ function rxTile(p, tier) {
   if (cur != null) foot.append(el("span", "rx-pr", Number(cur).toLocaleString("ar-EG") + " ج.م"));
   foot.append(el("span", "rx-open", "افتح صفحة المنتج ←"));
   body.append(foot);
-  if (tier === 3) { body.append(el("div", "rx-warn", "مش نفس التركيز/الشكل المكتوب")); t.title = "مش نفس التركيز/الشكل المكتوب"; }
+  if (tier === 3) { body.append(el("div", "rx-warn", "غير المكتوب")); t.title = "مش نفس التركيز/الشكل المكتوب"; }
   t.append(pic, body);
   t.addEventListener("click", () => { if (window.openProductDirect) window.openProductDirect(p, tier); });
   return t;
@@ -584,7 +584,7 @@ async function rxSuggest(brand, d, it, box, token, auto) {
   w.append(row); box.append(w);
   if (!auto && top.s >= RX_AUTO_MIN && (!wild || uniq.length === 1)) {
     const sub = el("div", "rx-auto");
-    sub.append(el("div", "scan-msg warn", "تخمين: أقرب اسم في سجل الأدوية لـ «" + brand + "» هو «" + top.n + "» (تشابه " + Math.round(top.s * 100) + "٪). مش مؤكد إنه نفس الدواء، راجعه مع الصيدلي."));
+    sub.append(el("div", "scan-msg warn", "تخمين: «" + top.n + "» (تشابه " + Math.round(top.s * 100) + "٪). راجعه مع الصيدلي."));
     const pb = el("div", "rx-prods"); sub.append(pb); box.append(sub);
     await fillRxProducts(it, pb, token, { name: top.n, sci: top.sci, auto: true });
   }
@@ -623,8 +623,8 @@ async function fillRxProducts(it, box, token, opt) {
       box.replaceChildren(el("p", "sec-note", "فيه حرف مش واضح في «" + brand + "» (الـ _). بنطابق الحروف الواضحة مع كل أدوية الدليل من غير ما نفترض الحرف الناقص."));
       const ok = await rxSuggest(brand, null, it, box, token, false);
       if (token !== polling) return;
-      if (!ok) box.append(el("div", "scan-msg warn", "ما لقيناش اسم بيطابق الحروف الواضحة في «" + brand + "». راجع الروشتة مع الصيدلي."));
-    } catch { box.replaceChildren(el("div", "scan-msg warn", "تعذّر مطابقة «" + brand + "». جرّب تاني.")); }
+      if (!ok) box.append(el("div", "scan-msg warn", "مفيش اسم بيطابق الحروف الواضحة. راجع الصيدلي."));
+    } catch { box.replaceChildren(el("div", "scan-msg warn", "تعذّرت المطابقة، جرّب تاني.")); }
     return;
   }
   try {
@@ -648,9 +648,9 @@ async function fillRxProducts(it, box, token, opt) {
       const pend = (job && Array.isArray(job.pending_products) ? job.pending_products : []).filter((x) => x && typeof x.name === "string");
       const dym = (job && Array.isArray(job.did_you_mean) ? job.did_you_mean : []).filter((x) => typeof x === "string" && x.trim());
       if (job) d = Object.assign({}, d, { suggestions: (d.suggestions || []).concat(dym.map((t) => ({ text: t, kind: "brand", search_type: "auto" }))) });
-      if (pend.length) box.append(el("div", "scan-msg warn", "لقينا «" + brand + "» على الإنترنت، وهو في انتظار المراجعة قبل ما يتضاف لقاعدة البيانات: " + pend.slice(0, 3).map((x) => x.name).join("، ")));
+      if (pend.length) box.append(el("div", "scan-msg warn", "لقيناه على الإنترنت وفي انتظار المراجعة: " + pend.slice(0, 3).map((x) => x.name).join("، ")));
       else if (job && job.message_ar) box.append(el("div", "scan-msg warn", job.message_ar));
-      else box.append(el("div", "scan-msg warn", (job ? "بحثنا عن «" + brand + "» في المصادر ومالقيناش نتيجة مؤكدة." : "ما لقيناش «" + brand + "» في السجل.") + " ده معناه إنه مش ظاهر في المصادر اللي بنبحث فيها، مش إنه مش موجود في السوق."));
+      else box.append(el("div", "scan-msg warn", (job ? "مفيش نتيجة مؤكدة في المصادر." : "مش في السجل.") + " مش معناها إنه مش موجود في السوق."));
       await rxSuggest(brand, d, it, box, token, opt.auto); return;
     }
     if (!need.length) {
@@ -670,16 +670,16 @@ async function fillRxProducts(it, box, token, opt) {
       return;
     }
     if (otherForm.length) {
-      box.append(el("div", "scan-msg warn", "لقينا «" + brand + "» بنفس التركيز لكن بشكل دوائي مختلف عن المكتوب (" + (it.dose || it.read_name) + "). مش نفس المنتج غالبًا:"));
+      box.append(el("div", "scan-msg warn", "نفس التركيز لكن بشكل دوائي مختلف عن (" + (it.dose || it.read_name) + "):"));
       box.append(rxRow(otherForm.slice(0, 6), 3));
       return;
     }
     const closest = list.map((p) => ({ p, g: strengthGap(need, prodAmtsAll(p)) })).filter((o) => isFinite(o.g)).sort((x, y) => x.g - y.g).slice(0, 2);
-    box.append(el("div", "scan-msg warn", "ما لقيناش «" + brand + "» بنفس التركيز المكتوب (" + need.map((a) => a.v).join(" + ") + (nd.assumed ? " mg" : "") + ")."));
+    box.append(el("div", "scan-msg warn", "مفيش بنفس التركيز المكتوب (" + need.map((a) => a.v).join(" + ") + (nd.assumed ? " mg" : "") + ")."));
     if (closest.length) { box.append(el("p", "sec-note", "أقرب تركيز متاح — مش نفس التركيز المطلوب:")); box.append(rxRow(closest.map((o) => o.p), 3)); }
     if (!closest.length) await rxSuggest(brand, d, it, box, token, opt.auto);
   } catch (err) {
-    box.replaceChildren(el("div", "scan-msg warn", "تعذّر البحث عن «" + brand + "». جرّب زر «ابحث عن الدواء»."));
+    box.replaceChildren(el("div", "scan-msg warn", "تعذّر البحث، جرّب «ابحث عن الدواء»."));
   }
 }
 
@@ -966,10 +966,9 @@ async function handleRx(f) {
     const out = $("out"); out.replaceChildren(); hideSkeleton();
     out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
     rxSetImage(f);
-    out.append(el("div", "scan-msg warn rx-note", "القراءة آلية وممكن تغلط في حرف أو رقم، فراجع كل سطر مع الصيدلي قبل الصرف. اضغط على القصاصة عشان تشوف الاسم في الروشتة الأصلية."));
-    if (r.overall_legibility === "poor") out.append(el("div", "scan-msg warn", "الخط مش واضح، فالقراءة غالبًا ناقصة أو غلط. جرّب تصوّر الروشتة تاني بإضاءة أحسن."));
     if (!items.some((it) => Array.isArray(it.name_box) && it.name_box.length === 4)) { const ob = el("button", "rx-go", "فتح الروشتة الأصلية"); ob.type = "button"; ob.addEventListener("click", () => rxViewer(null)); out.append(ob); } // لو مفيش قصاصات، زر واحد يفتح الصورة
     const pages = el("div", "rx-pages"); out.append(pages);
+    out.append(el("div", "scan-msg warn rx-note", "القراءة آلية، راجع كل سطر مع الصيدلي." + (r.overall_legibility === "poor" ? " الخط مش واضح، صوّر تاني بإضاءة أحسن." : "")));
     const boxes = items.map((it, i) => {
       const n = it.line_no || i + 1, w = el("section", "rx-block"), pb = el("div", "rx-prods");
       const det = el("details", "rx-more"); det.append(el("summary", null, "تفاصيل السطر وقراءة الروشتة"), rxCard(it, n));
@@ -997,7 +996,7 @@ async function handleRx(f) {
     if (token === polling) { // زر يعيد القراءة بنفس الصورة من غير ما تصوّر تاني
       const rb = el("button", "ip-retry-rx", "حاول تاني"); rb.type = "button";
       rb.addEventListener("click", () => handleRx(f));
-      const o = $("out"); o.replaceChildren(el("div", "scan-msg warn", "فشلت قراءة الروشتة (" + code + "). تقدر تعيد المحاولة بنفس الصورة."), rb);
+      const o = $("out"); o.replaceChildren(el("div", "scan-msg warn", "فشلت قراءة الروشتة (" + code + "). أعد المحاولة."), rb);
     }
   } finally { busy(false); }
 }
