@@ -114,7 +114,7 @@
       if (r) r.checked = true;
       $("f").requestSubmit();
     });
-    sheet.append(full, el("div", "meta", "راجع الجرعة والشكل الدوائي قبل البديل."));
+    sheet.append(full, el("div", "scan-msg warn", "راجع الجرعة والشكل الدوائي قبل البديل."));
     return [hero, sheet];
   }
 

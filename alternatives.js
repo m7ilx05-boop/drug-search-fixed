@@ -56,7 +56,7 @@ function altBlock(p) {
   const moreBtn = el("button", "alt-btn", "عرض المزيد من البدائل");
   const searchBtn = el("button", "alt-btn", "البحث عن البدائل");
   moreBtn.type = searchBtn.type = "button";
-  const foot = el("div", "meta", "راجع الجرعة والشكل الدوائي قبل البديل.");
+  const foot = el("div", "scan-msg warn", "راجع الجرعة والشكل الدوائي قبل البديل.");
   moreBtn.hidden = searchBtn.hidden = foot.hidden = true;
   box.append(note, list, msg, moreBtn, searchBtn, foot);
   let loaded = false, offset = 0, busy = false;
