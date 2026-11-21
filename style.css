@@ -787,3 +787,8 @@ body .sec-note.ok::before{background:#16A34A;opacity:1}
 .rxs-cap i:nth-of-type(2){animation-delay:.18s}.rxs-cap i:nth-of-type(3){animation-delay:.36s}
 @keyframes rxs-dot{0%,100%{opacity:.25}50%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.rxs-line.on,.rxs-cap i{animation:none}}
+/* بعد اختيار البراند: القايمة بتتقفل ويفضل اسم المختار */
+.rx-picked{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:2px 0 8px;font-size:13.5px;color:var(--muted)}
+.rx-picked[hidden]{display:none}
+.rx-picked strong{color:var(--ink);font-weight:700}
+.rx-rechoose{margin-inline-start:auto;padding:2px 4px;border:0;background:none;color:var(--accent);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}

@@ -957,10 +957,20 @@ function rxChoices(it, d, box, token) {
     const n = el("strong", null, c.brand); n.dir = "auto";
     const sub = [RX_STRC[c.strength_check], RX_VIS[c.vision]].filter(Boolean).join(" · ");
     b.append(n); if (sub) b.append(el("small", null, sub));
-    b.addEventListener("click", () => { btns.forEach((x) => x.classList.remove("on")); b.classList.add("on"); fillRxProducts(it, prod, token, { name: c.brand }); });
+    b.addEventListener("click", () => {
+      btns.forEach((x) => x.classList.remove("on")); b.classList.add("on");
+      // أول ما تختار: قايمة الاختيارات تتقفل، ويفضل اسم اللي اخترته ومعاه زر صغير لو عايز تغيّر
+      w.style.display = "none";
+      const nm = el("strong", null, c.brand); nm.dir = "auto";
+      const re = el("button", "rx-rechoose", "غيّر الاختيار"); re.type = "button";
+      re.addEventListener("click", () => { picked.hidden = true; w.style.display = ""; prod.replaceChildren(); btns.forEach((x) => x.classList.remove("on")); });
+      picked.replaceChildren(el("span", null, "اخترت:"), nm, re); picked.hidden = false;
+      fillRxProducts(it, prod, token, { name: c.brand });
+    });
     btns.push(b); w.append(b);
   });
-  box.append(w, prod);
+  const picked = el("div", "rx-picked"); picked.hidden = true;
+  box.append(w, picked, prod);
   const ex = rxExcluded(d.excluded); if (ex) box.append(ex);
 }
 
