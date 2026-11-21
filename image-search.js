@@ -479,6 +479,7 @@ function rxTile(p, tier) {
   if (cur != null) foot.append(el("span", "rx-pr", Number(cur).toLocaleString("ar-EG") + " ج.م"));
   foot.append(el("span", "rx-open", "افتح صفحة المنتج ←"));
   body.append(foot);
+  try { const ab = window.rxCart && window.rxCart.addBtn(p, true); if (ab) body.append(ab); } catch { /* الفاتورة اختيارية */ }
   if (tier === 3) { body.append(el("div", "rx-warn", "غير المكتوب")); t.title = "مش نفس التركيز/الشكل المكتوب"; }
   t.append(pic, body);
   t.addEventListener("click", () => { if (window.openProductDirect) window.openProductDirect(p, tier); });
@@ -1143,4 +1144,199 @@ async function handleRx(f) {
 }
 
 [camIn, galIn].forEach((inp) => inp.addEventListener("change", () => { const f = inp.files && inp.files[0]; inp.value = ""; handle(f); }));
+})();
+
+// ===== فاتورة الروشتة: بتجمع المنتجات اللي اخترتها من نتايج الروشتة وتحسب الإجمالي (علبة / شريط) =====
+// السعر من دليل الأسعار (current_price = سعر العلبة). major_unit_qty = عدد الشرايط (أو الأمبولات/الأكياس) في العلبة.
+(() => {
+  const KEY = "rxcart.v1";
+  const r2 = (x) => Math.round(x * 100) / 100;
+  const num = (v) => { if (v == null || v === "") return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
+  const money = (v) => Number(v).toLocaleString("ar-EG", { maximumFractionDigits: 2 }) + " ج.م";
+  const cnt = (v) => Number(v).toLocaleString("ar-EG");
+  const subLabel = (t) => /amp|أمبول|امبول/i.test(t) ? "أمبولة" : /vial|فيال/i.test(t) ? "فيال" : /sachet|كيس|اكياس|أكياس/i.test(t) ? "كيس" : /tab|cap|قرص|أقراص|اقراص|كبسول/i.test(t) ? "شريط" : "وحدة";
+  const valid = (l) => l && typeof l.id === "string" && typeof l.name === "string" && num(l.price) !== null && l.price > 0
+    && Number.isInteger(l.qty) && l.qty >= 1 && l.qty <= 999 && Number.isInteger(l.major) && l.major >= 1 && (l.unit === "box" || l.unit === "sub");
+  let lines = [], discount = 0;
+  try {
+    const s = JSON.parse(sessionStorage.getItem(KEY) || "null");
+    if (s && Array.isArray(s.lines)) lines = s.lines.filter(valid);
+    if (s && num(s.discount) !== null) discount = Math.min(100, Math.max(0, s.discount));
+  } catch { /* مفيش تخزين: الفاتورة بتفضل في الصفحة بس */ }
+  const save = () => { try { sessionStorage.setItem(KEY, JSON.stringify({ lines, discount })); } catch { /* ignore */ } };
+
+  const unitPrice = (l) => (l.unit === "sub" && l.major > 1 ? l.price / l.major : l.price);
+  const lineTotal = (l) => r2(l.qty * unitPrice(l));
+  const unitName = (l) => (l.unit === "sub" ? l.sub : "علبة");
+  const totals = () => { const sub = r2(lines.reduce((a, l) => a + lineTotal(l), 0)); const d = r2(sub * discount / 100); return { sub, d, total: r2(sub - d) }; };
+  const idOf = (p) => String(p.dwaprices_id != null ? p.dwaprices_id : p.id != null ? p.id : p.product_name);
+
+  const st = document.createElement("style");
+  st.textContent = ".rxc-add{width:100%;min-height:44px;margin-top:10px;border-radius:12px;border:1px solid var(--accent);background:var(--soft);color:var(--soft-ink);font:inherit;font-weight:600;cursor:pointer}"
+    + ".rxc-add.rxc-mini{display:flex;align-items:center;justify-content:center;width:auto;min-height:38px;margin-top:6px;padding:0 12px;font-size:13.5px}"
+    + ".rxc-add.in{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}"
+    + ".rxc-bar{position:fixed;z-index:40;inset-inline:12px;bottom:calc(var(--bot) + 12px);max-width:736px;margin-inline:auto;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:8px 18px;border:0;border-radius:18px;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;box-shadow:0 6px 22px rgba(0,0,0,.25);cursor:pointer}"
+    + ".rxc-bar[hidden]{display:none}.rxc-bar b{font-size:18px}"
+    + "body.rxc-on main{padding-bottom:calc(100px + var(--bot))}"
+    + ".rxc-ov{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.5)}"
+    + ".rxc-sheet{width:100%;max-width:760px;max-height:88dvh;display:flex;flex-direction:column;background:var(--surface);color:var(--ink);border-radius:22px 22px 0 0;padding:16px 16px calc(16px + var(--bot))}"
+    + ".rxc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.rxc-head h3{margin:0;font-size:18px}"
+    + ".rxc-x{min-width:44px;min-height:44px;border:0;border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:20px;cursor:pointer}"
+    + ".rxc-list{overflow:auto;flex:1;min-height:60px;margin:0 -4px;padding:0 4px}"
+    + ".rxc-row{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--bg)}"
+    + ".rxc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.rxc-name{font-weight:600;line-height:1.4}"
+    + ".rxc-del{flex:none;min-width:40px;min-height:40px;border:0;border-radius:10px;background:var(--bad-bg);color:var(--bad);font:inherit;cursor:pointer}"
+    + ".rxc-sub{color:var(--muted);font-size:13px;margin:2px 0 8px}"
+    + ".rxc-ctl{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}"
+    + ".rxc-seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}"
+    + ".rxc-seg button{min-height:40px;padding:0 14px;border:0;background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}"
+    + ".rxc-seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:600}"
+    + ".rxc-step{display:inline-flex;align-items:center;gap:4px}.rxc-step button{min-width:40px;min-height:40px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:20px;cursor:pointer}"
+    + ".rxc-step span{min-width:34px;text-align:center;font-weight:600}"
+    + ".rxc-lt{font-weight:700;color:var(--soft-ink)}"
+    + ".rxc-disc{display:flex;align-items:center;gap:10px;margin:6px 0}.rxc-disc input{width:84px;min-height:40px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;padding:0 10px;text-align:center}"
+    + ".rxc-tot{margin:6px 0 10px;padding:12px 14px;border-radius:14px;background:var(--soft);display:flex;flex-direction:column;gap:4px}"
+    + ".rxc-tot div{display:flex;justify-content:space-between;color:var(--muted);font-size:14px}.rxc-tot div.g{color:var(--soft-ink);font-size:20px;font-weight:700}"
+    + ".rxc-note{color:var(--muted);font-size:12.5px;margin:0 0 10px}"
+    + ".rxc-acts{display:flex;gap:10px}.rxc-acts button{flex:1;min-height:46px;border-radius:12px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink)}"
+    + ".rxc-acts button.sec{background:transparent;color:var(--accent)}.rxc-empty{text-align:center;color:var(--muted);padding:26px 0}";
+  document.head.append(st);
+
+  const lbl = (l, mini) => (mini ? (l ? "✓ في الفاتورة ×" + cnt(l.qty) : "＋ للفاتورة") : (l ? "✓ في الفاتورة (×" + cnt(l.qty) + ") — اضغط للزيادة" : "＋ أضف للفاتورة"));
+  const btns = new Map(); // id -> أزرار «أضف للفاتورة» الظاهرة في الصفحة
+  let bar = null, ov = null, listBox = null, totBox = null, discIn = null, clearBtn = null, clearT = 0;
+
+  function syncBtns() {
+    btns.forEach((set, id) => {
+      const l = lines.find((x) => x.id === id);
+      set.forEach((b) => {
+        if (!b.isConnected) { set.delete(b); return; }
+        b.classList.toggle("in", !!l);
+        b.textContent = lbl(l, b.dataset.mini === "1");
+      });
+    });
+  }
+  function paintBar() {
+    if (!bar) { bar = el("button", "rxc-bar"); bar.type = "button"; bar.hidden = true; bar.addEventListener("click", openSheet); document.body.append(bar); }
+    const n = lines.length;
+    bar.hidden = n === 0 || !!ov;
+    document.body.classList.toggle("rxc-on", n > 0);
+    bar.replaceChildren(el("span", null, "الفاتورة · " + cnt(n) + " صنف"), el("b", null, "الإجمالي " + money(totals().total)));
+  }
+  function paintTotals() {
+    if (!totBox) return;
+    const t = totals();
+    const rows = [["المجموع", money(t.sub)]];
+    if (discount > 0) rows.push(["الخصم (" + cnt(discount) + "%)", "− " + money(t.d)]);
+    totBox.replaceChildren(...rows.map(([a, b]) => { const d = el("div"); d.append(el("span", null, a), el("span", null, b)); return d; }));
+    const g = el("div", "g"); g.append(el("span", null, "الإجمالي"), el("span", null, money(t.total))); totBox.append(g);
+  }
+  function paintList() {
+    if (!listBox) return;
+    if (!lines.length) { listBox.replaceChildren(el("div", "rxc-empty", "الفاتورة فاضية. اختار منتجات من نتايج الروشتة.")); paintTotals(); return; }
+    listBox.replaceChildren(...lines.map((l) => {
+      const row = el("div", "rxc-row");
+      const top = el("div", "rxc-top"), nm = el("div", "rxc-name", l.name); nm.dir = "auto";
+      const del = el("button", "rxc-del", "حذف"); del.type = "button"; del.setAttribute("aria-label", "حذف " + l.name);
+      del.addEventListener("click", () => { lines = lines.filter((x) => x !== l); changed(); });
+      top.append(nm, del);
+      row.append(top, el("div", "rxc-sub", money(unitPrice(l)) + " لل" + unitName(l) + (l.major > 1 ? " · العلبة " + money(l.price) + " فيها " + cnt(l.major) + " " + l.sub : "")));
+      const ctl = el("div", "rxc-ctl");
+      if (l.major > 1) {
+        const seg = el("div", "rxc-seg");
+        [["box", "علبة"], ["sub", l.sub]].forEach(([u, t]) => {
+          const b = el("button", l.unit === u ? "on" : "", t); b.type = "button"; b.setAttribute("aria-pressed", String(l.unit === u));
+          b.addEventListener("click", () => { l.unit = u; changed(); });
+          seg.append(b);
+        });
+        ctl.append(seg);
+      }
+      const step = el("div", "rxc-step");
+      const minus = el("button", null, "−"), plus = el("button", null, "+");
+      minus.type = plus.type = "button"; minus.setAttribute("aria-label", "نقّص"); plus.setAttribute("aria-label", "زوّد");
+      minus.addEventListener("click", () => { if (l.qty > 1) l.qty--; else lines = lines.filter((x) => x !== l); changed(); });
+      plus.addEventListener("click", () => { if (l.qty < 999) l.qty++; changed(); });
+      step.append(minus, el("span", null, cnt(l.qty)), plus);
+      ctl.append(step, el("span", "rxc-lt", money(lineTotal(l))));
+      row.append(ctl);
+      return row;
+    }));
+    paintTotals();
+  }
+  function changed() { save(); paintBar(); paintList(); syncBtns(); }
+
+  function invoiceText() {
+    const t = totals();
+    const out = ["فاتورة تقديرية"];
+    lines.forEach((l, i) => out.push(cnt(i + 1) + ") " + l.name + " — " + cnt(l.qty) + " " + unitName(l) + " × " + money(unitPrice(l)) + " = " + money(lineTotal(l))));
+    out.push("المجموع: " + money(t.sub));
+    if (discount > 0) out.push("الخصم (" + cnt(discount) + "%): − " + money(t.d));
+    out.push("الإجمالي: " + money(t.total), "الأسعار من دليل الأسعار وممكن تختلف عن سعر الصيدلية.");
+    return out.join("\n");
+  }
+  async function copyInvoice() {
+    const txt = invoiceText();
+    try { await navigator.clipboard.writeText(txt); toast("success", "اتنسخت الفاتورة."); return; } catch { /* نجرّب الطريقة القديمة */ }
+    try {
+      const ta = document.createElement("textarea"); ta.value = txt; ta.style.cssText = "position:fixed;opacity:0"; document.body.append(ta); ta.select();
+      const ok = document.execCommand("copy"); ta.remove();
+      toast(ok ? "success" : "error", ok ? "اتنسخت الفاتورة." : "تعذّر النسخ.");
+    } catch { toast("error", "تعذّر النسخ."); }
+  }
+
+  function closeSheet() { if (!ov) return; ov.remove(); ov = listBox = totBox = discIn = clearBtn = null; document.removeEventListener("keydown", onKey); paintBar(); }
+  function onKey(e) { if (e.key === "Escape") closeSheet(); }
+  function openSheet() {
+    if (ov) return;
+    ov = el("div", "rxc-ov"); ov.addEventListener("click", (e) => { if (e.target === ov) closeSheet(); });
+    const sh = el("div", "rxc-sheet"); sh.setAttribute("role", "dialog"); sh.setAttribute("aria-modal", "true"); sh.setAttribute("aria-label", "الفاتورة");
+    const head = el("div", "rxc-head"), x = el("button", "rxc-x", "✕"); x.type = "button"; x.setAttribute("aria-label", "إغلاق"); x.addEventListener("click", closeSheet);
+    head.append(el("h3", null, "فاتورة الروشتة"), x);
+    listBox = el("div", "rxc-list"); totBox = el("div", "rxc-tot");
+    const dr = el("label", "rxc-disc"); discIn = el("input"); discIn.type = "number"; discIn.min = "0"; discIn.max = "100"; discIn.step = "any"; discIn.inputMode = "decimal"; discIn.value = discount ? String(discount) : "";
+    discIn.placeholder = "٠";
+    discIn.addEventListener("input", () => { const n = num(discIn.value); discount = n === null ? 0 : Math.min(100, Math.max(0, n)); save(); paintTotals(); paintBar(); });
+    dr.append(el("span", null, "خصم %"), discIn);
+    const acts = el("div", "rxc-acts");
+    const cp = el("button", null, "نسخ الفاتورة"); cp.type = "button"; cp.addEventListener("click", copyInvoice);
+    clearBtn = el("button", "sec", "مسح الكل"); clearBtn.type = "button";
+    clearBtn.addEventListener("click", () => {
+      if (!lines.length) return;
+      if (clearBtn.dataset.sure !== "1") { clearBtn.dataset.sure = "1"; clearBtn.textContent = "اضغط تاني للتأكيد"; clearTimeout(clearT); clearT = setTimeout(() => { if (clearBtn) { clearBtn.dataset.sure = ""; clearBtn.textContent = "مسح الكل"; } }, 3000); return; }
+      lines = []; discount = 0; if (discIn) discIn.value = ""; clearBtn.dataset.sure = ""; clearBtn.textContent = "مسح الكل"; changed();
+    });
+    acts.append(cp, clearBtn);
+    sh.append(head, listBox, dr, totBox, el("p", "rxc-note", "الأسعار من دليل الأسعار وممكن تختلف عن سعر الصيدلية، والتوفر غير متحقق منه."), acts);
+    ov.append(sh); document.body.append(ov); document.addEventListener("keydown", onKey);
+    paintBar(); paintList(); x.focus();
+  }
+
+  function add(p) {
+    const price = num(p.current_price != null ? p.current_price : p.price);
+    if (price === null || price <= 0) return false;
+    const id = idOf(p), ex = lines.find((l) => l.id === id);
+    if (ex) { if (ex.qty < 999) ex.qty++; } else {
+      let major = num(p.major_unit_qty), minor = num(p.minor_unit_qty);
+      major = major && major > 1 && (minor === null || major <= minor) ? Math.round(major) : 1; // عدد الشرايط في العلبة (1 = مفيش تقسيم)
+      lines.push({ id, name: String(p.product_name || "").slice(0, 120), price, major, sub: subLabel((p.dosage_form || "") + " " + (p.product_name || "")), unit: "box", qty: 1 });
+    }
+    changed();
+    return true;
+  }
+  // mini = جوه بلاطة منتج الروشتة (هي نفسها زرار بيفتح صفحة المنتج، فالإضافة span بدور زرار ومش بتفتح الصفحة)
+  function addBtn(p, mini) {
+    const price = num(p.current_price != null ? p.current_price : p.price);
+    if (price === null || price <= 0) return null; // مفيش سعر: مفيش إضافة للفاتورة
+    const id = idOf(p), b = el(mini ? "span" : "button", "rxc-add" + (mini ? " rxc-mini" : ""), lbl(null, !!mini));
+    if (mini) { b.dataset.mini = "1"; b.setAttribute("role", "button"); b.tabIndex = 0; } else b.type = "button";
+    const go = (e) => { e.stopPropagation(); add(p); };
+    b.addEventListener("click", go);
+    if (mini) b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(e); } });
+    if (!btns.has(id)) btns.set(id, new Set());
+    btns.get(id).add(b);
+    queueMicrotask(syncBtns);
+    return b;
+  }
+  window.rxCart = { addBtn, add, open: openSheet, count: () => lines.length };
+  paintBar();
 })();
