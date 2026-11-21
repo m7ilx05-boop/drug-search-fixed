@@ -766,3 +766,5 @@ body .sec-note.ok::before{background:#16A34A;opacity:1}
 .rx-seg{flex:1;height:4px;padding:0;border:0;border-radius:4px;background:color-mix(in srgb,var(--muted) 30%,transparent);cursor:pointer;transition:background .2s}
 .rx-seg.on{background:var(--accent)}
 .rx-lab{font-size:10.5px;font-weight:400;color:var(--muted)}
+/* عنوان «الأدوية المقروءة من الروشتة» في النص */
+.rx-sec-mid{text-align:center;display:block;width:100%}

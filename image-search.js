@@ -1106,7 +1106,7 @@ async function handleRx(f) {
     box.replaceChildren(); if (rs.error) box.append(el("div", "scan-msg warn", "المطابقة التانية ما اشتغلتش، فعرضنا القراءة العادية."));
     const hbox = el("div", "rx-info-slot"); out.append(hbox); // مكان بيانات الروشتة: بتتملي لما توصل
     hdrP.then((h) => { if (token !== polling || !h) return; const c = rxInfoCard(h); if (c) hbox.append(c); });
-    out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
+    out.append(el("h3", "sec rx-sec-mid", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
     rxSetImage(f);
     if (!items.some((it) => Array.isArray(it.name_box) && it.name_box.length === 4)) { const ob = el("button", "rx-go", "فتح الروشتة الأصلية"); ob.type = "button"; ob.addEventListener("click", () => rxViewer(null)); out.append(ob); } // لو مفيش قصاصات، زر واحد يفتح الصورة
     const pages = el("div", "rx-pages"); out.append(pages);
