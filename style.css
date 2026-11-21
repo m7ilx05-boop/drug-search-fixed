@@ -708,6 +708,14 @@ body[data-view=home] #imgbox{display:none}
 .rx-head .rx-band .rx-edit{min-width:0}
 .rx-head .rx-harr{width:38px;height:38px}
 .rx-pages:not(.multi) .rx-harr{display:none}
+/* بيانات الروشتة (تخصص الدكتور، المريض، السن…) */
+.rx-info{margin:6px 0 14px;padding:10px 14px 12px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.rx-info-t{margin:0 0 8px;font-size:13px;font-weight:700;color:var(--muted)}
+.rx-info-g{margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.rx-info-i{min-width:0}.rx-info-i.wide{grid-column:1/-1}
+.rx-info-i dt{font-size:11.5px;color:var(--muted);line-height:1.4}
+.rx-info-i dd{margin:0;font-size:14.5px;font-weight:600;line-height:1.45;overflow-wrap:anywhere}
+.rx-info-n{margin:8px 0 0;font-size:11px;color:var(--muted)}
 .rx-pages.at-first .rx-hprev,.rx-pages.at-last .rx-hnext{opacity:.3;box-shadow:none;pointer-events:none}
 
 /* اختيارات البراند: خلفية معتمة تناسب الثيم، والكلام ياخد لون الصفحة */

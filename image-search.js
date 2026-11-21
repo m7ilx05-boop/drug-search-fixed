@@ -1041,6 +1041,19 @@ function rxRedo(w, it, n, token, poor) {
   return wrap;
 }
 
+// كارت بيانات الروشتة: تخصص الدكتور وبيانات المريض زي ما هي مكتوبة (من دالة read-prescription-header، مش بتتحفظ في أي مكان)
+const RX_GEN = { male: "ذكر", female: "أنثى" };
+function rxInfoCard(h) {
+  const rows = [["التخصص", h.doctor_specialty], ["الدكتور", h.doctor_name], ["المريض", h.patient_name], ["السن", h.patient_age], ["النوع", RX_GEN[h.patient_gender]], ["الوزن", h.patient_weight], ["التشخيص", h.diagnosis], ["التاريخ", h.date]].filter((r) => r[1]);
+  if (!rows.length) return null;
+  const c = el("section", "rx-info"), g = el("dl", "rx-info-g");
+  rows.forEach(([l, v]) => {
+    const d = el("div", "rx-info-i" + (l === "التشخيص" ? " wide" : "")), dd = el("dd", null, v); dd.dir = "auto";
+    d.append(el("dt", null, l), dd); g.append(d);
+  });
+  c.append(el("div", "rx-info-t", "بيانات الروشتة"), g, el("p", "rx-info-n", "مقروءة آليًا من الورقة وممكن تغلط، راجعها. مش بتتحفظ."));
+  return c;
+}
 async function handleRx(f) {
   if (!/^image\//.test(f.type)) { imgErr("الملف ده مش صورة."); return; }
   const token = ++polling;
@@ -1054,6 +1067,8 @@ async function handleRx(f) {
     st.set("prep", "done", "اتجهّزت الصورة");
     st.lines("prep", [["الأبعاد بعد التصغير", lastShot.w + " × " + lastShot.h + " بكسل"], ["الحجم المبعوت", Math.round(b64.length * 0.75 / 1024) + " كيلوبايت (JPEG)"], ["ملحوظة", "الصورة بتتعرض على جهازك بس للمقارنة، ومش بتتحفظ. الأسطر المقروءة بتتسجّل للمراجعة."]]);
     st.set("read", "run", "جاري قراءة الروشتة…");
+    // بيانات الروشتة (تخصص الدكتور، المريض، السن…) بتتقرا بالتوازي ومش بتعطّل النتيجة: لو فشلت أو مش مكتوبة ببساطة مش بتظهر
+    const hdrP = call("read-prescription-header", { image_base64: b64, mime_type: "image/jpeg" }).then((x) => (x && x.header) || null).catch(() => null);
     const r = await call("read-prescription", { image_base64: b64, mime_type: "image/jpeg" });
     if (token !== polling) return;
     const items = Array.isArray(r.items) ? r.items : [];
@@ -1072,6 +1087,10 @@ async function handleRx(f) {
     if (rs.error) { st.set("resolve", "bad", "المطابقة التانية ما اشتغلتش، فعرضنا القراءة العادية"); st.lines("resolve", [["السبب", rs.error]]); }
     else st.set("resolve", "done", "اتطابقت الأسماء" + (rs.ms ? " (" + Math.round(rs.ms / 1000) + " ث)" : ""));
     const out = $("out"); out.replaceChildren(); hideSkeleton();
+    // قايمة الخطوات بتختفي أول ما النتايج تظهر (لو المطابقة التانية فشلت بنسيب تنبيه واحد بس)
+    box.replaceChildren(); if (rs.error) box.append(el("div", "scan-msg warn", "المطابقة التانية ما اشتغلتش، فعرضنا القراءة العادية."));
+    const hbox = el("div", "rx-info-slot"); out.append(hbox); // مكان بيانات الروشتة: بتتملي لما توصل
+    hdrP.then((h) => { if (token !== polling || !h) return; const c = rxInfoCard(h); if (c) hbox.append(c); });
     out.append(el("h3", "sec", "الأدوية المقروءة من الروشتة (" + items.length + ")"));
     rxSetImage(f);
     if (!items.some((it) => Array.isArray(it.name_box) && it.name_box.length === 4)) { const ob = el("button", "rx-go", "فتح الروشتة الأصلية"); ob.type = "button"; ob.addEventListener("click", () => rxViewer(null)); out.append(ob); } // لو مفيش قصاصات، زر واحد يفتح الصورة
