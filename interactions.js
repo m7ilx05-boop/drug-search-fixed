@@ -19,6 +19,9 @@
     + ".ddi-alert{display:flex;gap:12px;align-items:flex-start;margin:0 0 12px;padding:14px;border-radius:16px;background:#C62828;color:#fff;line-height:1.6;box-shadow:0 2px 10px rgba(0,0,0,.25)}"
     + ".ddi-alert-ic{flex:none;font-size:28px;line-height:1}.ddi-alert-t{font-weight:700;font-size:16.5px;margin:0 0 2px}.ddi-alert-s{font-size:14px;margin:0}"
     + ".ddi-pair.sev{border-width:2px;border-color:#C62828;box-shadow:0 0 0 3px rgba(198,40,40,.22)}"
+    + ".ddi-alert.warn{background:#B45309}.ddi-alert.okb{background:#1B7F4D}"
+    + ".ddi-pair.okc{border-width:2px;border-color:#1B7F4D}.ddi-pair.inc{border-width:2px;border-color:#B45309}"
+    + ".ddi-tag{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:4px 12px;border-radius:999px;color:#fff;font-size:13.5px;font-weight:700}.ddi-tag.warn{background:#B45309}.ddi-tag.okb{background:#1B7F4D}"
     + ".ddi-sevtag{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:4px 12px;border-radius:999px;background:#C62828;color:#fff;font-size:13.5px;font-weight:700}"
     + ".ddi-pair{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--bg)}"
     + ".ddi-pair.bad{border-color:var(--bad)}.ddi-pair.warn{border-color:var(--warn)}"
@@ -46,11 +49,13 @@
 
   const isSevere = (p) => !!p && (p.severe === true || (p.status === "interaction" && p.level === "Major"));
 
-  function pairCard(p) {
+  function pairCard(p, items) {
     const st = ST[p.status] || ["غير معروف", "warn"];
     const sev = isSevere(p);
     const c = el("section", "ddi-pair " + (sev ? "sev " : "") + (p.status === "interaction" ? "bad" : p.status === "label_only" || p.status === "incomplete" ? "warn" : ""));
     if (sev) c.append(el("div", "ddi-sevtag", "⚠️ تفاعل خطير"));
+    else if (p.status === "incomplete") { c.classList.add("inc"); c.append(el("div", "ddi-tag warn", "⚠️ بيانات ناقصة")); }
+    else if (p.status === "no_record") { c.classList.add("okc"); c.append(el("div", "ddi-tag okb", "✅ مفيش تفاعل مسجّل")); }
     c.append(names(p.a.label, p.b.label));
     const chips = el("div", "ddi-chips");
     chips.append(chip(st[0], st[1]));
@@ -102,7 +107,12 @@
         d.append(sr); c.append(d);
       });
     }
-    if (p.status === "no_record") c.append(el("p", "ddi-note", "مفيش تفاعل مسجّل في المصادر اللي بنفحصها. ده مش معناه إنهم آمنين مع بعض."));
+    if (p.status === "no_record") {
+      c.append(el("p", "ddi-note", "مفيش تفاعل مسجّل في المصادر اللي بنفحصها. ده مش معناه إنهم آمنين مع بعض."));
+      const ing = (i) => ((items && items[i] && items[i].ingredients) || []).map((x) => (x.matched && x.matched[0]) || x.raw).filter(Boolean);
+      const nm = ing(p.a.index).concat(ing(p.b.index));
+      if (nm.length) { const n = el("p", "ddi-note"); const b = el("bdi", null, [...new Set(nm)].join("، ")); b.dir = "ltr"; n.append("المواد اللي اتفحصت (كلها معروفة في قاعدة DDInter): ", b); c.append(n); }
+    }
 
     const pp = p.papers;
     if (pp && pp.found > 0 && Array.isArray(pp.items) && pp.items.length) {
@@ -131,6 +141,26 @@
       a.append(el("div", "ddi-alert-ic", "⚠️"), tx);
       nodes.push(a);
     }
+    const incPairs = (d.pairs || []).filter((p) => p.status === "incomplete");
+    if (incPairs.length) {
+      const unk = [...new Set(incPairs.flatMap((p) => (p.unresolved || []).filter(Boolean)))];
+      const a = el("div", "ddi-alert warn"); a.setAttribute("role", "alert");
+      const tx = el("div");
+      const sub = el("p", "ddi-alert-s"); sub.append(unk.length ? "مش عارفين عن المواد دي أي حاجة: " : "مفيش مواد فعّالة مسجّلة لبعض الأدوية. ");
+      if (unk.length) { const b = el("bdi", null, unk.join("، ")); b.dir = "ltr"; sub.append(b, ". "); }
+      sub.append("ده مش معناه إنها آمنة. راجع الصيدلي أو مرجع تاني.");
+      tx.append(el("p", "ddi-alert-t", "بيانات ناقصة: الفحص مش مكتمل لـ " + cnt(incPairs.length) + (incPairs.length === 1 ? " زوج" : " أزواج")), sub);
+      a.append(el("div", "ddi-alert-ic", "⚠️"), tx);
+      nodes.push(a);
+    }
+    if (!nSev && !incPairs.length && !cv.interaction && !cv.label_only && cv.no_record) {
+      const a = el("div", "ddi-alert okb");
+      const tx = el("div");
+      tx.append(el("p", "ddi-alert-t", "مفيش تفاعل مسجّل بين الأدوية دي"),
+        el("p", "ddi-alert-s", "في المصادر اللي فحصناها (DDInter وFDA وEMA وUK). ده مش ضمان إنها آمنة، راجع الصيدلي لو الحالة حساسة."));
+      a.append(el("div", "ddi-alert-ic", "✅"), tx);
+      nodes.push(a);
+    }
     const sum = el("div", "ddi-sum");
     if (nSev > 0) sum.append(chip("⚠️ " + cnt(nSev) + " خطير", "bad"));
     if (cv.interaction) sum.append(chip(cnt(cv.interaction) + " تفاعل مسجّل", "bad"));
@@ -144,7 +174,7 @@
       w.append("نفس المادة الفعّالة (", n, ") موجودة في: " + x.a.label + " و " + x.b.label + ". ممكن يكون تكرار في العلاج، راجع الصيدلي.");
       nodes.push(w);
     });
-    (d.pairs || []).forEach((p) => nodes.push(pairCard(p)));
+    (d.pairs || []).forEach((p) => nodes.push(pairCard(p, d.items)));
     nodes.push(el("p", "ddi-disc", d.disclaimer_ar || "النتيجة استرشادية، ومش بديل عن مراجعة الطبيب أو الصيدلي. غياب تفاعل مسجّل مش معناه إن الأدوية آمنة مع بعض."));
     box.replaceChildren(...nodes);
   }
