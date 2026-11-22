@@ -226,6 +226,7 @@ async function officialLocked(db: SupabaseClient, keys: string[]): Promise<Set<s
   return out;
 }
 
+// (match_terms column: see migration 20261122200000)
 // Every name a page lists that validateProducts compares with a search (trade name, Arabic name, ingredient names), normalized.
 function pageMatchTerms(items: unknown[]): string[] {
   const out = new Set<string>();
