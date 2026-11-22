@@ -1224,6 +1224,12 @@ async function handleRx(f) {
   const unitName = (l) => (l.unit === "sub" ? l.sub : "علبة");
   const totals = () => { const sub = r2(lines.reduce((a, l) => a + lineTotal(l), 0)); const d = r2(sub * discount / 100); return { sub, d, total: r2(sub - d) }; };
   const idOf = (p) => String(p.dwaprices_id != null ? p.dwaprices_id : p.id != null ? p.id : p.product_name);
+  // المواد الفعّالة للمنتج (لفحص التفاعلات): من product_ingredients لو موجودة، وإلا من scientific_name مفصولة بـ +
+  const ingsOf = (p) => {
+    const a = (p.product_ingredients || []).map((pi) => pi && pi.active_ingredients && pi.active_ingredients.inn).filter(Boolean);
+    const b = a.length ? a : String(p.scientific_name || "").split("+");
+    return [...new Set(b.map((x) => String(x).trim().slice(0, 100)).filter(Boolean))].slice(0, 8);
+  };
 
   const st = document.createElement("style");
   st.textContent = ".rxc-add{width:100%;min-height:44px;margin-top:10px;border-radius:12px;border:1px solid var(--accent);background:var(--soft);color:var(--soft-ink);font:inherit;font-weight:600;cursor:pointer}"
@@ -1252,6 +1258,7 @@ async function handleRx(f) {
     + ".rxc-tot{margin:6px 0 10px;padding:12px 14px;border-radius:14px;background:var(--soft);display:flex;flex-direction:column;gap:4px}"
     + ".rxc-tot div{display:flex;justify-content:space-between;color:var(--muted);font-size:14px}.rxc-tot div.g{color:var(--soft-ink);font-size:20px;font-weight:700}"
     + ".rxc-note{color:var(--muted);font-size:12.5px;margin:0 0 10px}"
+    + ".rxc-ddi{width:100%;min-height:46px;margin:0 0 10px;border-radius:12px;border:1px solid var(--warn);background:var(--warn-bg);color:var(--warn);font:inherit;font-weight:600;cursor:pointer}"
     + ".rxc-acts{display:flex;gap:10px}.rxc-acts button{flex:1;min-height:46px;border-radius:12px;font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink)}"
     + ".rxc-acts button.sec{background:transparent;color:var(--accent)}.rxc-empty{text-align:center;color:var(--muted);padding:26px 0}";
   document.head.append(st);
@@ -1360,7 +1367,13 @@ async function handleRx(f) {
       lines = []; discount = 0; if (discIn) discIn.value = ""; clearBtn.dataset.sure = ""; clearBtn.textContent = "مسح الكل"; changed();
     });
     acts.append(cp, clearBtn);
-    sh.append(head, listBox, dr, totBox, el("p", "rxc-note", "الأسعار من دليل الأسعار وممكن تختلف عن سعر الصيدلية، والتوفر غير متحقق منه."), acts);
+    const ddi = el("button", "rxc-ddi", "فحص التفاعلات بين الأدوية"); ddi.type = "button";
+    ddi.addEventListener("click", () => {
+      const ok = lines.filter((l) => Array.isArray(l.ings) && l.ings.length);
+      if (ok.length < 2) { toast("warn", lines.length < 2 ? "ضيف دوائين على الأقل للفاتورة الأول." : "المواد الفعّالة غير معروفة لأدوية الفاتورة. أضفها تاني من نتايج الروشتة."); return; }
+      if (window.DDI) window.DDI.open(ok.map((l) => ({ label: l.name, ingredients: l.ings })));
+    });
+    sh.append(head, listBox, dr, totBox, el("p", "rxc-note", "الأسعار من دليل الأسعار وممكن تختلف عن سعر الصيدلية، والتوفر غير متحقق منه."), ddi, acts);
     ov.append(sh); document.body.append(ov); document.addEventListener("keydown", onKey);
     paintBar(); paintList(); x.focus();
   }
@@ -1369,10 +1382,10 @@ async function handleRx(f) {
     const price = num(p.current_price != null ? p.current_price : p.price);
     if (price === null || price <= 0) return false;
     const id = idOf(p), ex = lines.find((l) => l.id === id);
-    if (ex) { if (ex.qty < 999) ex.qty++; } else {
+    if (ex) { if (ex.qty < 999) ex.qty++; if (!ex.ings) ex.ings = ingsOf(p); } else {
       let major = num(p.major_unit_qty), minor = num(p.minor_unit_qty);
       major = major && major > 1 && (minor === null || major <= minor) ? Math.round(major) : 1; // عدد الشرايط في العلبة (1 = مفيش تقسيم)
-      lines.push({ id, name: String(p.product_name || "").slice(0, 120), price, major, sub: subLabel((p.dosage_form || "") + " " + (p.product_name || "")), unit: "box", qty: 1 });
+      lines.push({ id, name: String(p.product_name || "").slice(0, 120), price, major, sub: subLabel((p.dosage_form || "") + " " + (p.product_name || "")), unit: "box", qty: 1, ings: ingsOf(p) });
     }
     changed();
     return true;
