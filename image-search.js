@@ -952,7 +952,7 @@ function rxSigView(s) {
   if (g.ambiguous_pattern) notes.push("النمط المكتوب ممكن يتفسر بأكتر من طريقة (عدد المرات أو الكمية)");
   if (g.where === "general") notes.push("جملة عامة مكتوبة مرة واحدة للروشتة كلها");
   if (g.unclear) notes.push("جزء من الكتابة مش واضح");
-  if (Array.isArray(g.conflicts) && g.conflicts.length) notes.push("القراءات اختلفت في بعض التفاصيل واتسابت فاضية");
+  if (Array.isArray(g.conflicts) && g.conflicts.length) notes.push("القراءات اختلفت في بعض التفاصيل (اتحسمت بالأغلبية أو اتسابت فاضية)");
   if (s.sig && s.sig.needs_review) { box.classList.add("warn"); notes.unshift("راجع الجرعة بنفسك من الروشتة الأصلية"); }
   notes.forEach((t) => box.append(el("small", null, t)));
   return box;
