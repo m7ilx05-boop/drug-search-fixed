@@ -13,6 +13,10 @@
   const MAX_RETRIES = 3;
   const cnt = (v) => Number(v).toLocaleString("ar-EG");
   const safeUrl = (u) => (typeof u === "string" && /^https:\/\//i.test(u) ? u : null);
+  const isOpenEv = (e) => !!e && typeof e.source === "string" && /^both open data/i.test(e.source);
+  const OS_KIND = { x: "bad", a: "bad", c: "warn", m: "warn", n: "ok" };
+  const osFound = (p) => !!p && !!p.open_source && p.open_source.state === "found";
+  const osPossible = (p) => osFound(p) && p.open_source.possible_only === true;
 
   const css = document.createElement("style");
   css.textContent = ".ddi-sum{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}"
@@ -36,7 +40,11 @@
     + ".ddi-load,.ddi-err{text-align:center;color:var(--muted);padding:26px 0}.ddi-err{color:var(--bad)}"
     + ".ddi-retry{display:block;margin:10px auto 0;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}"
     + ".ddi-uk{margin:6px 0 0;font-size:13px}.ddi-uk summary{cursor:pointer;color:var(--soft-ink)}.ddi-uk .ddi-q{white-space:pre-wrap;max-height:260px;overflow:auto}"
-    + ".ddi-pap{margin:6px 0 0;font-size:13px}.ddi-pap summary{cursor:pointer;color:var(--soft-ink)}.ddi-pap ul{margin:6px 0 0;padding-inline-start:18px}.ddi-pap li{margin-bottom:4px;text-align:left}.ddi-pap a{color:var(--accent)}";
+    + ".ddi-pap{margin:6px 0 0;font-size:13px}.ddi-pap summary{cursor:pointer;color:var(--soft-ink)}.ddi-pap ul{margin:6px 0 0;padding-inline-start:18px}.ddi-pap li{margin-bottom:4px;text-align:left}.ddi-pap a{color:var(--accent)}"
+    + ".ddi-os{margin:8px 0;padding:10px 12px;border-radius:12px;border:1px dashed var(--line);background:var(--soft);color:var(--soft-ink);font-size:13.5px;line-height:1.6}"
+    + ".ddi-os-h{font-weight:700;margin:0 0 4px}.ddi-os ul{margin:4px 0 0;padding-inline-start:18px}.ddi-os li{margin-bottom:2px}"
+    + ".ddi-os a,.ddi-attr a{color:var(--accent)}.ddi-attr{margin:8px 0 0;padding:10px 12px;border-radius:14px;background:var(--soft);color:var(--soft-ink);font-size:13px;line-height:1.6}"
+    + ".ddi-attr ul{margin:4px 0 0;padding-inline-start:18px}";
   document.head.append(css);
 
   const chip = (text, kind) => el("span", "chip " + (kind || ""), text);
@@ -50,14 +58,17 @@
   const isSevere = (p) => !!p && (p.severe === true || (p.status === "interaction" && p.level === "Major"));
 
   function pairCard(p, items) {
-    const st = ST[p.status] || ["غير معروف", "warn"];
+    let st = ST[p.status] || ["غير معروف", "warn"];
+    const openOnly = p.status === "label_only" && Array.isArray(p.evidence) && p.evidence.length > 0 && p.evidence.every(isOpenEv);
+    if (openOnly) st = ["مذكور في مصدر مفتوح مساعد (both)", "warn"];
     const sev = isSevere(p);
     const c = el("section", "ddi-pair " + (sev ? "sev " : "") + (p.status === "interaction" ? "bad" : p.status === "label_only" || p.status === "incomplete" ? "warn" : ""));
     if (sev) c.append(el("div", "ddi-sevtag", "⚠️ تفاعل خطير"));
     else if (p.status === "incomplete") { c.classList.add("inc"); c.append(el("div", "ddi-tag warn", "⚠️ بيانات ناقصة")); }
     else if (p.status === "no_record") {
       const pend = (p.ema && p.ema.state === "pending") || (p.uk && p.uk.state === "pending");
-      if (pend) { c.classList.add("inc"); c.append(el("div", "ddi-tag warn", "⏳ لسه بنقرا النشرات، النتيجة مش نهائية")); }
+      if (osPossible(p)) { c.classList.add("inc"); c.append(el("div", "ddi-tag warn", "⚠️ تداخل محتمل (مستنتج، مش موثّق)")); }
+      else if (pend) { c.classList.add("inc"); c.append(el("div", "ddi-tag warn", "⏳ لسه بنقرا النشرات، النتيجة مش نهائية")); }
       else { c.classList.add("okc"); c.append(el("div", "ddi-tag okb", "✅ مفيش تفاعل مسجّل")); }
     }
     c.append(names(p.a.label, p.b.label));
@@ -77,10 +88,27 @@
     (p.evidence || []).forEach((e) => {
       if (!e || !e.snippet) return;
       const q = el("blockquote", "ddi-q"); q.lang = "en"; q.dir = "ltr"; q.textContent = e.snippet; c.append(q);
-      const s = el("span", "ddi-src"); s.append("النص كما هو من: " + (e.source || "مصدر رسمي") + (e.product ? " — " + e.product : "") + " ");
+      const s = el("span", "ddi-src"); s.append("النص كما هو من: " + (e.source || "مصدر رسمي") + (e.product ? " — " + e.product : "") + (e.translated ? " (ترجمة آلية)" : "") + " ");
       const u = safeUrl(e.url); if (u) { const a = el("a", null, "فتح المصدر"); a.href = u; a.target = "_blank"; a.rel = "noopener noreferrer"; s.append(a); }
       c.append(s);
     });
+
+    const os = p.open_source;
+    if (osFound(p)) {
+      const box = el("div", "ddi-os"); box.append(el("p", "ddi-os-h", os.label_ar || "مصدر مفتوح مساعد (both)"));
+      const lv = el("p", "ddi-note", (os.level_ar || os.level || "") + (os.possible_only && !/محتمل/.test(os.level_ar || "") ? " (محتمل، مستنتج من الآلية)" : ""));
+      lv.append(" "); lv.append(chip(os.possible_only ? "محتمل" : "موثّق", os.possible_only ? "warn" : (OS_KIND[os.level] || "warn")));
+      box.append(lv);
+      (os.findings || []).slice(0, 4).forEach((f) => {
+        const n = el("div", "ddi-note"); const x = el("bdi", null, f.ingredient_a || ""), y = el("bdi", null, f.ingredient_b || ""); x.dir = y.dir = "ltr";
+        n.append("المادتين: ", x, " + ", y, f.level_ar ? " — " + f.level_ar : ""); box.append(n);
+        const cons = (f.consequences || []).filter((z) => typeof z === "string" && z);
+        if (cons.length) { const ul = el("ul"); cons.slice(0, 4).forEach((z) => ul.append(el("li", null, z))); box.append(ul); }
+      });
+      if (os.partial) box.append(el("p", "ddi-note", "بعض التركيبات ما اتفحصتش (المصدر المفتوح مش متاح لها دلوقتي)."));
+      box.append(el("p", "ddi-note", "ده مصدر مساعد ومش بيغيّر درجة DDInter. الترخيص: " + (os.license || "CC BY 4.0") + "."));
+      c.append(box);
+    }
 
     const isSupp = (p.a && p.a.kind === "supplement") || (p.b && p.b.kind === "supplement");
     if (p.status === "incomplete") {
@@ -94,6 +122,7 @@
         ? "النتيجة غير معروفة: المواد دي مش موجودة في قاعدة التفاعلات (" + un.join("، ") + ")، ومفيش معلومة عن الزوج ده في نشرات FDA أو EMA أو المملكة المتحدة اللي فحصناها. ده مش معناه إنهم آمنين. راجع الصيدلي."
         : "النتيجة غير معروفة: مفيش مواد فعّالة مسجّلة لواحد من الدوائين. راجع الصيدلي."));
     }
+    if (p.status === "incomplete" && p.coverage_note_ar) c.append(el("p", "ddi-note", p.coverage_note_ar));
     if (p.ema && p.ema.state === "pending") c.append(el("p", "ddi-note", "بنقرا نشرة الدواء الأوروبية (EMA) للزوج ده دلوقتي. النتيجة ممكن تتحدّث بعد دقيقتين."));
     if (p.ema && p.ema.state === "unavailable") c.append(el("p", "ddi-note", "نشرة EMA مش متاحة دلوقتي للزوج ده."));
     if (p.uk && p.uk.state === "pending") c.append(el("p", "ddi-note", "بنقرا نشرة المنتج البريطانية (emc) للزوج ده دلوقتي. النتيجة هتتحدّث تلقائي."));
@@ -116,7 +145,7 @@
       });
     }
     if (p.status === "no_record") {
-      c.append(el("p", "ddi-note", "مفيش تفاعل مسجّل في المصادر اللي بنفحصها. ده مش معناه إنهم آمنين مع بعض."));
+      c.append(el("p", "ddi-note", p.coverage_note_ar || "مفيش تفاعل مسجّل في المصادر اللي بنفحصها. ده مش معناه إنهم آمنين مع بعض."));
       const ing = (i) => ((items && items[i] && items[i].ingredients) || []).map((x) => (x.matched && x.matched[0]) || x.raw).filter(Boolean);
       const nm = ing(p.a.index).concat(ing(p.b.index));
       if (nm.length) { const n = el("p", "ddi-note"); const b = el("bdi", null, [...new Set(nm)].join("، ")); b.dir = "ltr"; n.append("المواد اللي اتفحصت (كلها معروفة في قاعدة DDInter): ", b); c.append(n); }
@@ -166,11 +195,11 @@
       nodes.push(a);
     }
     const pending = !!(cv.ema_pending || cv.uk_pending || d.retry_after_sec);
-    if (!nSev && !incPairs.length && !cv.interaction && !cv.label_only && cv.no_record && !pending) {
+    if (!nSev && !incPairs.length && !cv.interaction && !cv.label_only && cv.no_record && !pending && !cv.open_source_possible && !cv.open_source_unavailable) {
       const a = el("div", "ddi-alert okb");
       const tx = el("div");
       tx.append(el("p", "ddi-alert-t", "مفيش تفاعل مسجّل بين الأدوية دي"),
-        el("p", "ddi-alert-s", "في المصادر اللي فحصناها (DDInter وFDA وEMA وUK). ده مش ضمان إنها آمنة، راجع الصيدلي لو الحالة حساسة."));
+        el("p", "ddi-alert-s", "في المصادر اللي فحصناها (DDInter وFDA وEMA وUK والمصدر المفتوح المساعد). ده مش ضمان إنها آمنة، راجع الصيدلي لو الحالة حساسة."));
       a.append(el("div", "ddi-alert-ic", "✅"), tx);
       nodes.push(a);
     }
@@ -178,7 +207,10 @@
     if (nSev > 0) sum.append(chip("⚠️ " + cnt(nSev) + " خطير", "bad"));
     if (cv.interaction) sum.append(chip(cnt(cv.interaction) + " تفاعل مسجّل", "bad"));
     else if (!cv.incomplete && !cv.label_only && !pending) sum.append(chip("مفيش تفاعل مسجّل", "ok"));
-    if (cv.label_only) sum.append(chip(cnt(cv.label_only) + " في نشرة المنتج", "warn"));
+    if (cv.label_only) sum.append(chip(cnt(cv.label_only) + " في نشرة المنتج أو مصدر مفتوح", "warn"));
+    if (cv.open_source_documented) sum.append(chip(cnt(cv.open_source_documented) + " في المصدر المفتوح (both)", "warn"));
+    if (cv.open_source_possible) sum.append(chip(cnt(cv.open_source_possible) + " تداخل محتمل (مستنتج)", "warn"));
+    if (cv.open_source_unavailable) sum.append(chip("المصدر المفتوح مش متاح دلوقتي", "warn"));
     if (cv.incomplete) sum.append(chip(cnt(cv.incomplete) + " فحص ناقص", "warn"));
     if (cv.no_record) sum.append(chip(cnt(cv.no_record) + " مفيش تسجيل", "ok"));
     nodes.push(sum);
@@ -188,6 +220,19 @@
       nodes.push(w);
     });
     (d.pairs || []).forEach((p) => nodes.push(pairCard(p, d.items)));
+    const at = d.open_source_attribution;
+    if (at && typeof at === "object") {
+      const box = el("div", "ddi-attr"), line = el("p", "ddi-note");
+      const au = safeUrl(at.url);
+      line.append("بيانات المصدر المفتوح المساعد: ");
+      if (au) { const a = el("a", null, at.name || "both"); a.href = au; a.target = "_blank"; a.rel = "noopener noreferrer"; line.append(a); } else line.append(at.name || "both");
+      line.append(" — الترخيص: " + (at.license || "CC BY 4.0") + (at.dataset_version ? " — النسخة: " + at.dataset_version : ""));
+      box.append(line);
+      const us = (at.underlying_sources || []).filter((u) => u && (u.name || u.code));
+      if (us.length) { const ul = el("ul"); us.forEach((u) => ul.append(el("li", null, (u.name || u.code) + (u.license ? " (" + u.license + ")" : "")))); box.append(el("p", "ddi-note", "المصادر الأصلية اللي both بيجمّعها:"), ul); }
+      if (at.note_ar) box.append(el("p", "ddi-note", at.note_ar));
+      nodes.push(box);
+    }
     nodes.push(el("p", "ddi-disc", d.disclaimer_ar || "النتيجة استرشادية، ومش بديل عن مراجعة الطبيب أو الصيدلي. غياب تفاعل مسجّل مش معناه إن الأدوية آمنة مع بعض."));
     box.replaceChildren(...nodes);
   }
