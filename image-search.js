@@ -1371,7 +1371,7 @@ async function handleRx(f) {
     ddi.addEventListener("click", () => {
       const ok = lines.filter((l) => Array.isArray(l.ings) && l.ings.length);
       if (ok.length < 2) { toast("warn", lines.length < 2 ? "ضيف دوائين على الأقل للفاتورة الأول." : "المواد الفعّالة غير معروفة لأدوية الفاتورة. أضفها تاني من نتايج الروشتة."); return; }
-      if (window.DDI) window.DDI.open(ok.map((l) => ({ label: l.name, ingredients: l.ings })));
+      if (window.DDI) window.DDI.open(ok.map((l) => ({ label: l.name, ingredients: l.ings, kind: l.kind || null })));
     });
     sh.append(head, listBox, dr, totBox, el("p", "rxc-note", "الأسعار من دليل الأسعار وممكن تختلف عن سعر الصيدلية، والتوفر غير متحقق منه."), ddi, acts);
     ov.append(sh); document.body.append(ov); document.addEventListener("keydown", onKey);
@@ -1382,10 +1382,10 @@ async function handleRx(f) {
     const price = num(p.current_price != null ? p.current_price : p.price);
     if (price === null || price <= 0) return false;
     const id = idOf(p), ex = lines.find((l) => l.id === id);
-    if (ex) { if (ex.qty < 999) ex.qty++; if (!ex.ings) ex.ings = ingsOf(p); } else {
+    if (ex) { if (ex.qty < 999) ex.qty++; if (!ex.ings) ex.ings = ingsOf(p); if (!ex.kind && String(p.product_class || "").toLowerCase() === "supplement") ex.kind = "supplement"; } else {
       let major = num(p.major_unit_qty), minor = num(p.minor_unit_qty);
       major = major && major > 1 && (minor === null || major <= minor) ? Math.round(major) : 1; // عدد الشرايط في العلبة (1 = مفيش تقسيم)
-      lines.push({ id, name: String(p.product_name || "").slice(0, 120), price, major, sub: subLabel((p.dosage_form || "") + " " + (p.product_name || "")), unit: "box", qty: 1, ings: ingsOf(p) });
+      lines.push({ id, name: String(p.product_name || "").slice(0, 120), price, major, sub: subLabel((p.dosage_form || "") + " " + (p.product_name || "")), unit: "box", qty: 1, ings: ingsOf(p), kind: String(p.product_class || "").toLowerCase() === "supplement" ? "supplement" : null });
     }
     changed();
     return true;

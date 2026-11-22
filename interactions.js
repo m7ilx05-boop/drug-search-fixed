@@ -28,6 +28,7 @@
     + ".ddi-disc{margin:8px 0 0;padding:10px 12px;border-radius:14px;background:var(--soft);color:var(--soft-ink);font-size:13.5px;line-height:1.55}"
     + ".ddi-load,.ddi-err{text-align:center;color:var(--muted);padding:26px 0}.ddi-err{color:var(--bad)}"
     + ".ddi-retry{display:block;margin:10px auto 0;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}"
+    + ".ddi-uk{margin:6px 0 0;font-size:13px}.ddi-uk summary{cursor:pointer;color:var(--soft-ink)}.ddi-uk .ddi-q{white-space:pre-wrap;max-height:260px;overflow:auto}"
     + ".ddi-pap{margin:6px 0 0;font-size:13px}.ddi-pap summary{cursor:pointer;color:var(--soft-ink)}.ddi-pap ul{margin:6px 0 0;padding-inline-start:18px}.ddi-pap li{margin-bottom:4px;text-align:left}.ddi-pap a{color:var(--accent)}";
   document.head.append(css);
 
@@ -64,14 +65,35 @@
       c.append(s);
     });
 
+    const isSupp = (p.a && p.a.kind === "supplement") || (p.b && p.b.kind === "supplement");
     if (p.status === "incomplete") {
       const un = (p.unresolved || []).filter(Boolean);
-      c.append(el("p", "ddi-note", un.length
-        ? "النتيجة غير معروفة: المواد دي مش موجودة في قاعدة التفاعلات (" + un.join("، ") + ")، ومفيش معلومة عن الزوج ده في نشرات FDA أو EMA اللي فحصناها. ده مش معناه إنهم آمنين. راجع الصيدلي."
+      if (isSupp) {
+        const sn = (p.a && p.a.kind === "supplement" ? p.a.label : "") + (p.a && p.a.kind === "supplement" && p.b && p.b.kind === "supplement" ? " و " : "") + (p.b && p.b.kind === "supplement" ? p.b.label : "");
+        const w = el("p", "ddi-note"); const b = el("bdi", null, sn); b.dir = "auto";
+        w.append("مكمّل غذائي (", b, "): مفيش قاعدة تفاعلات رسمية ليه، فمكوناته مش بتتفحص في DDInter ولا في النشرات. ده مش معناه إنه آمن مع الدوا التاني. راجع الصيدلي.");
+        c.append(w);
+      } else c.append(el("p", "ddi-note", un.length
+        ? "النتيجة غير معروفة: المواد دي مش موجودة في قاعدة التفاعلات (" + un.join("، ") + ")، ومفيش معلومة عن الزوج ده في نشرات FDA أو EMA أو المملكة المتحدة اللي فحصناها. ده مش معناه إنهم آمنين. راجع الصيدلي."
         : "النتيجة غير معروفة: مفيش مواد فعّالة مسجّلة لواحد من الدوائين. راجع الصيدلي."));
     }
     if (p.ema && p.ema.state === "pending") c.append(el("p", "ddi-note", "بنقرا نشرة الدواء الأوروبية (EMA) للزوج ده دلوقتي. النتيجة ممكن تتحدّث بعد دقيقتين."));
     if (p.ema && p.ema.state === "unavailable") c.append(el("p", "ddi-note", "نشرة EMA مش متاحة دلوقتي للزوج ده."));
+    if (p.uk && p.uk.state === "pending") c.append(el("p", "ddi-note", "بنقرا نشرة المنتج البريطانية (emc) للزوج ده دلوقتي. النتيجة هتتحدّث تلقائي."));
+    if (p.uk && p.uk.state === "unavailable") c.append(el("p", "ddi-note", "نشرة emc البريطانية مش متاحة دلوقتي للزوج ده."));
+    if (Array.isArray(p.uk_sections) && p.uk_sections.length) {
+      p.uk_sections.forEach((u) => {
+        if (!u || !u.text) return;
+        const d = el("details", "ddi-uk"), sm = el("summary");
+        const ib = el("bdi", null, u.ingredient || ""); ib.dir = "ltr";
+        sm.append("نص قسم 4.5 (التفاعلات) من نشرة ", ib, " البريطانية");
+        d.append(sm);
+        const q = el("blockquote", "ddi-q"); q.lang = "en"; q.dir = "ltr"; q.textContent = u.text; d.append(q);
+        const sr = el("span", "ddi-src"); sr.append("النص كما هو من: UK SmPC (emc)" + (u.product ? " — " + u.product : "") + ". مصدر بريطاني مش مصري، واسم الدوا التاني مش مذكور بالاسم فيه، اقراه كله. ");
+        const uu = safeUrl(u.url); if (uu) { const a = el("a", null, "فتح المصدر"); a.href = uu; a.target = "_blank"; a.rel = "noopener noreferrer"; sr.append(a); }
+        d.append(sr); c.append(d);
+      });
+    }
     if (p.status === "no_record") c.append(el("p", "ddi-note", "مفيش تفاعل مسجّل في المصادر اللي بنفحصها. ده مش معناه إنهم آمنين مع بعض."));
 
     const pp = p.papers;
@@ -129,7 +151,7 @@
       if (closed) return;
       if (attempt === 0) body.replaceChildren(el("div", "ddi-load", "جاري فحص التفاعلات…"));
       try {
-        const d = await call("drug-interactions", { items: list.map((i) => ({ label: i.label, ingredients: i.ingredients })) });
+        const d = await call("drug-interactions", { items: list.map((i) => ({ label: i.label, ingredients: i.ingredients, kind: i.kind === "supplement" ? "supplement" : undefined })) });
         if (closed) return;
         render(body, d);
         if (d.retry_after_sec && attempt < MAX_RETRIES) {
