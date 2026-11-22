@@ -922,6 +922,58 @@ async function rxResolve(b64, items) {
     return { map: new Map((j.items || []).map((x) => [x.line_no, x])), error: null, ms: j.ms ?? null };
   } catch (e) { return { map: new Map(), error: (e && e.name) || "error", ms: null }; } finally { clearTimeout(tm); }
 }
+// ===== المرحلة التالتة للروشتة: rx-sig (طريقة الاستعمال المكتوبة جنب كل دواء). بتشتغل بالتوازي مع rx-resolve ومش بتعطّل النتيجة. لو وقعت السطر بيتعلّم «ما اتقراتش» ومفيش جرعة بتتخمّن =====
+const RX_SIG_MS = 90000;
+let rxSigCur = null; // { res: {map, error} | null, p: Promise } للروشتة الحالية
+async function rxSig(b64, items) {
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), RX_SIG_MS);
+  try {
+    const r = await fetch(BASE + "/rx-sig", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + ANON, apikey: ANON },
+      body: JSON.stringify({ image_base64: b64, mime_type: "image/jpeg", items: items.map((x, i) => ({ line_no: x.line_no || i + 1, read_name: x.read_name, name_box: x.name_box || null })) }), signal: ac.signal,
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j) return { map: new Map(), error: (j && j.error) || "http_" + r.status };
+    return { map: new Map((j.items || []).map((x) => [x.line_no, x])), error: null };
+  } catch (e) { return { map: new Map(), error: (e && e.name) || "error" }; } finally { clearTimeout(tm); }
+}
+// عرض طريقة الاستعمال لسطر واحد: الجملة الجاهزة (من الحقول المتأكدة بس) + النص زي ما هو مكتوب. أي شك = «راجع بنفسك»
+function rxSigView(s) {
+  const box = el("div", "rx-sig");
+  if (!s || s.status === "not_read") {
+    box.classList.add("warn"); box.append(el("strong", null, "طريقة الاستعمال: ما اتقراتش"), el("small", null, "اقراها من الروشتة الأصلية."));
+    return box;
+  }
+  if (s.status === "none_written") { box.classList.add("none"); box.append(el("strong", null, "طريقة الاستعمال: مش مكتوبة جنب الدواء")); return box; }
+  const g = s.sig || {};
+  const main = el("strong", null, g.display_ar || "الجرعة مش متأكدة، اقرا المكتوب"); box.append(main);
+  if (g.sig_text_ar) { const raw = el("small", "rx-sig-raw"); raw.append("المكتوب: "); const t = el("bdi", null, g.sig_text_ar); t.dir = "auto"; raw.append(t); box.append(raw); }
+  const notes = [];
+  if (g.ambiguous_pattern) notes.push("النمط المكتوب ممكن يتفسر بأكتر من طريقة (عدد المرات أو الكمية)");
+  if (g.where === "general") notes.push("جملة عامة مكتوبة مرة واحدة للروشتة كلها");
+  if (g.unclear) notes.push("جزء من الكتابة مش واضح");
+  if (Array.isArray(g.conflicts) && g.conflicts.length) notes.push("القراءات اختلفت في بعض التفاصيل واتسابت فاضية");
+  if (s.sig && s.sig.needs_review) { box.classList.add("warn"); notes.unshift("راجع الجرعة بنفسك من الروشتة الأصلية"); }
+  notes.forEach((t) => box.append(el("small", null, t)));
+  return box;
+}
+// مكان طريقة الاستعمال تحت شريط اسم الدواء. بيتبني تاني مع كل rxLine (يعني بيفضل موجود بعد «النتيجة مش صح؟ أعد البحث»)
+function rxSigSlot(w, n) {
+  const cur = rxSigCur; if (!cur) return;
+  const slot = el("div", "rx-sig-slot"), head = w.querySelector(".rx-head");
+  if (head) head.after(slot); else w.prepend(slot);
+  const show = (res) => { slot.replaceChildren(rxSigView(res.error ? null : res.map.get(n) || null)); };
+  if (cur.res) show(cur.res);
+  else { slot.append(el("div", "rx-sig pend", "جاري قراءة طريقة الاستعمال…")); cur.p.then(show); }
+}
+{
+  const st = document.createElement("style");
+  st.textContent = ".rx-sig{display:flex;flex-direction:column;gap:2px;margin:8px 2px 0;padding:9px 12px;border-radius:14px;background:var(--soft);color:var(--soft-ink);font-size:14px;line-height:1.5}"
+    + ".rx-sig strong{font-size:15px}.rx-sig small{color:var(--muted);font-size:12.5px}.rx-sig-raw bdi{color:var(--ink)}"
+    + ".rx-sig.warn{background:var(--warn-bg);color:var(--warn)}.rx-sig.warn small{color:var(--warn)}"
+    + ".rx-sig.none,.rx-sig.pend{background:transparent;border:1px dashed var(--line);color:var(--muted)}";
+  document.head.append(st);
+}
 // الحالة المعروضة لسطر واحد: matched / brand_only / choices / legacy / none
 function rxDisplay(item, r) {
   if (r && r.status === "matched") return { state: "matched", brand: r.matched_brand, product_id: r.product_id, note: null, excluded: r.excluded || [] };
@@ -989,6 +1041,7 @@ function rxLine(w, it, n, rsItem, token, poor) {
   src.append(pb);
   if (Array.isArray(it.name_box) && it.name_box.length === 4 && rxImgUrl) src.append(rxRedo(w, it, n, token, poor));
   w.replaceChildren(rxHead(band), src);
+  rxSigSlot(w, n);
   rxEditName(band, it, pb, token);
   if (d.state === "matched" || d.state === "brand_only") return () => fillRxProducts(it, pb, token, { name: d.brand });
   if (d.state === "choices") return async () => { rxChoices(it, d, pb, token); };
@@ -1107,6 +1160,7 @@ async function handleRx(f) {
     st.set("read", "done", "اتقرا " + items.length + " سطر، " + matched + " مطابق في السجل");
     st.lines("read", [["عدد الأسطر", items.length], ["مطابق في السجل", matched], ["وضوح الخط", RX_LEG[r.overall_legibility] || ""], ["تنبيه", "قراءة آلية وممكن تغلط في حرف أو رقم. اقرأ وراجع الجرعة والشكل الدوائي في كل سطر قبل الصرف."]]);
     st.set("resolve", "run", "جاري مطابقة الأسماء مع السجل…");
+    { const sc = { res: null, p: null }; sc.p = rxSig(b64, items).then((x) => (sc.res = x)); rxSigCur = sc; } // طريقة الاستعمال بالتوازي، ومش بنستناها
     const rs = await rxResolve(b64, items);
     if (token !== polling) return;
     if (rs.error) { st.set("resolve", "bad", "المطابقة التانية ما اشتغلتش، فعرضنا القراءة العادية"); st.lines("resolve", [["السبب", rs.error]]); }
