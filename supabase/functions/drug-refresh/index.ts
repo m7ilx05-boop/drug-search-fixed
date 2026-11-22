@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { tavilySearch, ProviderExhausted } from "./tavily.ts";
 import { firecrawlScrapeJson, firecrawlScrapeMarkdown, FirecrawlUnavailable, type ScrapeResult } from "./firecrawl.ts";
-import { PRODUCT_SCHEMA, RULES_VERSION, buildPrompt, validateProducts, norm, splitName } from "./extract.ts";
+import { PRODUCT_SCHEMA, RULES_VERSION, buildPrompt, validateProducts, norm, splitName, nameHit } from "./extract.ts";
 import { persistProducts, identityTtlMs, type Src } from "./persist.ts";
 import { type Code, type Found, dwaProductPages, exactMentioned, fallbackQueries, hostMatches, hostOf, noScrapeCode, pageKind, planPages, relevance, strengthsOf, NON_PRODUCT, pathRaw } from "./select.ts";
 import { suggestNames } from "./fuzzy.ts";
@@ -224,6 +224,21 @@ async function officialLocked(db: SupabaseClient, keys: string[]): Promise<Set<s
     }
   }
   return out;
+}
+
+// Every name a page lists that validateProducts compares with a search (trade name, Arabic name, ingredient names), normalized.
+function pageMatchTerms(items: unknown[]): string[] {
+  const out = new Set<string>();
+  for (const it of items) {
+    const r = it as { product_name?: unknown; arabic_name?: unknown; ingredients?: unknown };
+    const ings = Array.isArray(r?.ingredients) ? r.ingredients as { name?: unknown; inn_en?: unknown }[] : [];
+    for (const x of [r?.product_name, r?.arabic_name, ...ings.flatMap((g) => [g?.name, g?.inn_en])]) {
+      if (typeof x !== "string") continue;
+      const n = norm(splitName(x).name || x);
+      if (n.length >= 2) out.add(n);
+    }
+  }
+  return [...out].slice(0, 60);
 }
 
 Deno.serve(async (req) => {
@@ -497,6 +512,29 @@ Deno.serve(async (req) => {
         }
       }
     }
+    // A page that an earlier search read and rejected only because it did not match THAT search is a real product whose names are
+    // stored in match_terms (trade name, Arabic name, ingredients). For a different search whose name matches none of them the
+    // same validation would reject it again, so it is not read (saves Firecrawl credits). A page whose title/URL already states
+    // the searched name (relevance >= 2) is always read, and a page without stored names is read as before.
+    if (jobKind === "full" && plan.picks.length) {
+      const kn = await db.from("page_read_outcomes").select("page_key,match_terms")
+        .in("page_key", plan.picks.map((p) => pageKey(p.url))).eq("outcome", "rejected_query").not("match_terms", "is", null)
+        .eq("rules_version", RULES_VERSION).gte("read_at", new Date(Date.now() - SKIP_RECENT_MS).toISOString());
+      if (kn.error) console.error("known_names_error", kn.error.message);
+      else {
+        const namesOf = new Map<string, string[]>();
+        for (const r of kn.data ?? []) namesOf.set(String(r.page_key), [...(namesOf.get(String(r.page_key)) ?? []), ...((r.match_terms as string[] | null) ?? [])]);
+        const notMine = plan.picks.filter((p) => {
+          const c = namesOf.get(pageKey(p.url));
+          return !!c?.length && relevance(p, terms) < 2 && !c.some((x) => terms.some((t) => nameHit(x, t)));
+        });
+        if (notMine.length) {
+          plan = { ...plan, picks: plan.picks.filter((p) => !notMine.includes(p)) };
+          skippedKnown += notMine.length;
+          for (const p of notMine) mark(p.url, { st: "skipped_recent", why: "page_known_not_matching_search" });
+        }
+      }
+    }
 
     const deadline = Date.now() + BUDGET_MS;
     const prompt = buildPrompt(q);
@@ -673,6 +711,7 @@ Deno.serve(async (req) => {
             page_key: pageKey(p.url), query_key: validAlone ? queryKey : "*",
             outcome: validAlone ? "rejected_query" : "rejected_page", reason: validAlone ? "not_matching_search" : "no_valid_product_on_page",
             rules_version: RULES_VERSION, read_at: new Date().toISOString(),
+            match_terms: validAlone ? pageMatchTerms(items) : null,
           }, { onConflict: "page_key,query_key" });
           if (up.error) console.error("page_outcome_error", up.error.message);
         }
