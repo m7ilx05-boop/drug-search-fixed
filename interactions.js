@@ -16,6 +16,10 @@
 
   const css = document.createElement("style");
   css.textContent = ".ddi-sum{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}"
+    + ".ddi-alert{display:flex;gap:12px;align-items:flex-start;margin:0 0 12px;padding:14px;border-radius:16px;background:#C62828;color:#fff;line-height:1.6;box-shadow:0 2px 10px rgba(0,0,0,.25)}"
+    + ".ddi-alert-ic{flex:none;font-size:28px;line-height:1}.ddi-alert-t{font-weight:700;font-size:16.5px;margin:0 0 2px}.ddi-alert-s{font-size:14px;margin:0}"
+    + ".ddi-pair.sev{border-width:2px;border-color:#C62828;box-shadow:0 0 0 3px rgba(198,40,40,.22)}"
+    + ".ddi-sevtag{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:4px 12px;border-radius:999px;background:#C62828;color:#fff;font-size:13.5px;font-weight:700}"
     + ".ddi-pair{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--bg)}"
     + ".ddi-pair.bad{border-color:var(--bad)}.ddi-pair.warn{border-color:var(--warn)}"
     + ".ddi-names{font-weight:600;line-height:1.5;margin-bottom:6px}.ddi-n{overflow-wrap:anywhere}.ddi-with{color:var(--muted);font-size:12.5px;font-weight:400}"
@@ -40,9 +44,13 @@
     return d;
   };
 
+  const isSevere = (p) => !!p && (p.severe === true || (p.status === "interaction" && p.level === "Major"));
+
   function pairCard(p) {
     const st = ST[p.status] || ["غير معروف", "warn"];
-    const c = el("section", "ddi-pair " + (p.status === "interaction" ? "bad" : p.status === "label_only" || p.status === "incomplete" ? "warn" : ""));
+    const sev = isSevere(p);
+    const c = el("section", "ddi-pair " + (sev ? "sev " : "") + (p.status === "interaction" ? "bad" : p.status === "label_only" || p.status === "incomplete" ? "warn" : ""));
+    if (sev) c.append(el("div", "ddi-sevtag", "⚠️ تفاعل خطير"));
     c.append(names(p.a.label, p.b.label));
     const chips = el("div", "ddi-chips");
     chips.append(chip(st[0], st[1]));
@@ -114,7 +122,17 @@
   function render(box, d) {
     const nodes = [];
     const cv = d.coverage || {};
+    const nSev = Number.isFinite(Number(cv.major)) && cv.major !== undefined ? Number(cv.major) : (d.pairs || []).filter(isSevere).length;
+    if (nSev > 0) {
+      const a = el("div", "ddi-alert"); a.setAttribute("role", "alert");
+      const tx = el("div");
+      tx.append(el("p", "ddi-alert-t", "تحذير: " + (nSev === 1 ? "فيه تفاعل خطير" : cnt(nSev) + " تفاعلات خطيرة") + " في الروشتة"),
+        el("p", "ddi-alert-s", "الدرجة «شديد» حسب قاعدة DDInter. راجع الطبيب أو الصيدلي قبل صرف الأدوية دي مع بعض."));
+      a.append(el("div", "ddi-alert-ic", "⚠️"), tx);
+      nodes.push(a);
+    }
     const sum = el("div", "ddi-sum");
+    if (nSev > 0) sum.append(chip("⚠️ " + cnt(nSev) + " خطير", "bad"));
     if (cv.interaction) sum.append(chip(cnt(cv.interaction) + " تفاعل مسجّل", "bad"));
     else if (!cv.incomplete && !cv.label_only) sum.append(chip("مفيش تفاعل مسجّل", "ok"));
     if (cv.label_only) sum.append(chip(cnt(cv.label_only) + " في نشرة المنتج", "warn"));
