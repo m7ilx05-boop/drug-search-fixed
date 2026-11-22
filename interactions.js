@@ -122,6 +122,10 @@
       if (nm.length) { const n = el("p", "ddi-note"); const b = el("bdi", null, [...new Set(nm)].join("، ")); b.dir = "ltr"; n.append("المواد اللي اتفحصت (كلها معروفة في قاعدة DDInter): ", b); c.append(n); }
     }
 
+    if (p.papers && p.status === "incomplete") {
+      if (p.papers.error === "rate_limited") c.append(el("p", "ddi-note", "بحث PubMed مش متاح دلوقتي (ضغط على الخدمة). ده مش معناه إن مفيش أبحاث، جرّب تاني بعد شوية."));
+      else if (!p.papers.found) c.append(el("p", "ddi-note", "بحثنا في PubMed عن أبحاث بتجمع المادتين ومالقيناش. ده مش معناه إنهم آمنين مع بعض."));
+    }
     const pp = p.papers;
     if (pp && pp.found > 0 && Array.isArray(pp.items) && pp.items.length) {
       const d = el("details", "ddi-pap"); d.append(el("summary", null, "أبحاث مرتبطة (للاطلاع فقط، مش حكم بدرجة الخطورة)"));
