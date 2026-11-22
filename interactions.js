@@ -55,7 +55,11 @@
     const c = el("section", "ddi-pair " + (sev ? "sev " : "") + (p.status === "interaction" ? "bad" : p.status === "label_only" || p.status === "incomplete" ? "warn" : ""));
     if (sev) c.append(el("div", "ddi-sevtag", "⚠️ تفاعل خطير"));
     else if (p.status === "incomplete") { c.classList.add("inc"); c.append(el("div", "ddi-tag warn", "⚠️ بيانات ناقصة")); }
-    else if (p.status === "no_record") { c.classList.add("okc"); c.append(el("div", "ddi-tag okb", "✅ مفيش تفاعل مسجّل")); }
+    else if (p.status === "no_record") {
+      const pend = (p.ema && p.ema.state === "pending") || (p.uk && p.uk.state === "pending");
+      if (pend) { c.classList.add("inc"); c.append(el("div", "ddi-tag warn", "⏳ لسه بنقرا النشرات، النتيجة مش نهائية")); }
+      else { c.classList.add("okc"); c.append(el("div", "ddi-tag okb", "✅ مفيش تفاعل مسجّل")); }
+    }
     c.append(names(p.a.label, p.b.label));
     const chips = el("div", "ddi-chips");
     chips.append(chip(st[0], st[1]));
@@ -153,7 +157,8 @@
       a.append(el("div", "ddi-alert-ic", "⚠️"), tx);
       nodes.push(a);
     }
-    if (!nSev && !incPairs.length && !cv.interaction && !cv.label_only && cv.no_record) {
+    const pending = !!(cv.ema_pending || cv.uk_pending || d.retry_after_sec);
+    if (!nSev && !incPairs.length && !cv.interaction && !cv.label_only && cv.no_record && !pending) {
       const a = el("div", "ddi-alert okb");
       const tx = el("div");
       tx.append(el("p", "ddi-alert-t", "مفيش تفاعل مسجّل بين الأدوية دي"),
@@ -164,7 +169,7 @@
     const sum = el("div", "ddi-sum");
     if (nSev > 0) sum.append(chip("⚠️ " + cnt(nSev) + " خطير", "bad"));
     if (cv.interaction) sum.append(chip(cnt(cv.interaction) + " تفاعل مسجّل", "bad"));
-    else if (!cv.incomplete && !cv.label_only) sum.append(chip("مفيش تفاعل مسجّل", "ok"));
+    else if (!cv.incomplete && !cv.label_only && !pending) sum.append(chip("مفيش تفاعل مسجّل", "ok"));
     if (cv.label_only) sum.append(chip(cnt(cv.label_only) + " في نشرة المنتج", "warn"));
     if (cv.incomplete) sum.append(chip(cnt(cv.incomplete) + " فحص ناقص", "warn"));
     if (cv.no_record) sum.append(chip(cnt(cv.no_record) + " مفيش تسجيل", "ok"));
