@@ -18,7 +18,7 @@
   css.textContent = ".ddi-sum{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}"
     + ".ddi-pair{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--bg)}"
     + ".ddi-pair.bad{border-color:var(--bad)}.ddi-pair.warn{border-color:var(--warn)}"
-    + ".ddi-names{font-weight:600;line-height:1.5;margin-bottom:6px}"
+    + ".ddi-names{font-weight:600;line-height:1.5;margin-bottom:6px}.ddi-n{overflow-wrap:anywhere}.ddi-with{color:var(--muted);font-size:12.5px;font-weight:400}"
     + ".ddi-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}"
     + ".ddi-ai{margin:6px 0;padding:9px 12px;border-radius:12px;background:var(--soft);color:var(--soft-ink);font-size:14px;line-height:1.6}"
     + ".ddi-q{margin:6px 0;padding:8px 12px;border-inline-start:3px solid var(--line);color:var(--ink);font-size:13.5px;line-height:1.55;text-align:left}"
@@ -32,7 +32,12 @@
   document.head.append(css);
 
   const chip = (text, kind) => el("span", "chip " + (kind || ""), text);
-  const names = (a, b) => { const d = el("div", "ddi-names"); const x = el("bdi", null, a), y = el("bdi", null, b); x.dir = y.dir = "auto"; d.append(x, " + ", y); return d; };
+  const names = (a, b) => {
+    const d = el("div", "ddi-names"), x = el("div", "ddi-n", a), y = el("div", "ddi-n", b);
+    x.dir = y.dir = "auto";
+    d.append(x, el("div", "ddi-with", "مع"), y);
+    return d;
+  };
 
   function pairCard(p) {
     const st = ST[p.status] || ["غير معروف", "warn"];
@@ -61,7 +66,9 @@
 
     if (p.status === "incomplete") {
       const un = (p.unresolved || []).filter(Boolean);
-      c.append(el("p", "ddi-note", "الفحص مش كامل" + (un.length ? ": ما قدرناش نتعرف على " + un.join("، ") : " (مفيش مواد فعّالة مسجّلة لواحد من الدوائين)") + ". راجع الصيدلي."));
+      c.append(el("p", "ddi-note", un.length
+        ? "النتيجة غير معروفة: المواد دي مش موجودة في قاعدة التفاعلات (" + un.join("، ") + ")، ومفيش معلومة عن الزوج ده في نشرات FDA أو EMA اللي فحصناها. ده مش معناه إنهم آمنين. راجع الصيدلي."
+        : "النتيجة غير معروفة: مفيش مواد فعّالة مسجّلة لواحد من الدوائين. راجع الصيدلي."));
     }
     if (p.ema && p.ema.state === "pending") c.append(el("p", "ddi-note", "بنقرا نشرة الدواء الأوروبية (EMA) للزوج ده دلوقتي. النتيجة ممكن تتحدّث بعد دقيقتين."));
     if (p.ema && p.ema.state === "unavailable") c.append(el("p", "ddi-note", "نشرة EMA مش متاحة دلوقتي للزوج ده."));
@@ -86,7 +93,8 @@
     const nodes = [];
     const cv = d.coverage || {};
     const sum = el("div", "ddi-sum");
-    sum.append(chip(cnt(cv.interaction || 0) + " تفاعل مسجّل", cv.interaction ? "bad" : "ok"));
+    if (cv.interaction) sum.append(chip(cnt(cv.interaction) + " تفاعل مسجّل", "bad"));
+    else if (!cv.incomplete && !cv.label_only) sum.append(chip("مفيش تفاعل مسجّل", "ok"));
     if (cv.label_only) sum.append(chip(cnt(cv.label_only) + " في نشرة المنتج", "warn"));
     if (cv.incomplete) sum.append(chip(cnt(cv.incomplete) + " فحص ناقص", "warn"));
     if (cv.no_record) sum.append(chip(cnt(cv.no_record) + " مفيش تسجيل", "ok"));
