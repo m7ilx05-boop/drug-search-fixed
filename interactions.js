@@ -97,6 +97,10 @@
     if (p.ema && p.ema.state === "pending") c.append(el("p", "ddi-note", "بنقرا نشرة الدواء الأوروبية (EMA) للزوج ده دلوقتي. النتيجة ممكن تتحدّث بعد دقيقتين."));
     if (p.ema && p.ema.state === "unavailable") c.append(el("p", "ddi-note", "نشرة EMA مش متاحة دلوقتي للزوج ده."));
     if (p.uk && p.uk.state === "pending") c.append(el("p", "ddi-note", "بنقرا نشرة المنتج البريطانية (emc) للزوج ده دلوقتي. النتيجة هتتحدّث تلقائي."));
+    if (p.status === "incomplete" && p.uk && Array.isArray(p.uk.checked)) {
+      const np = [...new Set(p.uk.checked.filter((x) => x && x.state === "no_product" && x.ingredient).map((x) => x.ingredient))];
+      if (np.length) { const w = el("p", "ddi-note"); const b2 = el("bdi", null, np.join("، ")); b2.dir = "ltr"; w.append("مفيش نشرة رسمية مسجّلة في المملكة المتحدة (emc) للمواد دي: ", b2, ". يعني مفيش مصدر رسمي نقدر نقرا منه، وده مش معناه إنها آمنة."); c.append(w); }
+    }
     if (p.uk && p.uk.state === "unavailable") c.append(el("p", "ddi-note", "نشرة emc البريطانية مش متاحة دلوقتي للزوج ده."));
     if (Array.isArray(p.uk_sections) && p.uk_sections.length) {
       p.uk_sections.forEach((u) => {
