@@ -10,6 +10,7 @@
     no_record: ["مفيش تفاعل مسجّل", "ok"],
   };
   const LV = { Major: ["شديد", "bad"], Moderate: ["متوسط", "warn"], Minor: ["بسيط", "ok"], Unknown: ["الدرجة غير محددة", "warn"] };
+  const ACT = { avoid: ["تجنّب الجمع", "bad"], monitor: ["مراقبة", "warn"], adjust_dose: ["تعديل الجرعة", "warn"], separate_timing: ["المباعدة بين الجرعات", "warn"], use_with_caution: ["استخدام بحذر", "warn"], unclear: ["الإجراء مش محدد في المصادر", "warn"] };
   const MAX_RETRIES = 3;
   const cnt = (v) => Number(v).toLocaleString("ar-EG");
   const safeUrl = (u) => (typeof u === "string" && /^https:\/\//i.test(u) ? u : null);
@@ -44,7 +45,9 @@
     + ".ddi-os{margin:8px 0;padding:10px 12px;border-radius:12px;border:1px dashed var(--line);background:var(--soft);color:var(--soft-ink);font-size:13.5px;line-height:1.6}"
     + ".ddi-os-h{font-weight:700;margin:0 0 4px}.ddi-os ul{margin:4px 0 0;padding-inline-start:18px}.ddi-os li{margin-bottom:2px}"
     + ".ddi-os a,.ddi-attr a{color:var(--accent)}.ddi-attr{margin:8px 0 0;padding:10px 12px;border-radius:14px;background:var(--soft);color:var(--soft-ink);font-size:13px;line-height:1.6}"
-    + ".ddi-attr ul{margin:4px 0 0;padding-inline-start:18px}";
+    + ".ddi-attr ul{margin:4px 0 0;padding-inline-start:18px}"
+    + ".ddi-g{margin:6px 0;padding:10px 12px;border-radius:12px;background:var(--soft);color:var(--soft-ink);font-size:14px;line-height:1.65}"
+    + ".ddi-g p{margin:0 0 6px}.ddi-g p:last-child{margin:0}.ddi-g b{font-weight:700}.ddi-g .ddi-gs{color:var(--muted);font-size:12.5px}";
   document.head.append(css);
 
   const chip = (text, kind) => el("span", "chip " + (kind || ""), text);
@@ -77,7 +80,18 @@
     if (p.status === "interaction" && p.level) { const lv = LV[p.level] || LV.Unknown; chips.append(chip("الدرجة: " + lv[0], lv[1])); }
     c.append(chips);
 
-    if (p.ai_summary_ar) c.append(el("p", "ddi-ai", p.ai_summary_ar));
+    const g = p.ai_guidance;
+    if (g && g.effect_ar) {
+      const box = el("div", "ddi-g");
+      const ac = ACT[g.action_type] || ACT.unclear;
+      box.append(chip(ac[0], ac[1]));
+      const r1 = el("p"); r1.append(el("b", null, "إيه اللي بيحصل: "), g.effect_ar); box.append(r1);
+      if (g.mechanism_ar) { const r2 = el("p"); r2.append(el("b", null, "ليه بيحصل: "), g.mechanism_ar); box.append(r2); }
+      const r3 = el("p"); r3.append(el("b", null, "المطلوب: "), g.action_ar || "النصوص اللي لقيناها مش بتحدد إجراء واضح. راجع الصيدلي أو مرجع تاني."); box.append(r3);
+      box.append(el("p", "ddi-gs", "ملخص آلي مكتوب من النصوص الأصلية تحت، ومش مصدر لوحده. راجع النص الأصلي." + (Array.isArray(g.basis) && g.basis.length ? " اعتمد على: " + g.basis.join("، ") + "." : "")));
+      c.append(box);
+    } else if (p.ai_summary_ar) c.append(el("p", "ddi-ai", p.ai_summary_ar));
+    if (p.status === "interaction" && !(p.evidence || []).length) c.append(el("p", "ddi-note", "DDInter سجّل التفاعل ده بدرجة " + ((LV[p.level] || LV.Unknown)[0]) + " بس، ومفيش نص في المصادر اللي عندنا يشرح الآلية أو المطلوب عمليًا (تجنّب الجمع ولا مراقبة ولا مباعدة جرعات). راجع مرجع تفاعلات أو الصيدلي."));
     if (p.status === "interaction") {
       (p.findings || []).slice(0, 4).forEach((f) => {
         const n = el("div", "ddi-note"); const x = el("bdi", null, f.ddinter_a || f.ingredient_a), y = el("bdi", null, f.ddinter_b || f.ingredient_b); x.dir = y.dir = "ltr";
