@@ -1,0 +1,144 @@
+/* interactions.js — فحص التفاعلات الدوائية بين أدوية الفاتورة.
+   بيعتمد على: core.js (el, call, ERR, toast). بيتفتح من زر «فحص التفاعلات» جوه شيت فاتورة الروشتة (image-search.js).
+   القرار (فيه تفاعل ولا لأ، ودرجته) جاي من دالة drug-interactions بس. الفرونت بيعرض اللي رجع ومبيحكمش على حاجة بنفسه.
+   مفيش تفاعل مسجّل ≠ آمن: الجملة دي بتظهر دايمًا. */
+(function () {
+  const ST = {
+    interaction: ["تفاعل مسجّل", "bad"],
+    label_only: ["مذكور في نشرة المنتج", "warn"],
+    incomplete: ["الفحص ناقص", "warn"],
+    no_record: ["مفيش تفاعل مسجّل", "ok"],
+  };
+  const LV = { Major: ["شديد", "bad"], Moderate: ["متوسط", "warn"], Minor: ["بسيط", "ok"], Unknown: ["الدرجة غير محددة", "warn"] };
+  const MAX_RETRIES = 3;
+  const cnt = (v) => Number(v).toLocaleString("ar-EG");
+  const safeUrl = (u) => (typeof u === "string" && /^https:\/\//i.test(u) ? u : null);
+
+  const css = document.createElement("style");
+  css.textContent = ".ddi-sum{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}"
+    + ".ddi-pair{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--bg)}"
+    + ".ddi-pair.bad{border-color:var(--bad)}.ddi-pair.warn{border-color:var(--warn)}"
+    + ".ddi-names{font-weight:600;line-height:1.5;margin-bottom:6px}"
+    + ".ddi-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}"
+    + ".ddi-ai{margin:6px 0;padding:9px 12px;border-radius:12px;background:var(--soft);color:var(--soft-ink);font-size:14px;line-height:1.6}"
+    + ".ddi-q{margin:6px 0;padding:8px 12px;border-inline-start:3px solid var(--line);color:var(--ink);font-size:13.5px;line-height:1.55;text-align:left}"
+    + ".ddi-src{display:block;color:var(--muted);font-size:12.5px;margin:2px 0 6px}.ddi-src a{color:var(--accent)}"
+    + ".ddi-note{color:var(--muted);font-size:13px;line-height:1.55;margin:4px 0}"
+    + ".ddi-dup{margin:0 0 10px;padding:10px 12px;border-radius:14px;background:var(--warn-bg);color:var(--warn);font-size:14px;line-height:1.55}"
+    + ".ddi-disc{margin:8px 0 0;padding:10px 12px;border-radius:14px;background:var(--soft);color:var(--soft-ink);font-size:13.5px;line-height:1.55}"
+    + ".ddi-load,.ddi-err{text-align:center;color:var(--muted);padding:26px 0}.ddi-err{color:var(--bad)}"
+    + ".ddi-retry{display:block;margin:10px auto 0;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}"
+    + ".ddi-pap{margin:6px 0 0;font-size:13px}.ddi-pap summary{cursor:pointer;color:var(--soft-ink)}.ddi-pap ul{margin:6px 0 0;padding-inline-start:18px}.ddi-pap li{margin-bottom:4px;text-align:left}.ddi-pap a{color:var(--accent)}";
+  document.head.append(css);
+
+  const chip = (text, kind) => el("span", "chip " + (kind || ""), text);
+  const names = (a, b) => { const d = el("div", "ddi-names"); const x = el("bdi", null, a), y = el("bdi", null, b); x.dir = y.dir = "auto"; d.append(x, " + ", y); return d; };
+
+  function pairCard(p) {
+    const st = ST[p.status] || ["غير معروف", "warn"];
+    const c = el("section", "ddi-pair " + (p.status === "interaction" ? "bad" : p.status === "label_only" || p.status === "incomplete" ? "warn" : ""));
+    c.append(names(p.a.label, p.b.label));
+    const chips = el("div", "ddi-chips");
+    chips.append(chip(st[0], st[1]));
+    if (p.status === "interaction" && p.level) { const lv = LV[p.level] || LV.Unknown; chips.append(chip("الدرجة: " + lv[0], lv[1])); }
+    c.append(chips);
+
+    if (p.ai_summary_ar) c.append(el("p", "ddi-ai", p.ai_summary_ar));
+    if (p.status === "interaction") {
+      (p.findings || []).slice(0, 4).forEach((f) => {
+        const n = el("div", "ddi-note"); const x = el("bdi", null, f.ddinter_a || f.ingredient_a), y = el("bdi", null, f.ddinter_b || f.ingredient_b); x.dir = y.dir = "ltr";
+        n.append("المادتين: ", x, " + ", y, " (قاعدة DDInter)"); c.append(n);
+      });
+    }
+
+    (p.evidence || []).forEach((e) => {
+      if (!e || !e.snippet) return;
+      const q = el("blockquote", "ddi-q"); q.lang = "en"; q.dir = "ltr"; q.textContent = e.snippet; c.append(q);
+      const s = el("span", "ddi-src"); s.append("النص كما هو من: " + (e.source || "مصدر رسمي") + (e.product ? " — " + e.product : "") + " ");
+      const u = safeUrl(e.url); if (u) { const a = el("a", null, "فتح المصدر"); a.href = u; a.target = "_blank"; a.rel = "noopener noreferrer"; s.append(a); }
+      c.append(s);
+    });
+
+    if (p.status === "incomplete") {
+      const un = (p.unresolved || []).filter(Boolean);
+      c.append(el("p", "ddi-note", "الفحص مش كامل" + (un.length ? ": ما قدرناش نتعرف على " + un.join("، ") : " (مفيش مواد فعّالة مسجّلة لواحد من الدوائين)") + ". راجع الصيدلي."));
+    }
+    if (p.ema && p.ema.state === "pending") c.append(el("p", "ddi-note", "بنقرا نشرة الدواء الأوروبية (EMA) للزوج ده دلوقتي. النتيجة ممكن تتحدّث بعد دقيقتين."));
+    if (p.ema && p.ema.state === "unavailable") c.append(el("p", "ddi-note", "نشرة EMA مش متاحة دلوقتي للزوج ده."));
+    if (p.status === "no_record") c.append(el("p", "ddi-note", "مفيش تفاعل مسجّل في المصادر اللي بنفحصها. ده مش معناه إنهم آمنين مع بعض."));
+
+    const pp = p.papers;
+    if (pp && pp.found > 0 && Array.isArray(pp.items) && pp.items.length) {
+      const d = el("details", "ddi-pap"); d.append(el("summary", null, "أبحاث مرتبطة (للاطلاع فقط، مش حكم بدرجة الخطورة)"));
+      const ul = el("ul");
+      pp.items.forEach((it) => {
+        const li = el("li"); li.lang = "en"; li.dir = "ltr";
+        const u = safeUrl(it.url), t = (it.title || "PubMed " + it.pmid) + (it.year ? " (" + it.year + ")" : "");
+        if (u) { const a = el("a", null, t); a.href = u; a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); } else li.textContent = t;
+        ul.append(li);
+      });
+      d.append(ul); c.append(d);
+    }
+    return c;
+  }
+
+  function render(box, d) {
+    const nodes = [];
+    const cv = d.coverage || {};
+    const sum = el("div", "ddi-sum");
+    sum.append(chip(cnt(cv.interaction || 0) + " تفاعل مسجّل", cv.interaction ? "bad" : "ok"));
+    if (cv.label_only) sum.append(chip(cnt(cv.label_only) + " في نشرة المنتج", "warn"));
+    if (cv.incomplete) sum.append(chip(cnt(cv.incomplete) + " فحص ناقص", "warn"));
+    if (cv.no_record) sum.append(chip(cnt(cv.no_record) + " مفيش تسجيل", "ok"));
+    nodes.push(sum);
+    (d.duplicates || []).forEach((x) => {
+      const w = el("div", "ddi-dup"); const n = el("bdi", null, x.ingredient || ""); n.dir = "auto";
+      w.append("نفس المادة الفعّالة (", n, ") موجودة في: " + x.a.label + " و " + x.b.label + ". ممكن يكون تكرار في العلاج، راجع الصيدلي.");
+      nodes.push(w);
+    });
+    (d.pairs || []).forEach((p) => nodes.push(pairCard(p)));
+    nodes.push(el("p", "ddi-disc", d.disclaimer_ar || "النتيجة استرشادية، ومش بديل عن مراجعة الطبيب أو الصيدلي. غياب تفاعل مسجّل مش معناه إن الأدوية آمنة مع بعض."));
+    box.replaceChildren(...nodes);
+  }
+
+  // items: [{ label, ingredients: [..] }]، لازم دوائين على الأقل بمواد فعّالة
+  function open(items) {
+    const list = (items || []).filter((x) => x && Array.isArray(x.ingredients) && x.ingredients.length);
+    if (list.length < 2) { toast("warn", "محتاجين دوائين على الأقل بمواد فعّالة معروفة."); return; }
+    let closed = false, timer = 0;
+    const ov = el("div", "rxc-ov"), sh = el("div", "rxc-sheet");
+    sh.setAttribute("role", "dialog"); sh.setAttribute("aria-modal", "true"); sh.setAttribute("aria-label", "فحص التفاعلات الدوائية");
+    const head = el("div", "rxc-head"), x = el("button", "rxc-x", "✕"); x.type = "button"; x.setAttribute("aria-label", "إغلاق");
+    head.append(el("h3", null, "التفاعلات الدوائية"), x);
+    const body = el("div", "rxc-list");
+    sh.append(head, body); ov.append(sh); document.body.append(ov);
+    const close = () => { if (closed) return; closed = true; clearTimeout(timer); ov.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    x.addEventListener("click", close); ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+    document.addEventListener("keydown", onKey); x.focus();
+
+    async function load(attempt) {
+      if (closed) return;
+      if (attempt === 0) body.replaceChildren(el("div", "ddi-load", "جاري فحص التفاعلات…"));
+      try {
+        const d = await call("drug-interactions", { items: list.map((i) => ({ label: i.label, ingredients: i.ingredients })) });
+        if (closed) return;
+        render(body, d);
+        if (d.retry_after_sec && attempt < MAX_RETRIES) {
+          const n = el("p", "ddi-note", "فيه نشرات بتتقرا دلوقتي. هنحدّث النتيجة تلقائي بعد " + cnt(d.retry_after_sec) + " ثانية.");
+          body.prepend(n);
+          timer = setTimeout(() => load(attempt + 1), d.retry_after_sec * 1000);
+        }
+      } catch (err) {
+        if (closed) return;
+        const code = (err && (err.code || err.message)) || "unknown";
+        const box = el("div", "ddi-err", ERR[code] || "ما قدرناش نفحص التفاعلات دلوقتي (" + code + ").");
+        const rb = el("button", "ddi-retry", "حاول تاني"); rb.type = "button"; rb.addEventListener("click", () => load(0));
+        body.replaceChildren(box, rb);
+      }
+    }
+    load(0);
+  }
+
+  window.DDI = { open };
+})();
