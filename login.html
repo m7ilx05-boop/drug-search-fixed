@@ -4,36 +4,50 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>تسجيل الدخول</title>
+<title>The Pharmacist</title>
+<meta name="theme-color" content="#A6DCF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#143B5E" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
-:root{--bg:#eef3f1;--card:#fff;--fg:#14211d;--mut:#5d6e68;--line:#d5dfdb;--brand:#0f5b4c;--on:#fff;--err:#b3261e;--ok:#1b6e3c}
-@media(prefers-color-scheme:dark){:root{--bg:#0d1513;--card:#15201d;--fg:#eaf2ef;--mut:#93a8a1;--line:#27382f;--brand:#5fc7ae;--on:#0d1513;--err:#f2b8b5;--ok:#8fd9a8}}
+:root{--bg:#EAF5FD;--surface:#fff;--ink:#10264F;--muted:#5F7494;--line:#D6E6F4;--accent:#1068C9;--accent-ink:#fff;--soft:#E7F2FC;--bad:#9B2226;--ok:#0B7A66;--shadow:0 10px 28px rgba(20,90,160,.16);--grad:linear-gradient(135deg,#2388EA,#0D5CBF);--grad-shadow:0 8px 18px rgba(15,100,200,.32);--hd1:#A6DCF8;--hd2:#CDEBFB;--hd-ink:#0B2E63;--wave:#FFE58A;--glow:rgba(233,247,255,.9)}
+@media(prefers-color-scheme:dark){:root{--bg:#0B1722;--surface:#122434;--ink:#E7F1FB;--muted:#9BB2C7;--line:#233A4E;--accent:#5DB1F5;--accent-ink:#04203A;--soft:#173553;--bad:#F29B9E;--ok:#8FE6D2;--shadow:0 10px 28px rgba(0,0,0,.45);--grad:linear-gradient(135deg,#5DB1F5,#3F8FDB);--grad-shadow:0 8px 18px rgba(0,0,0,.4);--hd1:#173B5C;--hd2:#143B5E;--hd-ink:#E2F2FF;--wave:#7A6A2A;--glow:rgba(93,177,245,.18)}}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;padding:20px}
-main{width:min(400px,100%);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:32px 26px}
-h1{font-size:1.4rem;margin:0 0 8px;font-weight:600}
-p{margin:0 0 24px;color:var(--mut);line-height:1.7;font-size:.95rem}
-button{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 16px;font:inherit;font-weight:600;color:var(--fg);background:var(--card);border:1.5px solid var(--brand);border-radius:10px;cursor:pointer}
-button:hover{background:color-mix(in srgb,var(--brand) 8%,var(--card))}
-button.p{background:var(--brand);color:var(--on)}
-button.p:hover{background:var(--brand);opacity:.92}
-button:focus-visible,input:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font:400 16px/1.65 "Readex Pro","IBM Plex Sans Arabic",Tahoma,sans-serif}
+.hero{position:relative;overflow:hidden;display:flex;align-items:center;gap:14px;padding:calc(env(safe-area-inset-top,0px) + 34px) 22px 96px;border-radius:0 0 44px 44px;background:radial-gradient(120% 90% at 85% 0,var(--glow) 0,transparent 60%),linear-gradient(180deg,var(--hd1) 0%,var(--hd2) 100%);color:var(--hd-ink)}
+.hero::after{content:"";position:absolute;inset-inline:-10%;bottom:-34px;height:70px;background:var(--wave);opacity:.55;border-radius:50% 50% 0 0}
+.hero-in{position:relative;z-index:1;width:min(440px,100%);margin:0 auto;display:flex;align-items:center;gap:14px;direction:ltr}
+.hero img{width:92px;height:92px;flex:none;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}
+.hero h1{margin:0;font-size:29px;font-weight:700;line-height:1.25;direction:ltr;text-align:left}
+.hero .sub{margin:6px 0 0;font-size:13px;font-weight:500;color:var(--hd-ink);opacity:.9;line-height:1.5;direction:rtl;text-align:left}
+main{position:relative;z-index:2;width:min(440px,calc(100% - 32px));margin:-52px auto 28px;background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:26px 22px 24px}
+h2{font-size:1.25rem;margin:0 0 6px;font-weight:600}
+p{margin:0 0 22px;color:var(--muted);line-height:1.7;font-size:.93rem}
+button{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 16px;font:inherit;font-weight:600;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:14px;cursor:pointer;transition:background .15s,transform .05s}
+button:hover{background:var(--soft)}
+button:active{transform:scale(.99)}
+button.p{background:var(--grad);color:var(--accent-ink);border:0;box-shadow:var(--grad-shadow)}
+button.p:hover{background:var(--grad);opacity:.94}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 button[disabled]{opacity:.6;cursor:wait}
-.or{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--mut);font-size:.85rem}
+.or{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--muted);font-size:.85rem}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
-label{display:block;margin-bottom:6px;font-size:.9rem;color:var(--mut)}
-input{width:100%;padding:12px 14px;margin-bottom:12px;font:inherit;color:var(--fg);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;text-align:left}
+label{display:block;margin-bottom:6px;font-size:.9rem;color:var(--muted)}
+input{width:100%;padding:12px 14px;margin-bottom:12px;font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:14px;text-align:left}
 #msg{min-height:1.4em;margin-top:14px;font-size:.9rem;line-height:1.6}
-#msg.bad{color:var(--err)}#msg.ok{color:var(--ok)}
+#msg.bad{color:var(--bad)}#msg.ok{color:var(--ok)}
 </style>
 </head>
 <body>
+<header class="hero"><div class="hero-in">
+  <img src="robot-coat.webp" width="300" height="300" alt="" decoding="async">
+  <div><h1>The Pharmacist</h1><p class="sub">ابحث بالاسم التجاري أو المادة الفعّالة</p></div>
+</div></header>
 <main>
-  <h1>تسجيل الدخول</h1>
+  <h2>تسجيل الدخول</h2>
   <p>سجّل دخولك عشان تفتح الموقع.</p>
   <button id="g" type="button">
     <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>

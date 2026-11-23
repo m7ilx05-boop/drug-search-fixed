@@ -2,7 +2,7 @@
 const SB_URL = "https://clhtimetvykbjdhfdmig.supabase.co";
 const SB_KEY = "sb_publishable_iaieY2I6Kiy9RLo9JiY1BQ_khK91Dim";
 const GATED_HOST = "the-pharmacist.pages.dev";
-const PUBLIC_PATHS = ["/login", "/login.html", "/manifest.webmanifest", "/robots.txt", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
+const PUBLIC_PATHS = ["/login", "/login.html", "/manifest.webmanifest", "/robots.txt", "/icon-180.png", "/icon-192.png", "/icon-512.png", "/robot-coat.webp"];
 const seen = new Map();
 function getCookie(req, name) {
   const parts = (req.headers.get("Cookie") || "").split(";");
