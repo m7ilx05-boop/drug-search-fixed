@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>تسجيل الدخول</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#eef3f1;--card:#fff;--fg:#14211d;--mut:#5d6e68;--line:#d5dfdb;--brand:#0f5b4c;--on:#fff;--err:#b3261e;--ok:#1b6e3c}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1513;--card:#15201d;--fg:#eaf2ef;--mut:#93a8a1;--line:#27382f;--brand:#5fc7ae;--on:#0d1513;--err:#f2b8b5;--ok:#8fd9a8}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;padding:20px}
+main{width:min(400px,100%);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:32px 26px}
+h1{font-size:1.4rem;margin:0 0 8px;font-weight:600}
+p{margin:0 0 24px;color:var(--mut);line-height:1.7;font-size:.95rem}
+button{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 16px;font:inherit;font-weight:600;color:var(--fg);background:var(--card);border:1.5px solid var(--brand);border-radius:10px;cursor:pointer}
+button:hover{background:color-mix(in srgb,var(--brand) 8%,var(--card))}
+button.p{background:var(--brand);color:var(--on)}
+button.p:hover{background:var(--brand);opacity:.92}
+button:focus-visible,input:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+button[disabled]{opacity:.6;cursor:wait}
+.or{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--mut);font-size:.85rem}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+label{display:block;margin-bottom:6px;font-size:.9rem;color:var(--mut)}
+input{width:100%;padding:12px 14px;margin-bottom:12px;font:inherit;color:var(--fg);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;text-align:left}
+#msg{min-height:1.4em;margin-top:14px;font-size:.9rem;line-height:1.6}
+#msg.bad{color:var(--err)}#msg.ok{color:var(--ok)}
+</style>
+</head>
+<body>
+<main>
+  <h1>تسجيل الدخول</h1>
+  <p>سجّل دخولك عشان تفتح الموقع.</p>
+  <button id="g" type="button">
+    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+    <span>متابعة بحساب جوجل</span>
+  </button>
+  <div class="or">أو بالإيميل</div>
+  <form id="f">
+    <label for="e">الإيميل</label>
+    <input id="e" type="email" autocomplete="email" inputmode="email" required dir="ltr" placeholder="name@example.com">
+    <button id="s" type="submit" class="p">ابعتلي رابط الدخول</button>
+  </form>
+  <div id="msg" role="status"></div>
+</main>
+<script>
+var SB_URL = "https://clhtimetvykbjdhfdmig.supabase.co";
+var SB_KEY = "sb_publishable_iaieY2I6Kiy9RLo9JiY1BQ_khK91Dim";
+var sb = supabase.createClient(SB_URL, SB_KEY, { auth: { flowType: "implicit", persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+var qs = new URLSearchParams(location.search);
+var msg = document.getElementById("msg"), done = false, stay = false;
+function say(t, bad) { msg.textContent = t; msg.className = bad ? "bad" : "ok"; }
+function clearCookie() { document.cookie = "ph_at=; Path=/; Max-Age=0; Secure; SameSite=Lax"; }
+function okNext(n) { return typeof n === "string" && n.charAt(0) === "/" && n.charAt(1) !== "/" && n.charAt(1) !== "\\" && n.indexOf("/login") !== 0; }
+(function () { var n = qs.get("next"); if (okNext(n)) { try { localStorage.setItem("ph_next", n); } catch (e) {} } })();
+function target() { var n = null; try { n = localStorage.getItem("ph_next"); } catch (e) {} return okNext(n) ? n : "/"; }
+function finish(s) {
+  if (done || stay || !s || !s.access_token) return;
+  done = true;
+  var age = Math.max(60, (s.expires_at || 0) - Math.floor(Date.now() / 1000));
+  document.cookie = "ph_at=" + s.access_token + "; Path=/; Max-Age=" + age + "; Secure; SameSite=Lax";
+  var t = target();
+  try { localStorage.removeItem("ph_next"); } catch (e) {}
+  location.replace(t);
+}
+(function () {
+  var h = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (h.get("error_description")) say("ماقدرناش نكمّل الدخول: " + h.get("error_description").replace(/\+/g, " "), true);
+})();
+sb.auth.onAuthStateChange(function (ev, s) { if (ev === "SIGNED_IN" || ev === "TOKEN_REFRESHED") finish(s); });
+(async function () {
+  if (qs.get("logout") === "1" || qs.get("e") === "1") {
+    stay = true; clearCookie();
+    try { await sb.auth.signOut(); } catch (e) {}
+    say(qs.get("logout") === "1" ? "تم تسجيل الخروج." : "الجلسة انتهت. سجّل دخولك تاني.", qs.get("logout") !== "1");
+    history.replaceState(null, "", "/login");
+    return;
+  }
+  var r = await sb.auth.getSession();
+  if (r && r.data && r.data.session) finish(r.data.session);
+})();
+document.getElementById("g").addEventListener("click", async function () {
+  var b = this; say("", false); b.disabled = true;
+  var r = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + "/login" } });
+  if (r.error) { say("ماقدرناش نبدأ الدخول بجوجل. حاول تاني.", true); b.disabled = false; }
+});
+document.getElementById("f").addEventListener("submit", async function (ev) {
+  ev.preventDefault();
+  var btn = document.getElementById("s"), email = document.getElementById("e").value.trim();
+  if (!email) return;
+  say("", false); btn.disabled = true;
+  var r = await sb.auth.signInWithOtp({ email: email, options: { emailRedirectTo: location.origin + "/login", shouldCreateUser: true } });
+  if (r.error) {
+    say(r.error.status === 429 ? "طلبات كتير. استنى شوية وحاول تاني." : "ماقدرناش نبعت الرابط. اتأكد من الإيميل وحاول تاني.", true);
+    btn.disabled = false;
+  } else {
+    say("بعتنالك رابط على الإيميل. افتحه من نفس الموبايل عشان تدخل.", false);
+    setTimeout(function () { btn.disabled = false; }, 30000);
+  }
+});
+</script>
+</body>
+</html>
