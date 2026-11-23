@@ -812,3 +812,12 @@ body.acct-on[data-view=home] .appbar{padding-top:calc(var(--top,0px) + 50px)}
 .acct-nm{font-size:16px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}
 .acct-em{font-size:12px;color:var(--muted);text-align:right;overflow-wrap:anywhere}
 .acct-out{grid-column:1/-1;margin-top:6px;display:block;text-align:center;padding:10px 12px;border-radius:12px;background:var(--soft);color:var(--soft-ink);font-weight:600;font-size:14px;text-decoration:none}
+
+/* ===== اقتراحات البحث (suggest.js) ===== */
+.sugg{display:none;position:absolute;z-index:31;inset-inline:0;top:calc(100% + 8px);margin:0;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);max-height:56vh;overflow-y:auto;overscroll-behavior:contain}
+.sugg.open{display:block;animation:cardIn .16s ease-out}
+.sugg .sg{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;width:100%;background:none;color:var(--ink);border:0;border-radius:12px;padding:8px 12px;min-height:48px;text-align:start;font:inherit;cursor:pointer}
+.sugg .sg:hover,.sugg .sg.on,.sugg .sg:active{background:var(--soft)}
+.sugg .sg-name{font-size:16px;font-weight:600;line-height:1.35}
+.sugg .sg-meta{font-size:13px;color:var(--muted);line-height:1.3}
+.sugg .sg-ing .sg-name::after{content:"";display:inline-block;width:7px;height:7px;margin-inline-start:8px;border-radius:50%;background:var(--accent);vertical-align:middle}
