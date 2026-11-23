@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { PRODUCT_SCHEMA, validateProducts, norm, splitName } from "./extract.ts";
 import { groundProducts } from "./ground.ts";
@@ -118,8 +119,8 @@ async function markKey(db: SupabaseClient, provider: string, slot: string, statu
 
 async function usableSlots(db: SupabaseClient, provider: "tavily" | "firecrawl"): Promise<string[]> {
   const re = provider === "tavily" ? /^tavily/i : /^firecrawl/i;
-  const all = Object.keys(Deno.env.toObject())
-    .filter((k) => re.test(k) && !/url|endpoint|host/i.test(k) && Deno.env.get(k))
+  const all = Object.keys(kenv.toObject())
+    .filter((k) => re.test(k) && !/url|endpoint|host/i.test(k) && kenv.get(k))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   if (!all.length) throw new Unavailable(`no ${provider} key`);
   const { data } = await db.from("provider_key_state").select("slot, exhausted_until").eq("provider", provider);
@@ -138,7 +139,7 @@ async function tavily(db: SupabaseClient, query: string, includeDomains?: string
     let res: Response;
     try {
       res = await fetch("https://api.tavily.com/search", {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get(slot)}` },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${kenv.get(slot)}` },
         body: JSON.stringify(payload), signal: AbortSignal.timeout(20000),
       });
     } catch { continue; }
@@ -161,7 +162,7 @@ async function scrape(db: SupabaseClient, url: string, prompt: string): Promise<
     let res: Response;
     try {
       res = await fetch("https://api.firecrawl.dev/v2/scrape", {
-        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get(slot)}` },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${kenv.get(slot)}` },
         body: JSON.stringify({ url, formats: [{ type: "json", schema: PRODUCT_SCHEMA, prompt }, "markdown"], timeout: 60000 }),
         signal: AbortSignal.timeout(75000),
       });
@@ -217,8 +218,8 @@ async function llmPick(
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const url = kenv.get("SUPABASE_URL")!;
+  const svc = kenv.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const db = createClient(url, svc, { auth: { persistSession: false } });
 
   // internal only: service-role bearer or the same shared secret the verify trigger uses

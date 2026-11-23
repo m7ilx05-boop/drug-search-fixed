@@ -1,10 +1,11 @@
+import { kenv } from "./vault-env.ts";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 export class ProviderExhausted extends Error {}
 
 function tavilySlots(): string[] {
-  return Object.keys(Deno.env.toObject())
-    .filter((k) => /^tavily/i.test(k) && Deno.env.get(k))
+  return Object.keys(kenv.toObject())
+    .filter((k) => /^tavily/i.test(k) && kenv.get(k))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
@@ -41,7 +42,7 @@ export async function tavilySearch(db: SupabaseClient, query: string, opts?: { i
     try {
       res = await fetch("https://api.tavily.com/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get(slot)}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${kenv.get(slot)}` },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(20000),
       });

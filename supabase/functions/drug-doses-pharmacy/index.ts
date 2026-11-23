@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 // drug-doses-pharmacy: looks for the doses that an official (tier 1) product page did not publish, in the enabled
@@ -24,7 +25,7 @@ const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9\u0600-\u06FF.]+/
 const host = (u: string) => { try { return new URL(u).hostname.replace(/^www[.]/, ""); } catch { return ""; } };
 
 const tavilySlots = () =>
-  Object.keys(Deno.env.toObject()).filter((k) => /^tavily/i.test(k) && Deno.env.get(k))
+  Object.keys(kenv.toObject()).filter((k) => /^tavily/i.test(k) && kenv.get(k))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
 async function tavily(db: SupabaseClient, query: string, domains: string[]) {
@@ -37,7 +38,7 @@ async function tavily(db: SupabaseClient, query: string, domains: string[]) {
     try {
       res = await fetch("https://api.tavily.com/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get(slot)}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${kenv.get(slot)}` },
         body: JSON.stringify({ query, include_domains: domains, search_depth: "advanced", max_results: 8, include_raw_content: true }),
         signal: AbortSignal.timeout(40_000),
       });
@@ -53,8 +54,8 @@ async function tavily(db: SupabaseClient, query: string, domains: string[]) {
 }
 
 async function llm(prompt: string, system: string) {
-  const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/llm-gateway`;
-  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const url = `${kenv.get("SUPABASE_URL")}/functions/v1/llm-gateway`;
+  const key = kenv.get("SUPABASE_SERVICE_ROLE_KEY")!;
   let lastErr = "";
   for (const provider of ["gemini", "grok"]) {
     try {
@@ -88,7 +89,7 @@ Deno.serve(async (req) => {
   const productId = typeof body.product_id === "string" ? body.product_id : "";
   if (!UUID.test(productId)) return json({ error: "invalid_product_id" }, 400);
 
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const db = createClient(kenv.get("SUPABASE_URL")!, kenv.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const rl = await db.rpc("check_rate_limit", { p_key: `doses:${ip}`, p_limit: 5, p_window_seconds: 60 });

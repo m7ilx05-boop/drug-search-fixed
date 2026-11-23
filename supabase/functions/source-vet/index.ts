@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { tavilySearch } from "./tavily.ts";
 import { firecrawlScrapeJson } from "./firecrawl.ts";
@@ -243,7 +244,7 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const db = createClient(kenv.get("SUPABASE_URL")!, kenv.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
   const secret = req.headers.get("x-cron-secret") ?? "";
   const { data: s } = await db.from("app_secrets").select("value").eq("name", "cron_secret").maybeSingle();

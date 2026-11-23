@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
@@ -162,7 +163,7 @@ function safeHttps(u: unknown): URL | null {
 const BAD_EXT = /\.(svg|gif|ico|bmp|tiff?)(\?|$)/i;
 
 async function tavilySearch(db: ReturnType<typeof createClient>, query: string): Promise<{ ok: true; images: string[] } | { ok: false; code: string }> {
-  const slots = Object.keys(Deno.env.toObject()).filter((k) => /^tavily/i.test(k) && Deno.env.get(k));
+  const slots = Object.keys(kenv.toObject()).filter((k) => /^tavily/i.test(k) && kenv.get(k));
   if (!slots.length) return { ok: false, code: "no_search_key" };
   const st = await db.from("tavily_key_checks").select("slot,state");
   const rank = new Map<string, number>();
@@ -174,7 +175,7 @@ async function tavilySearch(db: ReturnType<typeof createClient>, query: string):
     try {
       const r = await fetch("https://api.tavily.com/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get(slot)}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${kenv.get(slot)}` },
         body: JSON.stringify({ query, search_depth: "basic", include_images: true, max_results: 6 }),
         signal: AbortSignal.timeout(20_000),
       });
@@ -223,8 +224,8 @@ Deno.serve(async (req) => {
   const id = typeof body.dwaprices_id === "number" ? body.dwaprices_id : NaN;
   if (!Number.isInteger(id) || id < 1 || id > 2_000_000_000) return json({ error: "invalid_id" }, 400);
 
-  const supaUrl = Deno.env.get("SUPABASE_URL")!;
-  const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supaUrl = kenv.get("SUPABASE_URL")!;
+  const svc = kenv.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const db = createClient(supaUrl, svc, { auth: { persistSession: false } });
   const publicUrl = (path: string) => `${supaUrl}/storage/v1/object/public/${BUCKET}/${path}`;
 

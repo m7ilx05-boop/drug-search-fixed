@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { nameMentioned, rankCandidates, type Item } from "./naming.ts";
 
@@ -10,8 +11,8 @@ const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
 
 function tavilySlots(): string[] {
-  return Object.keys(Deno.env.toObject())
-    .filter((k) => /^tavily/i.test(k) && Deno.env.get(k))
+  return Object.keys(kenv.toObject())
+    .filter((k) => /^tavily/i.test(k) && kenv.get(k))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 const firstOfNextMonthUTC = () => {
@@ -52,7 +53,7 @@ async function searchItems(db: SupabaseClient, query: string, domains: string[])
     try {
       res = await fetch("https://api.tavily.com/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get(slot)}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${kenv.get(slot)}` },
         body: JSON.stringify({ query, search_depth: "basic", max_results: 20, include_domains: domains }),
         signal: AbortSignal.timeout(20000),
       });
@@ -79,8 +80,8 @@ async function searchItems(db: SupabaseClient, query: string, domains: string[])
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const url = kenv.get("SUPABASE_URL")!;
+  const svc = kenv.get("SUPABASE_SERVICE_ROLE_KEY")!;
   // internal-only: callers must present the service role key
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (token !== svc) return json({ error: "forbidden" }, 403);

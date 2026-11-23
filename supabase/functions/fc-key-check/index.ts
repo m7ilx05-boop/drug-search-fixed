@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 // Temporary diagnostic: asks Tavily for the usage of every TAVILY* secret. Never returns or logs a key.
 const TOKEN = "p4Wn8cXr2Jv7Ty5LqD9mZe3A";
 
@@ -10,15 +11,15 @@ Deno.serve(async (req) => {
   if (req.method !== "POST" || req.headers.get("x-check-token") !== TOKEN) {
     return new Response("forbidden", { status: 403 });
   }
-  const slots = Object.keys(Deno.env.toObject())
-    .filter((k) => /^tavily/i.test(k) && Deno.env.get(k))
+  const slots = Object.keys(kenv.toObject())
+    .filter((k) => /^tavily/i.test(k) && kenv.get(k))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const keys: Record<string, unknown>[] = [];
   for (const slot of slots) {
     try {
       const r = await fetch("https://api.tavily.com/usage", {
-        headers: { Authorization: `Bearer ${Deno.env.get(slot)}` },
+        headers: { Authorization: `Bearer ${kenv.get(slot)}` },
         signal: AbortSignal.timeout(15000),
       });
       const b = await r.json().catch(() => null);

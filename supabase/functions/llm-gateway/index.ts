@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 // llm-gateway: the ONLY place that calls Gemini and Grok. Two independent quota systems (one per provider), each with its own
@@ -33,8 +34,8 @@ const SLOT_RE: Record<Provider, RegExp> = { gemini: /^gemini/i, grok: /^(grok|xa
 const NOT_A_KEY = /url|endpoint|host|model|quota|limit/i;
 
 const slotsFor = (p: Provider): string[] =>
-  Object.keys(Deno.env.toObject())
-    .filter((k) => SLOT_RE[p].test(k) && !NOT_A_KEY.test(k) && Deno.env.get(k))
+  Object.keys(kenv.toObject())
+    .filter((k) => SLOT_RE[p].test(k) && !NOT_A_KEY.test(k) && kenv.get(k))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
 type Args = { prompt: string; system?: string; json?: boolean; grounded?: boolean; image?: { mime: string; data: string } };
@@ -141,8 +142,8 @@ async function overview(db: SupabaseClient) {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const url = kenv.get("SUPABASE_URL")!;
+  const svc = kenv.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const db = createClient(url, svc, { auth: { persistSession: false } });
 
   const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -199,7 +200,7 @@ Deno.serve(async (req) => {
     if (claim.error) { console.error("claim_error", claim.error.message); return json({ error: "internal_error" }, 500); }
     const slot = claim.data as string | null;
     if (!slot) return json({ error: "quota_exhausted", provider, detail: "every key is at its daily/minute cap or cooling down", last_status: last.status, keys: keyLog }, 429);
-    const key = Deno.env.get(slot)!;
+    const key = kenv.get(slot)!;
 
     let r: CallResult = { status: 404 };
     let usedModel = "", sawModelErr = false, allOverloaded = true, cur = args;

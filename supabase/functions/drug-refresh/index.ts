@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { tavilySearch, ProviderExhausted } from "./tavily.ts";
 import { firecrawlScrapeJson, firecrawlScrapeMarkdown, FirecrawlUnavailable, type ScrapeResult } from "./firecrawl.ts";
@@ -245,8 +246,8 @@ function pageMatchTerms(items: unknown[]): string[] {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const url = kenv.get("SUPABASE_URL")!;
+  const svc = kenv.get("SUPABASE_SERVICE_ROLE_KEY")!;
   // internal-only: callers must present the service role key
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (token !== svc) return json({ error: "forbidden" }, 403);

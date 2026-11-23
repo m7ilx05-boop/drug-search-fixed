@@ -1,10 +1,11 @@
+import { kenv } from "./vault-env.ts";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 export class FirecrawlUnavailable extends Error {}
 
 function slots(): string[] {
-  return Object.keys(Deno.env.toObject())
-    .filter((k) => /^firecrawl/i.test(k) && !/url|endpoint|host/i.test(k) && Deno.env.get(k))
+  return Object.keys(kenv.toObject())
+    .filter((k) => /^firecrawl/i.test(k) && !/url|endpoint|host/i.test(k) && kenv.get(k))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
@@ -44,7 +45,7 @@ export async function firecrawlScrapeJson(
     try {
       res = await fetch("https://api.firecrawl.dev/v2/scrape", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get(slot)}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${kenv.get(slot)}` },
         body: JSON.stringify({ url, formats: [{ type: "json", schema, prompt }], timeout: 60000 }),
         signal: AbortSignal.timeout(75000),
       });

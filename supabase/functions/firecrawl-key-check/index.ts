@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 // Checks every FIRECRAWL* secret against Firecrawl's credit-usage endpoint and stores the result
 // (slot name + numbers only; a key is never returned, logged or stored).
 // Auth: header x-check-token must equal app_secrets.cron_secret.
@@ -6,8 +7,8 @@
 // (429 / timeout / 5xx) no longer wipes the last good numbers: only http_status, error and
 // checked_at are updated for that slot.
 
-const SB_URL = Deno.env.get("SUPABASE_URL")!;
-const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SB_URL = kenv.get("SUPABASE_URL")!;
+const SB_KEY = kenv.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const sbHeaders = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
 const BATCH = 6;
@@ -37,7 +38,7 @@ async function checkOnce(slot: string): Promise<Result> {
     plan_credits: null, period_end: null, error: null };
   try {
     const r = await fetch("https://api.firecrawl.dev/v2/team/credit-usage", {
-      headers: { Authorization: `Bearer ${Deno.env.get(slot)}` },
+      headers: { Authorization: `Bearer ${kenv.get(slot)}` },
       signal: AbortSignal.timeout(15000),
     });
     const b = await r.json().catch(() => null);
@@ -104,8 +105,8 @@ async function store(results: Result[]) {
 Deno.serve(async (req) => {
   if (req.method !== "POST" || !(await authorized(req))) return json({ error: "forbidden" }, 403);
 
-  const slots = Object.keys(Deno.env.toObject())
-    .filter((k) => /^firecrawl/i.test(k) && !/url|endpoint|host/i.test(k) && Deno.env.get(k))
+  const slots = Object.keys(kenv.toObject())
+    .filter((k) => /^firecrawl/i.test(k) && !/url|endpoint|host/i.test(k) && kenv.get(k))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const results: Result[] = [];
