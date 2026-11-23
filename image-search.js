@@ -1146,8 +1146,20 @@ async function handleRx(f) {
     st.lines("prep", [["الأبعاد بعد التصغير", lastShot.w + " × " + lastShot.h + " بكسل"], ["الحجم المبعوت", Math.round(b64.length * 0.75 / 1024) + " كيلوبايت (JPEG)"], ["ملحوظة", "الصورة بتتعرض على جهازك بس للمقارنة، ومش بتتحفظ. الأسطر المقروءة بتتسجّل للمراجعة."]]);
     st.set("read", "run", "جاري قراءة الروشتة…");
     // بيانات الروشتة (تخصص الدكتور، المريض، السن…) بتتقرا بالتوازي ومش بتعطّل النتيجة: لو فشلت أو مش مكتوبة ببساطة مش بتظهر
-    const hdrP = call("read-prescription-header", { image_base64: b64, mime_type: "image/jpeg" }).then((x) => (x && x.header) || null).catch(() => null);
-    const r = await call("read-prescription", { image_base64: b64, mime_type: "image/jpeg" });
+    // المسار الجديد: طلبين بس على الموديل الأقوى بيرجّعوا الأسماء + طريقة الاستعمال + بيانات الورقة مع بعض (read-prescription-v2).
+    // لو الموديل الأقوى مش متاح (كوتا خلصت في كل المفاتيح أو وقع) أو حصل أي خطأ غير أخطاء الصورة، بنرجع للمسار القديم على الـ lite من غير ما المستخدم يحس
+    let r = null, hdrP = null, v2 = false;
+    try {
+      r = await call("read-prescription-v2", { image_base64: b64, mime_type: "image/jpeg" });
+      v2 = true;
+    } catch (e) {
+      if (e && ["rate_limited", "image_base64_required", "unsupported_image_type", "image_too_large", "invalid_json"].includes(e.code)) throw e;
+    }
+    if (v2) hdrP = Promise.resolve(r.header || null);
+    else {
+      hdrP = call("read-prescription-header", { image_base64: b64, mime_type: "image/jpeg" }).then((x) => (x && x.header) || null).catch(() => null);
+      r = await call("read-prescription", { image_base64: b64, mime_type: "image/jpeg" });
+    }
     if (token !== polling) return;
     const items = Array.isArray(r.items) ? r.items : [];
     if (!items.length) {
@@ -1160,7 +1172,8 @@ async function handleRx(f) {
     st.set("read", "done", "اتقرا " + items.length + " سطر، " + matched + " مطابق في السجل");
     st.lines("read", [["عدد الأسطر", items.length], ["مطابق في السجل", matched], ["وضوح الخط", RX_LEG[r.overall_legibility] || ""], ["تنبيه", "قراءة آلية وممكن تغلط في حرف أو رقم. اقرأ وراجع الجرعة والشكل الدوائي في كل سطر قبل الصرف."]]);
     st.set("resolve", "run", "جاري مطابقة الأسماء مع السجل…");
-    { const sc = { res: null, p: null }; sc.p = rxSig(b64, items).then((x) => (sc.res = x)); rxSigCur = sc; } // طريقة الاستعمال بالتوازي، ومش بنستناها
+    if (v2) rxSigCur = { res: { map: new Map((r.sig_items || []).map((x) => [x.line_no, x])), error: null }, p: Promise.resolve() }; // طريقة الاستعمال جاية جاهزة من نفس القراءة
+    else { const sc = { res: null, p: null }; sc.p = rxSig(b64, items).then((x) => (sc.res = x)); rxSigCur = sc; } // المسار القديم: طريقة الاستعمال بالتوازي، ومش بنستناها
     const rs = await rxResolve(b64, items);
     if (token !== polling) return;
     if (rs.error) { st.set("resolve", "bad", "المطابقة التانية ما اشتغلتش، فعرضنا القراءة العادية"); st.lines("resolve", [["السبب", rs.error]]); }
