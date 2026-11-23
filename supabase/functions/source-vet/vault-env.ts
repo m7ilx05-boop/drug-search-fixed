@@ -1,7 +1,10 @@
-// بيحمّل مفاتيح الـ API من Supabase Vault في متغيرات البيئة عند بداية تشغيل الدالة.
+// بيحمّل مفاتيح الـ API من Supabase Vault عند بداية تشغيل الدالة.
+// Deno.env.set مش مدعوم في Supabase Edge Runtime، فالمفاتيح بتتخزن في Map محلي،
+// والدوال بتقرا من kenv (get / toObject) بدل Deno.env.
 // الأسرار العادية ليها الأولوية، ومفتاح Vault بيتضاف بس لو مفيش سر بنفس الاسم.
-// الباقي من الكود (Deno.env.get / toObject) شغال زي ما هو من غير تغيير.
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+const extra = new Map<string, string>();
 
 try {
   const url = Deno.env.get("SUPABASE_URL");
@@ -12,16 +15,17 @@ try {
     if (error) {
       console.error("vault_keys_error", error.message);
     } else {
-      let added = 0;
       for (const r of (data ?? []) as { name: string; secret: string }[]) {
-        if (r.name && r.secret && !Deno.env.get(r.name)) { Deno.env.set(r.name, r.secret); added++; }
+        if (r.name && r.secret && !Deno.env.get(r.name)) extra.set(r.name, r.secret);
       }
-      if (added) console.log("vault_keys_loaded", added);
+      if (extra.size) console.log("vault_keys_loaded", extra.size);
     }
   }
 } catch (e) {
   console.error("vault_keys_exception", e instanceof Error ? e.message : String(e));
 }
 
-// الدوال بتستورد kenv من هنا؛ Deno.env فيه get / set / toObject.
-export const kenv = Deno.env;
+export const kenv = {
+  get: (k: string): string | undefined => Deno.env.get(k) ?? extra.get(k),
+  toObject: (): Record<string, string> => ({ ...Object.fromEntries(extra), ...Deno.env.toObject() }),
+};
