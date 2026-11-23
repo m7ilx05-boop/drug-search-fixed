@@ -1,3 +1,4 @@
+import { kenv } from "./vault-env.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 // ingredient-class: purpose / therapeutic class of each single active ingredient.
@@ -35,7 +36,7 @@ const json = (body: unknown, status = 200) =>
 const FDA_URL = "https://api.fda.gov/drug/label.json";
 const RX_URL = "https://rxnav.nlm.nih.gov/REST";
 // the openFDA key lives in the project secrets (FDA_key_1; the older name FDA_1 is accepted too)
-const fdaKey = () => Deno.env.get("FDA_key_1") ?? Deno.env.get("FDA_1") ?? null;
+const fdaKey = () => kenv.get("FDA_key_1") ?? kenv.get("FDA_1") ?? null;
 
 // International (INN / British) names that openFDA writes differently (US names), plus known misspellings found in the database.
 const SYN: Record<string, string> = {
