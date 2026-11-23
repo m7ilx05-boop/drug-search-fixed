@@ -22,3 +22,6 @@ try {
 } catch (e) {
   console.error("vault_keys_exception", e instanceof Error ? e.message : String(e));
 }
+
+// الدوال بتستورد kenv من هنا؛ Deno.env فيه get / set / toObject.
+export const kenv = Deno.env;
