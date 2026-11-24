@@ -603,8 +603,12 @@ Deno.serve(async (req) => {
         // A page whose own title/URL already contains the searched name (or a close misspelling) and that lists exactly
         // one product is that product, even when the page writes its name in another script (e.g. Arabic).
         // An alternatives job reads pages chosen from the product's own alternatives list: one product per page, trusted.
-        const trustSingle = isAlt || relevance(p, terms) >= 2;
+        // A dwaprices.com page read by the reader is always ONE product, so it is trusted as such: it is stored even when its name
+        // does not match this search (saves reading it again). Such an off-topic product is kept out of this search's result list.
+        const trustSingle = isAlt || !!dwa || relevance(p, terms) >= 2;
         let products = validateProducts(r.json, matchName, extra, { trustSingle, allowDigits: cosmetic });
+        const offTopic = !!dwa && !isAlt && relevance(p, terms) < 2 &&
+          validateProducts(r.json, matchName, extra, { trustSingle: false, allowDigits: cosmetic }).length === 0;
 
         // Known-or-new key: the same product written slightly differently by a site ("Centrum Adult" / "Centrum Adults",
         // "... Tablets") gets the identity key of the already-approved row, so it refreshes that row instead of becoming
@@ -679,10 +683,13 @@ Deno.serve(async (req) => {
         }
         if (knownProducts.length) {
           const written = await persistProducts(db, src, p.url, knownProducts, products.length === 1);
-          for (const id of written) ids.add(id);
+          if (!offTopic) for (const id of written) ids.add(id); // an off-topic product is stored but never shown for this search
           savedN = written.length;
           if (dwa && dwaRowOk && products.length === 1 && written.length === 1) {
-            const lk = await db.from("dwaprices_products").update({ product_id: written[0] }).eq("dwaprices_id", dwa.dwaprices_id);
+            // only a page that has no link yet is linked: an existing link is never written over
+            const lk = await db.from("dwaprices_products").update({ product_id: written[0] })
+              .eq("dwaprices_id", dwa.dwaprices_id)
+              .is("product_id", null).is("drug_pre_id", null).is("review_id", null);
             if (lk.error) console.error("dwaprices_link_product_error", lk.error.message);
           }
         }
@@ -693,10 +700,16 @@ Deno.serve(async (req) => {
           });
           if (stErr) throw new Error("stage_error: " + stErr.message);
           staged++;
-          const preId = (stData as { pre_id?: string | null } | null)?.pre_id ?? null;
-          if (dwa && dwaRowOk && products.length === 1 && preId) {
-            const lk = await db.from("dwaprices_products").update({ drug_pre_id: preId }).eq("dwaprices_id", dwa.dwaprices_id);
-            if (lk.error) console.error("dwaprices_link_pre_error", lk.error.message);
+          // A single-product dwaprices page is linked to what the staging produced: the drug_pre row, or the review row when
+          // the product needs a human look. The database function links only a page whose three link columns are still NULL
+          // (an existing link is never written over) and records every link it makes in dwaprices_link_backfill_log
+          // under this job's id, so the link can be rolled back.
+          const st = stData as { pre_id?: string | null; review_id?: string | null } | null;
+          if (dwa && dwaRowOk && products.length === 1 && (st?.pre_id || st?.review_id)) {
+            const lk = await db.rpc("link_dwaprices_page", {
+              p_id: dwa.dwaprices_id, p_pre: st.pre_id ?? null, p_review: st.review_id ?? null, p_run: jobId,
+            });
+            if (lk.error) console.error("dwaprices_link_stage_error", lk.error.message);
           }
         }
 
