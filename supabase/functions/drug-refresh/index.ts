@@ -637,8 +637,11 @@ Deno.serve(async (req) => {
 
         // The Dwaprices row (price, barcode, units, notes) is written only for a page whose product passed validation
         // (so an unrelated page never lands in dwaprices_products). A failure here never blocks the product itself.
+        // Every dwaprices.com page the reader understood is stored in dwaprices_products, whether or not its product passes
+        // validation for this search (a digit in the name, a name that does not match...): this table is the collected data, and
+        // the filtering happens when results are shown. Such a page is not linked to drug_pre / drug_products.
         let dwaRowOk = false;
-        if (dwa && products.length) {
+        if (dwa) {
           const imp = await db.rpc("import_dwaprices_product", { p: dwaPayload(dwa) });
           if (imp.error) {
             failures.push("dwaprices_import_error: " + imp.error.message.slice(0, 100));
@@ -715,7 +718,7 @@ Deno.serve(async (req) => {
 
         // Ledger, part 2: what happened to this page.
         const stN = newProducts.length;
-        const pageSt = stN ? (savedN ? "saved+pending_review" : "pending_review") : savedN ? "saved" : lockedN ? "official_locked" : "rejected";
+        const pageSt = stN ? (savedN ? "saved+pending_review" : "pending_review") : savedN ? "saved" : lockedN ? "official_locked" : dwaRowOk ? "stored_only" : "rejected";
         // A page that gave no product is remembered (normal search only) so the same search does not read it again. If no product of
         // the page is valid on its own (digit in the name, nothing listed...) the page itself is the reason and it is skipped for
         // every search; if some product would be valid for its own name, only this search's name is skipped.
