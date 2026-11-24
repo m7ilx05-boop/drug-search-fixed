@@ -98,7 +98,7 @@ const PACK_RE = new RegExp(`(?<![\\p{L}\\p{N}])(${NUM})\\s*(${PACK_UNITS})(?![\\
 const STRENGTH_RE = new RegExp(`(?<![\\p{L}\\p{N}])${NUM}\\s*(?:${STRENGTH_UNITS})(?![\\p{L}\\p{N}])`, "giu");
 const PACK_ONLY_RE = new RegExp(`^\\s*(${NUM})\\s*(${PACK_UNITS})\\s*$`, "iu");
 // Bump when product validation / name cleaning changes: pages rejected under an older version are read again.
-export const RULES_VERSION = 2;
+export const RULES_VERSION = 3;
 export const HAS_DIGIT = /[0-9\u0660-\u0669\u06F0-\u06F9]/;
 
 // Group / marketing labels are never an ingredient ("B Vitamins", "Vitamins and minerals", "Antioxidants").
