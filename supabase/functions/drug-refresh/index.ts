@@ -635,8 +635,7 @@ Deno.serve(async (req) => {
         }
         productsFound += products.length;
 
-        // The Dwaprices row (price, barcode, units, notes) is written only for a page whose product passed validation
-        // (so an unrelated page never lands in dwaprices_products). A failure here never blocks the product itself.
+        // The Dwaprices row (price, barcode, units, notes). A failure here never blocks the product itself.
         // Every dwaprices.com page the reader understood is stored in dwaprices_products, whether or not its product passes
         // validation for this search (a digit in the name, a name that does not match...): this table is the collected data, and
         // the filtering happens when results are shown. Such a page is not linked to drug_pre / drug_products.
