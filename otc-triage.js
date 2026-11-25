@@ -1,4 +1,4 @@
-/* otc-triage.js — صفحة تقييم الأعراض (#/t). نسخة تجريبية.
+/* otc-triage.js — صفحة تقييم الأعراض (#/t): مربع لكل حالة (برد، حلق، كحة...) وليه أسئلته. نسخة تجريبية.
    بتكلّم دالة otc-triage (مشروع الـ OTC) بتوكن تسجيل الدخول الموجود في المتصفح.
    الدالة بتسمح لإيميلات محددة بس (جدول otc_test_users) وبتشغّل المسودات من غير ما تسجّل جلسات.
    بيعتمد على: core.js (el, $, toast). بيتحمّل قبل pages.js. */
@@ -17,7 +17,13 @@
     invalid_input: "في بيانات ناقصة أو غلط. راجع السن والنوع.",
   };
 
-  const S = { built: false, step: "form", symptoms: null, sel: new Set(), q: "", age: "", sex: "", preg: null, lact: null, answers: {}, stack: [], res: null, err: "", loading: false };
+  // شكل مربعات الحالات اللي ليها مسار أسئلة جاهز (بالترتيب). الباقي بيتعرض "قريبًا".
+  const CARDS = {
+    common_cold: { title: "البرد والإنفلونزا", sub: "رشح، عطس، سخونية، تعب، حساسية الأنف", icon: "🤧", order: 1 },
+    sore_throat: { title: "التهاب الحلق", sub: "ألم أو التهاب في الحلق", icon: "🗣️", order: 2 },
+    acute_cough: { title: "الكحة", sub: "كحة جافة أو ببلغم", icon: "😷", order: 3 },
+  };
+  const S = { built: false, step: "home", conds: null, card: null, sel: new Set(), age: "", sex: "", preg: null, lact: null, answers: {}, stack: [], res: null, err: "", loading: false };
 
   function token() {
     try {
@@ -72,11 +78,61 @@
     const b = el("button", cls || "otc-btn", text); b.type = "button"; b.addEventListener("click", fn); return b;
   }
 
-  // ===== الخطوة 1: البيانات والأعراض =====
-  function formView() {
+  // الحالات متجمّعة بمسار الأسئلة: كل مسار = مربع، وأعراضه = اتحاد أعراض الحالات اللي بتشاركه
+  function groups() {
+    const m = new Map(), soon = [];
+    (S.conds || []).forEach((c) => {
+      if (!c.flow_code) { soon.push(c.name_ar); return; }
+      let g = m.get(c.flow_code);
+      if (!g) { g = { code: c.flow_code, names: [], syms: new Map() }; m.set(c.flow_code, g); }
+      g.names.push(c.name_ar);
+      (c.symptoms || []).forEach((x) => g.syms.set(x.id, x));
+    });
+    const cards = [...m.values()].sort((x, y) => ((CARDS[x.code] || {}).order || 99) - ((CARDS[y.code] || {}).order || 99));
+    return { cards, soon };
+  }
+  const cardInfo = (g) => CARDS[g.code] || { title: g.names[0] || g.code, sub: g.names.slice(1).join("، "), icon: "💊" };
+
+  // ===== الخطوة 1: مربعات الحالات =====
+  function homeView() {
     const w = el("div", "otc-wrap");
     w.append(banner());
     const e = errBox(); if (e) w.append(e);
+    w.append(el("h3", "otc-h", "إيه اللي مضايقك؟"));
+    if (!S.conds) { if (!S.err) w.append(el("p", "otc-hint", "ثانية...")); return w; }
+    const { cards, soon } = groups();
+    const grid = el("div", "otc-cards");
+    cards.forEach((g) => {
+      const ci = cardInfo(g);
+      const c = el("button", "otc-card"); c.type = "button";
+      c.append(el("span", "otc-ic", ci.icon));
+      const t = el("span", "otc-ct"); t.append(el("b", null, ci.title), el("small", null, ci.sub));
+      c.append(t, el("span", "otc-go-ic", "‹"));
+      c.addEventListener("click", () => {
+        S.card = g; S.err = ""; S.errLogin = false;
+        S.sel = new Set(g.syms.size === 1 ? [...g.syms.keys()] : []); // مربع بعرض واحد = العرض ده اتحدد بالاختيار نفسه
+        S.answers = {}; S.stack = []; S.res = null; S.step = "info"; render();
+      });
+      grid.append(c);
+    });
+    w.append(grid);
+    if (soon.length) {
+      const d = el("div", "otc-soon");
+      d.append(el("h4", null, "قريبًا (لسه مفيش أسئلة لها)"));
+      const l = el("div", "otc-soonl"); soon.forEach((n) => l.append(el("span", null, n)));
+      d.append(l); w.append(d);
+    }
+    return w;
+  }
+
+  // ===== الخطوة 2: بيانات المريض + أعراض الحالة دي بس =====
+  function infoView() {
+    const g = S.card, ci = cardInfo(g);
+    const w = el("div", "otc-wrap");
+    w.append(banner());
+    const e = errBox(); if (e) w.append(e);
+    const hd = el("div", "otc-chead"); hd.append(el("span", "otc-ic", ci.icon), el("b", null, ci.title));
+    w.append(hd);
 
     const row = el("div", "otc-row");
     const ageL = el("label", "otc-f"); ageL.append(el("span", null, "السن (بالسنين)"));
@@ -94,50 +150,50 @@
     row.append(ageL, sexL);
     w.append(row);
 
-    const pg = el("div", "otc-preg"); pg.id = "otcPreg";
-    w.append(pg);
+    const pg = el("div", "otc-preg"); w.append(pg);
     function syncPreg() {
       pg.replaceChildren();
       if (!needsPreg()) { S.preg = null; S.lact = null; return; }
       [["preg", "حامل؟"], ["lact", "بترضّعي؟"]].forEach(([k, t]) => {
         const f = el("div", "otc-f"); f.append(el("span", null, t));
-        const g = el("div", "otc-seg");
+        const gg = el("div", "otc-seg");
         [[true, "أيوه"], [false, "لأ"]].forEach(([v, tt]) => {
           const b = btn(tt, "otc-opt" + (S[k] === v ? " on" : ""), () => { S[k] = v; syncPreg(); });
           b.setAttribute("aria-pressed", S[k] === v);
-          g.append(b);
+          gg.append(b);
         });
-        f.append(g); pg.append(f);
+        f.append(gg); pg.append(f);
       });
     }
     syncPreg();
 
-    w.append(el("h3", "otc-h", "إيه الأعراض اللي عندك؟"));
-    const find = el("input", "otc-find"); find.type = "search"; find.placeholder = "دوّر على عرض"; find.value = S.q; find.setAttribute("aria-label", "بحث في الأعراض");
-    w.append(find);
-    const chips = el("div", "otc-chips"); chips.setAttribute("role", "group"); chips.setAttribute("aria-label", "الأعراض");
-    w.append(chips);
-    const cnt = el("div", "otc-cnt"); w.append(cnt);
-    function drawChips() {
-      chips.replaceChildren();
-      const q = find.value.trim();
-      (S.symptoms || []).filter((s) => !q || s.name.includes(q)).forEach((s) => {
-        const on = S.sel.has(s.id);
-        const c = btn(s.name, "otc-chip" + (on ? " on" : "") + (s.has_flow ? "" : " nof"), () => {
-          if (S.sel.has(s.id)) S.sel.delete(s.id); else if (S.sel.size < 20) S.sel.add(s.id);
-          drawChips();
+    let go;
+    if (g.syms.size > 1) {
+      w.append(el("h3", "otc-h", "إيه اللي حاسس بيه؟"));
+      const chips = el("div", "otc-chips"); chips.setAttribute("role", "group"); chips.setAttribute("aria-label", "الأعراض");
+      const cnt = el("div", "otc-cnt");
+      w.append(chips, cnt);
+      const list = [...g.syms.values()].sort((x, y) => x.name.localeCompare(y.name, "ar"));
+      const draw = () => {
+        chips.replaceChildren();
+        list.forEach((x) => {
+          const on = S.sel.has(x.id);
+          const c = btn(x.name, "otc-chip" + (on ? " on" : ""), () => { if (S.sel.has(x.id)) S.sel.delete(x.id); else S.sel.add(x.id); draw(); });
+          c.setAttribute("aria-pressed", on);
+          chips.append(c);
         });
-        c.setAttribute("aria-pressed", on);
-        chips.append(c);
-      });
-      cnt.textContent = S.sel.size ? "اخترت " + S.sel.size.toLocaleString("ar-EG") + " من الأعراض" : "اختار عرض واحد على الأقل";
-      go.disabled = !S.sel.size || S.loading;
+        cnt.textContent = S.sel.size ? "اخترت " + S.sel.size.toLocaleString("ar-EG") + " من الأعراض" : "اختار عرض واحد على الأقل";
+        go.disabled = !S.sel.size || S.loading;
+      };
+      go = btn(S.loading ? "ثانية..." : "ابدأ الأسئلة", "otc-btn otc-go", start);
+      w.append(go);
+      draw();
+    } else {
+      go = btn(S.loading ? "ثانية..." : "ابدأ الأسئلة", "otc-btn otc-go", start);
+      go.disabled = S.loading;
+      w.append(go);
     }
-    find.addEventListener("input", () => { S.q = find.value; drawChips(); });
-
-    const go = btn(S.loading ? "ثانية..." : "ابدأ الأسئلة", "otc-btn otc-go", start);
-    w.append(go);
-    drawChips();
+    w.append(btn("← رجوع للحالات", "otc-link", () => { S.step = "home"; S.err = ""; render(); }));
     return w;
   }
 
@@ -214,12 +270,12 @@
   function undo() {
     const k = S.stack.pop();
     if (k) delete S.answers[k];
-    if (!S.stack.length && !k) { S.step = "form"; render(); return; }
+    if (!S.stack.length && !k) { S.step = "info"; render(); return; }
     assess();
   }
   function navRow(canUndo) {
     const r = el("div", "otc-nav");
-    if (canUndo) r.append(btn(S.stack.length ? "← السؤال اللي فات" : "← رجوع للأعراض", "otc-link", () => { if (S.stack.length) undo(); else { S.step = "form"; render(); } }));
+    if (canUndo) r.append(btn(S.stack.length ? "← السؤال اللي فات" : "← رجوع لبياناتك", "otc-link", () => { if (S.stack.length) undo(); else { S.step = "info"; render(); } }));
     return r;
   }
 
@@ -242,7 +298,7 @@
     const w = el("div", "otc-wrap");
     w.append(banner());
 
-    if (r.status === "missing_input") { w.append(el("div", "otc-err", "في بيانات ناقصة. ارجع واكمّلها.")); w.append(btn("رجوع", "otc-btn", () => { S.step = "form"; render(); })); return w; }
+    if (r.status === "missing_input") { w.append(el("div", "otc-err", "في بيانات ناقصة. ارجع واكمّلها.")); w.append(btn("رجوع", "otc-btn", () => { S.step = "info"; render(); })); return w; }
 
     const oc = OUTCOME[r.outcome] || ["النتيجة غير مؤكدة", "warn"];
     const head = el("div", "otc-out " + oc[1]);
@@ -300,32 +356,32 @@
 
     const nav = el("div", "otc-nav");
     if (S.stack.length) nav.append(btn("← السؤال اللي فات", "otc-link", undo));
-    nav.append(btn("تقييم جديد", "otc-btn", () => { S.step = "form"; S.answers = {}; S.stack = []; S.res = null; S.sel = new Set(); render(); }));
+    nav.append(btn("حالة تانية", "otc-btn", () => { S.step = "home"; S.card = null; S.answers = {}; S.stack = []; S.res = null; S.sel = new Set(); render(); }));
     w.append(nav);
     return w;
   }
 
   function render() {
     const pg = root(); if (!pg) return;
-    const y = window.scrollY;
     let v;
     if (S.step === "ask" && S.res && nextQuestion(S.res)) v = askView();
     else if (S.step === "result" && S.res) v = resultView();
-    else v = formView();
+    else if (S.step === "info" && S.card) v = infoView();
+    else v = homeView();
     pg.replaceChildren(v);
-    if (S.step !== "form" || !S.loading) window.scrollTo(0, S.step === "form" ? y : 0);
+    window.scrollTo(0, 0);
   }
 
-  async function loadSymptoms() {
-    if (S.symptoms) return;
-    try { const d = await api({ action: "symptoms" }); S.symptoms = (d.symptoms || []).sort((a, b) => (b.has_flow - a.has_flow) || a.name.localeCompare(b.name, "ar")); S.err = ""; }
-    catch (e) { S.symptoms = null; fail(e); return; }
+  async function loadConds() {
+    if (S.conds) return;
+    try { const d = await api({ action: "conditions" }); S.conds = d.conditions || []; S.err = ""; }
+    catch (e) { S.conds = null; fail(e); return; }
     render();
   }
 
   // بيتنادى من pages.js أول ما #/t تفتح
   window.otcPage = function () {
     if (!S.built) { S.built = true; render(); }
-    if (!S.symptoms) { S.symptoms = null; loadSymptoms(); }
+    if (!S.conds) loadConds();
   };
 })();

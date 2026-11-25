@@ -881,3 +881,17 @@ body[data-view=otc] .appbar{padding-bottom:18px}
 .otc-tag.warn{background:var(--warn-bg);color:var(--warn)}
 .otc-warnline{color:var(--warn)}
 .otc-disc{font-size:.8rem;color:var(--muted);line-height:1.7}
+.otc-cards{display:flex;flex-direction:column;gap:12px}
+.otc-card{display:flex;align-items:center;gap:14px;width:100%;text-align:start;font:inherit;cursor:pointer;padding:16px 18px;border-radius:20px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:0 4px 16px rgba(20,90,160,.1)}
+.otc-card:active{transform:scale(.99)}
+.otc-ic{flex:none;display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:16px;background:var(--soft);font-size:1.7rem}
+.otc-ct{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.otc-ct b{font-size:1.1rem}
+.otc-ct small{font-size:.82rem;color:var(--muted);line-height:1.5}
+.otc-go-ic{flex:none;font-size:1.6rem;color:var(--soft-ink)}
+.otc-chead{display:flex;align-items:center;gap:12px}
+.otc-chead b{font-size:1.2rem}
+.otc-soon{margin-top:6px}
+.otc-soon h4{margin:0 0 8px;font-size:.85rem;color:var(--muted);font-weight:500}
+.otc-soonl{display:flex;flex-wrap:wrap;gap:6px}
+.otc-soonl span{padding:4px 12px;border-radius:999px;background:var(--soft);color:var(--muted);font-size:.8rem}
