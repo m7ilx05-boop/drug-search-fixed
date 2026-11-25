@@ -62,6 +62,8 @@
   <button id="go" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5h17l-6.5 7.6V19l-4-2v-4.4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg><span>بحث</span></button>
 </form>
 
+<a id="otcEntry" class="otc-entry" href="#/t"><b>تقييم الأعراض <i>تجريبي</i></b><span>جاوب على أسئلة بسيطة وشوف الحالة تناسب العلاج الذاتي ولا محتاجة دكتور</span></a>
+
 <div class="drugs3d" id="drugs3d" aria-label="أدوية شائعة"><div class="d3-inner" id="d3inner"></div></div>
 </section>
 
@@ -78,6 +80,9 @@
 <!-- صفحة البحث بصورة (#/img): image-search.js بيملاها -->
 <section id="v-image" class="view"><div id="imgpage" class="imgpage"></div></section>
 
+<!-- صفحة تقييم الأعراض (#/t): otc-triage.js بيملاها -->
+<section id="v-otc" class="view"><div id="otcpage" class="otc"></div></section>
+
 <!-- الصفحة 3: تفاصيل المنتج (pages.js بيملاها) -->
 <section id="v-product" class="view"><div id="pd" class="detail"></div></section>
 </main>
@@ -92,6 +97,7 @@
 <script src="scanner.js"></script>
 <script src="rx-scan.js"></script>
 <script src="image-search.js?v=20261122b"></script>
+<script src="otc-triage.js?v=20261125a"></script>
 <script src="interactions.js?v=20261122g"></script>
 <script src="pages.js"></script>
 <script src="dosage-filter.js"></script>
