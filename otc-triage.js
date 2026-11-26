@@ -19,7 +19,7 @@
 
   // شكل مربعات الحالات اللي ليها مسار أسئلة جاهز (بالترتيب). الباقي بيتعرض "قريبًا".
   const CARDS = {
-    common_cold: { title: "البرد والإنفلونزا", sub: "رشح، عطس، سخونية، تعب، حساسية الأنف", icon: "🤧", order: 1 },
+    common_cold: { title: "البرد والإنفلونزا", sub: "رشح، عطس، سخونية، تعب، حساسية الأنف", icon: "🤧", order: 1, lead: "انسداد أو سيلان الأنف" },
     sore_throat: { title: "التهاب الحلق", sub: "ألم أو التهاب في الحلق", icon: "🗣️", order: 2 },
     acute_cough: { title: "الكحة", sub: "كحة جافة أو ببلغم", icon: "😷", order: 3 },
   };
@@ -89,6 +89,11 @@
       g.names.push(c.name_ar);
       (c.symptoms || []).forEach((x) => g.syms.set(x.id, x));
     });
+    m.forEach((g) => {
+      const want = (CARDS[g.code] || {}).lead;
+      const hit = want && [...g.syms.values()].find((x) => x.name === want);
+      g.lead = hit ? hit.id : null; // الشكوى الرئيسية للمربع: بتتحدد لوحدها وأسئلة المسار بتبدأ على طول من غير قايمة أعراض
+    });
     const cards = [...m.values()].sort((x, y) => ((CARDS[x.code] || {}).order || 99) - ((CARDS[y.code] || {}).order || 99));
     return { cards, soon };
   }
@@ -111,7 +116,7 @@
       c.append(t, el("span", "otc-go-ic", "‹"));
       c.addEventListener("click", () => {
         S.card = g; S.err = ""; S.errLogin = false;
-        S.sel = new Set(g.syms.size === 1 ? [...g.syms.keys()] : []); // مربع بعرض واحد = العرض ده اتحدد بالاختيار نفسه
+        S.sel = new Set(g.syms.size === 1 ? [...g.syms.keys()] : g.lead ? [g.lead] : []); // مربع بعرض واحد أو بشكوى رئيسية = اتحدد بالاختيار نفسه
         S.answers = {}; S.stack = []; S.res = null; S.step = "info"; render();
       });
       grid.append(c);
@@ -176,7 +181,7 @@
     syncPreg();
 
     let go;
-    if (g.syms.size > 1) {
+    if (g.syms.size > 1 && !g.lead) {
       w.append(el("h3", "otc-h", "إيه اللي حاسس بيه؟"));
       const chips = el("div", "otc-chips"); chips.setAttribute("role", "group"); chips.setAttribute("aria-label", "الأعراض");
       const cnt = el("div", "otc-cnt");
@@ -197,6 +202,7 @@
       w.append(go);
       draw();
     } else {
+      if (g.lead) w.append(el("p", "otc-hint", "هنسألك شوية أسئلة عن اللي حاسس بيه بالترتيب، وانت بتجاوب بس."));
       go = btn(S.loading ? "ثانية..." : "ابدأ الأسئلة", "otc-btn otc-go", start);
       go.disabled = S.loading;
       w.append(go);
