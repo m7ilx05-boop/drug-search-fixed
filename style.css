@@ -859,6 +859,7 @@ body[data-view=otc] .appbar{padding-bottom:18px}
 .otc-hint{margin:2px 0 0;font-size:.85rem;color:var(--muted)}
 .otc-yn{display:flex;gap:12px;margin-top:16px}
 .otc-yn .otc-btn{flex:1;min-height:54px}
+.otc-yn.otc-choices{flex-direction:column}
 .otc-yes{background:var(--accent)}
 .otc-no{background:var(--soft);color:var(--soft-ink)}
 .otc-nav{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}

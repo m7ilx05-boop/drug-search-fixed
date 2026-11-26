@@ -23,7 +23,7 @@
     sore_throat: { title: "التهاب الحلق", sub: "ألم أو التهاب في الحلق", icon: "🗣️", order: 2 },
     acute_cough: { title: "الكحة", sub: "كحة جافة أو ببلغم", icon: "😷", order: 3 },
   };
-  const S = { built: false, step: "home", conds: null, card: null, sel: new Set(), age: "", sex: "", preg: null, lact: null, answers: {}, stack: [], res: null, err: "", loading: false };
+  const S = { built: false, step: "home", conds: null, card: null, sel: new Set(), age: "", ageUnit: "y", sex: "", preg: null, lact: null, answers: {}, stack: [], res: null, err: "", loading: false };
 
   function token() {
     try {
@@ -54,7 +54,8 @@
   }
 
   const root = () => $("otcpage");
-  const needsPreg = () => S.sex === "female" && Number(S.age) >= 12 && Number(S.age) <= 55;
+  const ageYears = () => { const a = Number(S.age); return S.ageUnit === "m" ? a / 12 : a; };
+  const needsPreg = () => S.sex === "female" && ageYears() >= 12 && ageYears() <= 55;
 
   function fail(e) {
     S.loading = false;
@@ -135,10 +136,17 @@
     w.append(hd);
 
     const row = el("div", "otc-row");
-    const ageL = el("label", "otc-f"); ageL.append(el("span", null, "السن (بالسنين)"));
-    const age = el("input"); age.type = "number"; age.inputMode = "decimal"; age.min = "0"; age.max = "120"; age.step = "any"; age.value = S.age; age.setAttribute("aria-label", "السن");
+    const ageL = el("label", "otc-f"); ageL.append(el("span", null, "السن"));
+    const age = el("input"); age.type = "number"; age.inputMode = "decimal"; age.min = "0"; age.max = S.ageUnit === "m" ? "60" : "120"; age.step = "any"; age.value = S.age; age.setAttribute("aria-label", "السن");
     age.addEventListener("input", () => { S.age = age.value; syncPreg(); });
     ageL.append(age);
+    const ug = el("div", "otc-seg");
+    [["y", "سنة"], ["m", "شهر"]].forEach(([v, t]) => {
+      const b = btn(t, "otc-opt" + (S.ageUnit === v ? " on" : ""), () => { S.ageUnit = v; render(); });
+      b.setAttribute("aria-pressed", S.ageUnit === v);
+      ug.append(b);
+    });
+    ageL.append(ug);
     const sexL = el("div", "otc-f"); sexL.append(el("span", null, "النوع"));
     const sg = el("div", "otc-seg");
     [["male", "ذكر"], ["female", "أنثى"]].forEach(([v, t]) => {
@@ -198,8 +206,9 @@
   }
 
   function validForm() {
-    const a = Number(S.age);
-    if (S.age === "" || !Number.isFinite(a) || a < 0 || a > 120) return "اكتب سن صحيح من 0 لـ 120.";
+    const a = Number(S.age), y = ageYears();
+    if (S.age === "" || !Number.isFinite(a) || a < 0 || y > 120) return "اكتب سن صحيح.";
+    if (S.ageUnit === "m" && a > 60) return "السن بالشهور لحد 60 شهر. لو أكبر اختار سنة.";
     if (!S.sex) return "اختار النوع.";
     if (needsPreg() && (S.preg == null || S.lact == null)) return "جاوب على الحمل والرضاعة.";
     if (!S.sel.size) return "اختار عرض واحد على الأقل.";
@@ -217,7 +226,7 @@
     S.loading = true; S.err = ""; S.errLogin = false; render();
     try {
       const d = await api({
-        action: "assess", age_years: Number(S.age), sex: S.sex,
+        action: "assess", age_years: Math.round(ageYears() * 10000) / 10000, sex: S.sex,
         is_pregnant: needsPreg() ? S.preg : undefined, is_lactating: needsPreg() ? S.lact : undefined,
         symptom_ids: [...S.sel], answers: S.answers,
       });
@@ -231,7 +240,7 @@
   function nextQuestion(r) {
     if (!r) return null;
     if (r.status === "flow_question" && r.flow && r.flow.question) {
-      const q = r.flow.question; return { key: q.key, text: q.question_ar, hint: q.hint_ar };
+      const q = r.flow.question; return { key: q.key, text: q.question_ar, hint: q.hint_ar, choices: Array.isArray(q.choices) ? q.choices : null };
     }
     const p = (r.pending_questions || []).find((x) => x && x.question_id);
     if (p) return { key: p.question_id, text: p.question_ar };
@@ -253,9 +262,10 @@
     card.append(el("div", "otc-qn", "سؤال " + (S.stack.length + 1).toLocaleString("ar-EG")));
     card.append(el("p", "otc-qt", q.text));
     if (q.hint) card.append(el("p", "otc-hint", q.hint));
-    const g = el("div", "otc-yn");
-    ["yes", "no"].forEach((v) => {
-      const b = btn(v === "yes" ? "أيوه" : "لأ", "otc-btn " + (v === "yes" ? "otc-yes" : "otc-no"), async () => {
+    const g = el("div", "otc-yn" + (q.choices ? " otc-choices" : ""));
+    const opts = q.choices ? q.choices.map((c) => [c.key, c.label_ar]) : [["yes", "أيوه"], ["no", "لأ"]];
+    opts.forEach(([v, label]) => {
+      const b = btn(label, "otc-btn " + (q.choices ? "" : v === "yes" ? "otc-yes" : "otc-no"), async () => {
         S.answers[q.key] = v; S.stack.push(q.key); await assess();
       });
       b.disabled = S.loading;
