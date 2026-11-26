@@ -851,7 +851,8 @@ body[data-view=otc] .appbar{padding-bottom:18px}
 .otc-cnt{font-size:.85rem;color:var(--muted)}
 .otc-btn{font:inherit;font-weight:600;cursor:pointer;border:0;border-radius:14px;padding:13px 18px;min-height:48px;background:var(--accent);color:var(--accent-ink)}
 .otc-btn[disabled]{opacity:.5;cursor:default}
-.otc-go{position:sticky;bottom:calc(var(--bot,0px) + 12px)}
+.otc-go{position:sticky;bottom:calc(var(--bot,0px) + 12px);z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.otc-go[disabled]{opacity:1;background:var(--line);color:var(--muted)}
 .otc-link{font:inherit;cursor:pointer;border:0;background:none;color:var(--soft-ink);padding:10px 4px;min-height:44px}
 .otc-q{padding:20px 18px;border-radius:20px;background:var(--surface);border:1.5px solid var(--line);box-shadow:0 4px 16px rgba(20,90,160,.1)}
 .otc-qn{font-size:.8rem;color:var(--muted)}
